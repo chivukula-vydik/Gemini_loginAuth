@@ -1,11 +1,11 @@
 import passport from 'passport';
 import local from './local.js';
-// import google from './google.js'; // re-enabled in Task 10
+import google from './google.js';
 // import saml from './saml.js';     // re-enabled in Task 11
 
 const MODULES = {
   local,
-  // google, // re-enabled in Task 10
+  google,
   // saml,   // re-enabled in Task 11
 };
 
