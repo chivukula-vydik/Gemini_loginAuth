@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import { sendPasswordReset } from '../services/mailer.js';
 import { revokeAllForUser } from '../services/tokens.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 function sha256(v) {
   return crypto.createHash('sha256').update(v).digest('hex');
@@ -27,7 +28,7 @@ export default {
       })
     );
 
-    router.post('/local/register', async (req, res) => {
+    router.post('/local/register', asyncHandler(async (req, res) => {
       const { email, password, displayName } = req.body || {};
       if (!email || !password) return res.status(400).json({ error: 'email and password required' });
       const normalized = String(email).toLowerCase().trim();
@@ -43,18 +44,22 @@ export default {
       });
       const accessToken = await completeLogin(res, user);
       res.status(201).json({ accessToken });
-    });
+    }));
 
     router.post('/local/login', (req, res, next) => {
       passport.authenticate('local', { session: false }, async (err, user) => {
         if (err) return next(err);
         if (!user) return res.status(401).json({ error: 'invalid credentials' });
-        const accessToken = await completeLogin(res, user);
-        res.json({ accessToken });
+        try {
+          const accessToken = await completeLogin(res, user);
+          res.json({ accessToken });
+        } catch (e) {
+          next(e);
+        }
       })(req, res, next);
     });
 
-    router.post('/local/forgot-password', async (req, res) => {
+    router.post('/local/forgot-password', asyncHandler(async (req, res) => {
       const { email } = req.body || {};
       const normalized = String(email || '').toLowerCase().trim();
       const user = normalized ? await User.findOne({ email: normalized }) : null;
@@ -70,9 +75,9 @@ export default {
         await sendPasswordReset(user.email, resetUrl);
       }
       res.json({ ok: true });
-    });
+    }));
 
-    router.post('/local/reset-password', async (req, res) => {
+    router.post('/local/reset-password', asyncHandler(async (req, res) => {
       const { token, password } = req.body || {};
       if (!token || !password) return res.status(400).json({ error: 'token and password required' });
       const record = await PasswordResetToken.findOne({ tokenHash: sha256(token) });
@@ -87,6 +92,6 @@ export default {
       await record.save();
       await revokeAllForUser(user._id); // force re-login everywhere
       res.json({ ok: true });
-    });
+    }));
   },
 };

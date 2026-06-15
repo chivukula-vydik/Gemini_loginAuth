@@ -18,5 +18,13 @@ export function createApp(config) {
   mountProviders(authRouter, config.enabled, {});
   app.use('/auth', authRouter);
 
+  // Central error handler: turn thrown/rejected handler errors into a 500
+  // instead of crashing the process. Must be registered last.
+  app.use((err, req, res, next) => {
+    console.error('[auth-api] request error', err);
+    if (res.headersSent) return next(err);
+    res.status(500).json({ error: 'internal error' });
+  });
+
   return app;
 }

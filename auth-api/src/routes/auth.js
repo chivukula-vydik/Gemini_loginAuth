@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 import {
   findValidRefreshToken,
   issueRefreshToken,
@@ -41,7 +42,7 @@ export function createAuthRouter(enabledProviders) {
     );
   });
 
-  router.post('/refresh', async (req, res) => {
+  router.post('/refresh', asyncHandler(async (req, res) => {
     const token = req.cookies[COOKIE_NAME];
     if (!token) return res.status(401).json({ error: 'no refresh token' });
     const record = await findValidRefreshToken(token);
@@ -50,23 +51,29 @@ export function createAuthRouter(enabledProviders) {
       return res.status(401).json({ error: 'invalid refresh token' });
     }
     const user = await User.findById(record.userId);
+    if (!user) {
+      // Refresh token outlived its user (e.g. deleted account).
+      await revokeRefreshToken(token);
+      res.clearCookie(COOKIE_NAME, cookieOptions());
+      return res.status(401).json({ error: 'invalid refresh token' });
+    }
     await revokeRefreshToken(token); // rotate
     const accessToken = await completeLogin(res, user);
     res.json({ accessToken });
-  });
+  }));
 
-  router.post('/logout', async (req, res) => {
+  router.post('/logout', asyncHandler(async (req, res) => {
     const token = req.cookies[COOKIE_NAME];
     if (token) await revokeRefreshToken(token);
     res.clearCookie(COOKIE_NAME, cookieOptions());
     res.json({ ok: true });
-  });
+  }));
 
-  router.get('/me', requireAuth, async (req, res) => {
+  router.get('/me', requireAuth, asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.sub).select('email displayName providers');
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
-  });
+  }));
 
   return router;
 }

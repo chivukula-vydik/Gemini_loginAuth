@@ -42,15 +42,20 @@ secrets live in the committed file.
 ```json
 {
   "providers": {
-    "local":  { "enabled": true, "displayName": "Email & Password" },
-    "google": { "enabled": true, "displayName": "Google", "clientID": "env:GOOGLE_CLIENT_ID", ... },
-    "saml":   { "enabled": true, "displayName": "SAML SSO", "cert": "env:SAML_IDP_CERT", ... }
+    "local":  { "enabled": true,  "displayName": "Email & Password" },
+    "google": { "enabled": false, "displayName": "Google", "clientID": "env:GOOGLE_CLIENT_ID", ... },
+    "saml":   { "enabled": false, "displayName": "SAML SSO", "cert": "env:SAML_IDP_CERT", ... }
   }
 }
 ```
 
+**Defaults:** `local` is enabled so the stack works out of the box. `google` and `saml`
+ship **disabled** because they need external setup (Google credentials / an IdP cert) —
+flip `enabled` to `true` after providing their env vars (see Provider setup below).
+
 If an enabled provider is missing a required field, the server **fails fast at boot**
-with an error naming the missing key/env var.
+with an error naming the missing key/env var — so enable a provider only once its env
+vars are filled in.
 
 ### `.env` — secrets and runtime settings
 
@@ -100,12 +105,13 @@ SAML: `GET /auth/saml` → `POST /auth/saml/callback`.
 
 ## Proving plug-and-play
 
-1. With all three enabled, `http://localhost:5173` shows the password form plus
-   "Continue with Google" and "Continue with SAML SSO".
-2. Edit `auth.config.json`, set `"saml": { "enabled": false }`, and restart `auth-api`
-   (`docker compose restart auth-api`).
-3. Reload the web app: the SAML button is gone, `/auth/providers` no longer lists `saml`,
-   and `/auth/saml` returns 404 — the provider is fully unmounted, no code changed.
+1. Out of the box only `local` is enabled, so `http://localhost:5173` shows just the
+   email/password form and `/auth/providers` lists only `local`.
+2. Provide the SAML cert (see SAML setup), set `"saml": { "enabled": true }` in
+   `auth.config.json`, and restart `auth-api` (`docker compose restart auth-api`).
+3. Reload the web app: a "Continue with SAML SSO" button now appears, `/auth/providers`
+   lists `saml`, and `/auth/saml` redirects to the IdP — the provider was mounted with
+   no code changed. Flip it back to `false` and it disappears entirely (`/auth/saml` → 404).
 
 ## Running without Docker
 
