@@ -4,11 +4,13 @@ import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { createAuthRouter } from './routes/auth.js';
 import { mountProviders } from './providers/index.js';
+import { createTimesheetRouter } from './routes/timesheets.js';
 
 export function createApp(config) {
   const app = express();
   app.use(cors({ origin: process.env.WEB_URL, credentials: true }));
   app.use(express.json());
+  app.use(express.urlencoded({ extended: false })); // SAML IdPs POST assertions as form-urlencoded
   app.use(cookieParser());
   app.use(passport.initialize());
 
@@ -17,6 +19,7 @@ export function createApp(config) {
   const authRouter = createAuthRouter(config.enabled);
   mountProviders(authRouter, config.enabled, {});
   app.use('/auth', authRouter);
+  app.use('/timesheets', createTimesheetRouter());
 
   // Central error handler: turn thrown/rejected handler errors into a 500
   // instead of crashing the process. Must be registered last.

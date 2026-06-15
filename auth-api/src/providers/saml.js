@@ -44,7 +44,12 @@ export default {
     router.post('/saml/callback', (req, res, next) => {
       passport.authenticate('saml', { session: false }, async (err, user) => {
         const webUrl = process.env.WEB_URL;
-        if (err || !user) return res.redirect(`${webUrl}/?error=saml_failed`);
+        if (err || !user) {
+          console.error('[saml] callback failed:', err ? err.message : 'no user returned');
+          if (err && err.stack) console.error(err.stack);
+          return res.redirect(`${webUrl}/?error=saml_failed`);
+        }
+        console.log('[saml] login ok for', user.email);
         const accessToken = await completeLogin(res, user);
         return res.redirect(`${webUrl}/#access_token=${accessToken}`);
       })(req, res, next);

@@ -1,30 +1,24 @@
 import { AuthProvider, useAuth } from './authContext';
+import { AuthLayout } from './AuthLayout';
+import { AppShell } from './AppShell';
 import { LoginWidget } from './LoginWidget';
 import { ForgotPassword } from './ForgotPassword';
 import { ResetPassword } from './ResetPassword';
 
-function Home() {
-  const { user, loading, signOut } = useAuth();
-  if (loading) return <p>Loading…</p>;
-  if (user) {
-    return (
-      <div>
-        <h1>Welcome, {user.displayName || user.email}</h1>
-        <p>Linked: {user.providers.map((p) => p.provider).join(', ')}</p>
-        <button onClick={signOut}>Sign out</button>
-      </div>
-    );
-  }
-  return <LoginWidget />;
+function Gate() {
+  const { user, loading } = useAuth();
+  if (loading) return <AuthLayout><p className="center-loading">Loading…</p></AuthLayout>;
+  if (user) return <AppShell />;
+  return <AuthLayout><LoginWidget /></AuthLayout>;
 }
 
 export default function App() {
   const path = window.location.pathname;
-  if (path === '/forgot') return <ForgotPassword />;
-  if (path === '/reset') return <ResetPassword />;
+  if (path === '/forgot') return <AuthLayout><ForgotPassword /></AuthLayout>;
+  if (path === '/reset') return <AuthLayout><ResetPassword /></AuthLayout>;
   return (
     <AuthProvider>
-      <Home />
+      <Gate />
     </AuthProvider>
   );
 }
