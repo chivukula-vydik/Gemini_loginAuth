@@ -1,0 +1,20 @@
+{
+  "providers": {
+    "local": { "enabled": true, "displayName": "Email & Password" },
+    "google": {
+      "enabled": true,
+      "displayName": "Google",
+      "clientID": "env:GOOGLE_CLIENT_ID",
+      "clientSecret": "env:GOOGLE_CLIENT_SECRET",
+      "callbackURL": "http://localhost:4000/auth/google/callback"
+    },
+    "saml": {
+      "enabled": true,
+      "displayName": "SAML SSO",
+      "entryPoint": "http://localhost:8080/simplesaml/saml2/idp/SSOService.php",
+      "issuer": "auth-service",
+      "callbackURL": "http://localhost:4000/auth/saml/callback",
+      "cert": "env:SAML_IDP_CERT"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+services:
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+
+  auth-api:
+    build: ./auth-api
+    env_file: [.env]
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/auth
+    ports: ["4000:4000"]
+    volumes:
+      - ./auth.config.json:/app/auth.config.json:ro
+    depends_on: [mongo]
+
+  web:
+    build: ./web
+    ports: ["5173:5173"]
+    depends_on: [auth-api]
+
+  test-saml-idp:
+    image: kristophjunge/test-saml-idp
+    ports: ["8080:8080", "8443:8443"]
+    environment:
+      - SIMPLESAMLPHP_SP_ENTITY_ID=auth-service
+      - SIMPLESAMLPHP_SP_ASSERTION_CONSUMER_SERVICE=http://localhost:4000/auth/saml/callback
+
+volumes:
+  mongo-data:
