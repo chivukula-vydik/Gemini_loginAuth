@@ -2,6 +2,14 @@ import bcrypt from 'bcrypt';
 import { Strategy as LocalStrategy } from 'passport-local';
 import { User } from '../models/User.js';
 import { completeLogin } from '../routes/auth.js';
+import crypto from 'node:crypto';
+import { PasswordResetToken } from '../models/PasswordResetToken.js';
+import { sendPasswordReset } from '../services/mailer.js';
+import { revokeAllForUser } from '../services/tokens.js';
+
+function sha256(v) {
+  return crypto.createHash('sha256').update(v).digest('hex');
+}
 
 export default {
   id: 'local',
@@ -44,6 +52,41 @@ export default {
         const accessToken = await completeLogin(res, user);
         res.json({ accessToken });
       })(req, res, next);
+    });
+
+    router.post('/local/forgot-password', async (req, res) => {
+      const { email } = req.body || {};
+      const normalized = String(email || '').toLowerCase().trim();
+      const user = normalized ? await User.findOne({ email: normalized }) : null;
+      // Always 200 — never reveal whether the account exists.
+      if (user && user.passwordHash) {
+        const raw = crypto.randomBytes(32).toString('hex');
+        await PasswordResetToken.create({
+          userId: user._id,
+          tokenHash: sha256(raw),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+        });
+        const resetUrl = `${process.env.WEB_URL}/reset?token=${raw}`;
+        await sendPasswordReset(user.email, resetUrl);
+      }
+      res.json({ ok: true });
+    });
+
+    router.post('/local/reset-password', async (req, res) => {
+      const { token, password } = req.body || {};
+      if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+      const record = await PasswordResetToken.findOne({ tokenHash: sha256(token) });
+      if (!record || record.usedAt || record.expiresAt < new Date()) {
+        return res.status(400).json({ error: 'invalid or expired token' });
+      }
+      const user = await User.findById(record.userId);
+      if (!user) return res.status(400).json({ error: 'invalid or expired token' });
+      user.passwordHash = await bcrypt.hash(password, 12);
+      await user.save();
+      record.usedAt = new Date();
+      await record.save();
+      await revokeAllForUser(user._id); // force re-login everywhere
+      res.json({ ok: true });
     });
   },
 };
