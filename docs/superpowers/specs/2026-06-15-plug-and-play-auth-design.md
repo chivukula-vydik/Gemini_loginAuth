@@ -15,6 +15,7 @@ runtime and renders only their buttons.
 
 - Plug-and-play providers: add/remove an auth method via config alone.
 - Three providers in v1: `local` (email/password), `google` (OAuth 2.0), `saml`.
+- Password reset (forgot → emailed link → set new password) for the local provider.
 - Reusable as a standalone service consumable by other apps.
 - Local SAML development without an external IdP (Okta/Azure).
 
@@ -22,8 +23,7 @@ runtime and renders only their buttons.
 
 - No automated test suite (explicit decision).
 - No runtime admin UI for editing config (config is file + env, read at boot).
-- No MFA, password reset emails, or rate-limiting hardening beyond basics
-  (can be layered later; not in v1 scope).
+- No MFA, or rate-limiting hardening beyond basics (can be layered later).
 
 ## Decisions
 
@@ -90,7 +90,10 @@ under `providers/` + add a config block. No core changes.
 - `services/tokens.js` — issue access + refresh JWTs; persist, rotate, revoke
   refresh tokens.
 - `services/users.js` — find-or-create / link-provider logic.
-- `models/User.js`, `models/RefreshToken.js` — Mongoose schemas.
+- `services/mailer.js` — nodemailer transport from env SMTP config; dev fallback
+  logs the reset link to the console when SMTP is not configured.
+- `models/User.js`, `models/RefreshToken.js`, `models/PasswordResetToken.js` —
+  Mongoose schemas.
 - `middleware/requireAuth.js` — verify access JWT, attach `req.user`.
 - `app.js` / `server.js` — wiring and boot.
 
@@ -101,6 +104,8 @@ under `providers/` + add a config block. No core changes.
   providers. Renders only what is enabled.
 - `authContext` — holds the in-memory access token, exposes `login`, `logout`,
   `user`; calls `/auth/refresh` on load / on 401.
+- Password-reset pages — a "forgot password" form (posts email) and a `/reset`
+  page that reads `?token=` and posts the new password.
 
 ## API surface
 
@@ -115,7 +120,8 @@ Shared (always mounted):
 
 Per provider (mounted only when enabled):
 
-- **local:** `POST /auth/local/register`, `POST /auth/local/login`.
+- **local:** `POST /auth/local/register`, `POST /auth/local/login`,
+  `POST /auth/local/forgot-password`, `POST /auth/local/reset-password`.
 - **google:** `GET /auth/google` → Google; `GET /auth/google/callback`.
 - **saml:** `GET /auth/saml` → IdP; `POST /auth/saml/callback` (assertion).
 
@@ -157,6 +163,30 @@ redirecting back to the web app, which then calls `/auth/me`.
 }
 ```
 
+**PasswordResetToken**
+
+```
+{
+  userId: ObjectId,
+  tokenHash: string,      // hash of the single-use reset token
+  expiresAt: Date,        // short-lived (e.g. 1 hour)
+  usedAt?: Date,
+  createdAt: Date
+}
+```
+
+### Password reset flow (local provider)
+
+1. `POST /auth/local/forgot-password { email }` — always responds `200` (never
+   reveals whether the email exists). If a local user exists, generate a random
+   token, store its hash in `PasswordResetToken`, and email a link
+   `<WEB_URL>/reset?token=...` via `mailer`.
+2. User opens the link; the web app collects a new password and calls
+   `POST /auth/local/reset-password { token, password }`.
+3. Validate the token hash, expiry, and unused state; update `passwordHash`,
+   mark the reset token `usedAt`, and revoke all of the user's refresh tokens
+   (force re-login everywhere).
+
 ### Account linking
 
 On any successful provider login, look up the user by lowercased email.
@@ -173,6 +203,9 @@ many linked providers.
 - Invalid/expired/revoked refresh token → 401; clear cookie; force re-login.
 - Provider callback failure (denied consent, bad SAML assertion) → redirect to
   web with an error query param the widget can show.
+- `forgot-password` for an unknown/non-local email → still `200` (no account
+  enumeration). Invalid/expired/used reset token → `400`.
+- SMTP not configured in dev → mailer logs the reset link instead of sending.
 
 ## Deployment — docker-compose
 
@@ -211,3 +244,8 @@ flows work inside the network without an external tenant.
 
 `env:NAME` markers are resolved by `configLoader` from environment variables so
 secrets never live in the committed file.
+
+Email (password reset) is configured via env, not the providers block:
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, and `WEB_URL`
+(for building the reset link). When `SMTP_HOST` is absent, the mailer runs in
+dev mode and logs the reset link to the console.
