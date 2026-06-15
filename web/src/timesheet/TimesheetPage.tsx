@@ -19,12 +19,18 @@ export function TimesheetPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
 
+  // Always holds the latest selected week so async callbacks can detect a stale result.
+  const weekStartRef = useRef(weekStart);
+  weekStartRef.current = weekStart;
+
   const load = useCallback(async (week: string) => {
     setLoadError('');
     try {
       const loaded = await getWeek(week);
+      if (weekStartRef.current !== week) return; // a newer week was selected; ignore stale response
       setTasks(loaded);
     } catch (e) {
+      if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
       setTasks([]);
     }
@@ -48,6 +54,7 @@ export function TimesheetPage() {
     saveTimer.current = setTimeout(async () => {
       try {
         await saveWeek(week, snapshot);
+        dirty.current = false;
         setStatus('saved');
       } catch {
         setStatus('error');
@@ -72,6 +79,17 @@ export function TimesheetPage() {
 
   const onAddTask = () => update([...tasks, newTask()]);
 
+  // Switch weeks, flushing any pending edit for the CURRENT week first so a
+  // quick edit-then-navigate (within the autosave debounce) never loses data.
+  function goToWeek(target: string) {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (dirty.current) {
+      saveWeek(weekStart, tasks).catch(() => {}); // flush the week we're leaving
+      dirty.current = false;
+    }
+    setWeekStart(target);
+  }
+
   async function onCopyLastWeek() {
     try {
       const prev = await getWeek(prevWeek(weekStart));
@@ -93,8 +111,8 @@ export function TimesheetPage() {
         weekStart={weekStart}
         grandTotal={grandTotal}
         status={status}
-        onPrev={() => setWeekStart((w) => prevWeek(w))}
-        onNext={() => setWeekStart((w) => nextWeek(w))}
+        onPrev={() => goToWeek(prevWeek(weekStart))}
+        onNext={() => goToWeek(nextWeek(weekStart))}
         onCopyLastWeek={onCopyLastWeek}
       />
       {loadError && <p className="ts-error">{loadError} <button className="link-btn" onClick={() => load(weekStart)}>Retry</button></p>}
