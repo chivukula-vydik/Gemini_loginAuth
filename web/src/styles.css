@@ -319,3 +319,68 @@ body {
   display: grid;
   gap: 14px;
 }
+
+/* ---- App shell ---- */
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: var(--bg-to);
+}
+.shell-sidebar {
+  background: #fff;
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.shell-brand { display: flex; align-items: center; gap: 10px; }
+.shell-nav { display: grid; gap: 4px; flex: 1; }
+.shell-nav-item {
+  padding: 9px 12px; border-radius: 9px; text-decoration: none;
+  color: var(--text); font-size: 14px; font-weight: 500;
+}
+.shell-nav-item.active { background: var(--primary-soft); color: var(--primary); }
+.shell-user { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 14px; }
+.shell-user-email { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.shell-content { padding: 28px 32px; }
+
+/* ---- Timesheet ---- */
+.ts-page { max-width: 920px; }
+.ts-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 12px; flex-wrap: wrap; }
+.ts-nav-left { display: flex; align-items: center; gap: 10px; }
+.ts-arrow {
+  width: 30px; height: 30px; border: 1px solid var(--border); background: #fff;
+  border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+.ts-arrow:hover { background: #f8fafc; }
+.ts-week-label { font-weight: 600; font-size: 15px; min-width: 150px; text-align: center; }
+.ts-copy {
+  border: 1px solid var(--border); background: #fff; border-radius: 8px;
+  padding: 6px 11px; font-size: 13px; cursor: pointer; color: var(--text);
+}
+.ts-copy:hover { background: #f8fafc; }
+.ts-nav-right { display: flex; align-items: center; gap: 14px; }
+.ts-status { font-size: 12px; color: var(--muted); min-width: 70px; text-align: right; }
+.ts-status-error { color: var(--danger); }
+.ts-status-saved { color: #16a34a; }
+.ts-grand { font-weight: 700; font-size: 16px; }
+
+.ts-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.ts-table caption.ts-add-caption { caption-side: bottom; text-align: left; padding: 12px; }
+.ts-table th, .ts-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: center; font-size: 14px; }
+.ts-table thead th { background: #f8fafc; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ts-table th.ts-task, .ts-table td.ts-task { text-align: left; min-width: 180px; }
+.ts-name { width: 100%; border: 1px solid transparent; background: transparent; padding: 7px 8px; border-radius: 8px; font-size: 14px; }
+.ts-name:hover { border-color: var(--border); }
+.ts-name:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--ring); }
+.ts-cell { width: 72px; text-align: center; border: 1px solid var(--border); border-radius: 8px; padding: 7px 4px; font-size: 13px; }
+.ts-cell:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--ring); }
+.ts-cell::placeholder { color: #cbd5e1; }
+.ts-rowtotal, .ts-coltotal { font-weight: 600; }
+.ts-table tfoot td { background: #f8fafc; font-weight: 600; }
+.ts-del { border: none; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 6px; }
+.ts-del:hover { color: var(--danger); }
+.ts-empty { color: var(--muted); padding: 20px; }
+.ts-error { color: var(--danger); font-size: 13px; }
