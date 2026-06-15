@@ -1,8 +1,8 @@
 import { formatMinutes } from './time';
 
 type Props = {
-  weekTotal: number;        // minutes
-  busiestLabel: string;     // e.g. "Wed"
+  weekTotal: number;
+  busiestLabel: string;
   busiestMinutes: number;
   activeTasks: number;
 };

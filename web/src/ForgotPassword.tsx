@@ -11,7 +11,7 @@ export function ForgotPassword() {
     setBusy(true);
     try {
       await apiPost('/auth/local/forgot-password', { email });
-      setSent(true); // always show success — no account enumeration
+      setSent(true);
     } finally {
       setBusy(false);
     }
