@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { createAuthRouter } from './routes/auth.js';
 import { mountProviders } from './providers/index.js';
+import { createTimesheetRouter } from './routes/timesheets.js';
 
 export function createApp(config) {
   const app = express();
@@ -18,6 +19,7 @@ export function createApp(config) {
   const authRouter = createAuthRouter(config.enabled);
   mountProviders(authRouter, config.enabled, {});
   app.use('/auth', authRouter);
+  app.use('/timesheets', createTimesheetRouter());
 
   // Central error handler: turn thrown/rejected handler errors into a 500
   // instead of crashing the process. Must be registered last.
