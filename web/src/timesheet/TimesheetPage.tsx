@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
+import { SummaryTiles } from './SummaryTiles';
 import { getWeek, saveWeek, Task, Entries } from './timesheetApi';
-import { DAYS, mondayOf, prevWeek, nextWeek } from './time';
+import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, isPastWeek } from './time';
 
 function newTask(name = ''): Task {
   const entries = {} as Entries;
@@ -22,6 +23,9 @@ export function TimesheetPage() {
   // Always holds the latest selected week so async callbacks can detect a stale result.
   const weekStartRef = useRef(weekStart);
   weekStartRef.current = weekStart;
+
+  // Past weeks are history — view only. Current and future weeks are editable.
+  const readOnly = isPastWeek(weekStart);
 
   const load = useCallback(async (week: string) => {
     setLoadError('');
@@ -64,7 +68,9 @@ export function TimesheetPage() {
   }, [tasks, weekStart]);
 
   // All mutations go through here so they mark dirty + trigger autosave.
+  // Read-only (past) weeks never mutate.
   function update(next: Task[]) {
+    if (readOnly) return;
     dirty.current = true;
     setTasks(next);
   }
@@ -91,6 +97,7 @@ export function TimesheetPage() {
   }
 
   async function onCopyLastWeek() {
+    if (readOnly) return;
     try {
       const prev = await getWeek(prevWeek(weekStart));
       if (prev.length === 0) { setLoadError('Nothing to copy from last week.'); return; }
@@ -100,25 +107,50 @@ export function TimesheetPage() {
     }
   }
 
-  const grandTotal = tasks.reduce(
-    (sum, t) => sum + DAYS.reduce((s, d) => s + (t.entries[d] || 0), 0),
-    0
-  );
+  // --- live derived stats ---
+  const dayTotals = DAYS.map((d) => ({
+    day: d,
+    total: tasks.reduce((s, t) => s + (t.entries[d] || 0), 0),
+  }));
+  const weekTotal = dayTotals.reduce((s, x) => s + x.total, 0);
+  const busiest = dayTotals.reduce((a, b) => (b.total > a.total ? b : a), dayTotals[0]);
 
   return (
     <div className="ts-page">
+      <header className="ts-header">
+        <h1 className="ts-h1">Timesheet</h1>
+        <p className="ts-sub">Log hours per task across the week. Totals update as you type.</p>
+      </header>
+
       <WeekNav
         weekStart={weekStart}
-        grandTotal={grandTotal}
         status={status}
+        readOnly={readOnly}
         onPrev={() => goToWeek(prevWeek(weekStart))}
         onNext={() => goToWeek(nextWeek(weekStart))}
+        onToday={() => goToWeek(mondayOf())}
         onCopyLastWeek={onCopyLastWeek}
       />
+
+      {readOnly && (
+        <div className="ts-readonly-banner">
+          Viewing a past week — read only. Use <strong>Today</strong> to return to the current week and make changes.
+        </div>
+      )}
+
+      <SummaryTiles
+        weekTotal={weekTotal}
+        busiestLabel={DAY_LABELS[busiest.day]}
+        busiestMinutes={busiest.total}
+        activeTasks={tasks.length}
+      />
+
       {loadError && <p className="ts-error">{loadError} <button className="link-btn" onClick={() => load(weekStart)}>Retry</button></p>}
+
       <TimesheetGrid
         weekStart={weekStart}
         tasks={tasks}
+        readOnly={readOnly}
         onRename={onRename}
         onCellChange={onCellChange}
         onDelete={onDelete}

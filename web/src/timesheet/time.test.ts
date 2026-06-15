@@ -6,6 +6,7 @@ import {
   mondayOf,
   addDays,
   columnDates,
+  isPastWeek,
 } from './time.ts';
 
 test('parseTimeInput: hours and minutes', () => {
@@ -49,4 +50,11 @@ test('columnDates labels', () => {
   const cols = columnDates('2026-06-15');
   assert.equal(cols.mon, 'Mon 15');
   assert.equal(cols.fri, 'Fri 19');
+});
+
+test('isPastWeek: only weeks before the current Monday are past', () => {
+  const today = new Date('2026-06-17T12:00:00Z'); // current week Monday = 2026-06-15
+  assert.equal(isPastWeek('2026-06-08', today), true);  // last week
+  assert.equal(isPastWeek('2026-06-15', today), false); // current week
+  assert.equal(isPastWeek('2026-06-22', today), false); // next week
 });
