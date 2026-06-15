@@ -63,6 +63,12 @@ export function addDays(isoDate: string, days: number): string {
 export const prevWeek = (weekStart: string) => addDays(weekStart, -7);
 export const nextWeek = (weekStart: string) => addDays(weekStart, 7);
 
+// A week is "past" (read-only) if it starts before the current week's Monday.
+// ISO YYYY-MM-DD strings compare lexicographically in chronological order.
+export function isPastWeek(weekStart: string, today: Date = new Date()): boolean {
+  return weekStart < mondayOf(today);
+}
+
 // Per-column label like "Mon 16" for a given weekStart Monday.
 export function columnDates(weekStart: string): Record<Day, string> {
   const out = {} as Record<Day, string>;
