@@ -1,12 +1,12 @@
 import passport from 'passport';
 import local from './local.js';
 import google from './google.js';
-// import saml from './saml.js';     // re-enabled in Task 11
+import saml from './saml.js';
 
 const MODULES = {
   local,
   google,
-  // saml,   // re-enabled in Task 11
+  saml,
 };
 
 // Mount only the enabled providers' strategies and routes.

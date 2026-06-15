@@ -1,0 +1,53 @@
+import { Strategy as SamlStrategy } from '@node-saml/passport-saml';
+import { findOrCreateByProvider } from '../services/users.js';
+import { completeLogin } from '../routes/auth.js';
+
+// The test-saml-idp image's PEM cert may arrive base64-encoded; normalize it.
+function normalizeCert(value) {
+  if (value.includes('BEGIN CERTIFICATE')) return value;
+  return Buffer.from(value, 'base64').toString('utf8');
+}
+
+export default {
+  id: 'saml',
+  register(passport, router, config) {
+    passport.use(
+      'saml',
+      new SamlStrategy(
+        {
+          entryPoint: config.entryPoint,
+          issuer: config.issuer,
+          callbackUrl: config.callbackURL,
+          cert: normalizeCert(config.cert),
+          wantAssertionsSigned: false,
+        },
+        async (profile, done) => {
+          try {
+            const email = profile.email || profile.nameID;
+            const user = await findOrCreateByProvider({
+              email,
+              displayName: profile.displayName || email,
+              provider: 'saml',
+              providerUserId: profile.nameID,
+            });
+            return done(null, user);
+          } catch (err) {
+            return done(err);
+          }
+        },
+        (profile, done) => done(null, {}) // logout verify (unused)
+      )
+    );
+
+    router.get('/saml', passport.authenticate('saml', { session: false }));
+
+    router.post('/saml/callback', (req, res, next) => {
+      passport.authenticate('saml', { session: false }, async (err, user) => {
+        const webUrl = process.env.WEB_URL;
+        if (err || !user) return res.redirect(`${webUrl}/?error=saml_failed`);
+        const accessToken = await completeLogin(res, user);
+        return res.redirect(`${webUrl}/#access_token=${accessToken}`);
+      })(req, res, next);
+    });
+  },
+};
