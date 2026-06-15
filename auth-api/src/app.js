@@ -9,6 +9,7 @@ export function createApp(config) {
   const app = express();
   app.use(cors({ origin: process.env.WEB_URL, credentials: true }));
   app.use(express.json());
+  app.use(express.urlencoded({ extended: false })); // SAML IdPs POST assertions as form-urlencoded
   app.use(cookieParser());
   app.use(passport.initialize());
 

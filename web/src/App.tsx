@@ -1,17 +1,31 @@
 import { AuthProvider, useAuth } from './authContext';
+import { AuthLayout } from './AuthLayout';
 import { LoginWidget } from './LoginWidget';
 import { ForgotPassword } from './ForgotPassword';
 import { ResetPassword } from './ResetPassword';
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2);
+  return letters.toUpperCase();
+}
+
 function Home() {
   const { user, loading, signOut } = useAuth();
-  if (loading) return <p>Loading…</p>;
+  if (loading) return <p className="center-loading">Loading…</p>;
   if (user) {
+    const display = user.displayName || user.email;
     return (
-      <div>
-        <h1>Welcome, {user.displayName || user.email}</h1>
-        <p>Linked: {user.providers.map((p) => p.provider).join(', ')}</p>
-        <button onClick={signOut}>Sign out</button>
+      <div className="welcome">
+        <div className="avatar">{initials(display)}</div>
+        <h1>Welcome, {display}</h1>
+        <p className="email">{user.email}</p>
+        <div className="chips">
+          {user.providers.map((p) => (
+            <span key={p.provider} className="chip">{p.provider}</span>
+          ))}
+        </div>
+        <button className="btn btn-ghost" onClick={signOut}>Sign out</button>
       </div>
     );
   }
@@ -20,11 +34,14 @@ function Home() {
 
 export default function App() {
   const path = window.location.pathname;
-  if (path === '/forgot') return <ForgotPassword />;
-  if (path === '/reset') return <ResetPassword />;
-  return (
+  let content;
+  if (path === '/forgot') content = <ForgotPassword />;
+  else if (path === '/reset') content = <ResetPassword />;
+  else content = (
     <AuthProvider>
       <Home />
     </AuthProvider>
   );
+
+  return <AuthLayout>{content}</AuthLayout>;
 }
