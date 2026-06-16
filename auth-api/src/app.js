@@ -10,6 +10,7 @@ import { createSkillsRouter } from './routes/skills.js';
 import { createProfileRouter } from './routes/profile.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createTasksRouter } from './routes/tasks.js';
+import { createUsersRouter } from './routes/users.js';
 
 export function createApp(config) {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp(config) {
   app.use('/me', createProfileRouter());
   app.use('/projects', createProjectsRouter());
   app.use('/tasks', createTasksRouter());
+  app.use('/users', createUsersRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
