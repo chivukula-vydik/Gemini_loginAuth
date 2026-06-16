@@ -1,3 +1,4 @@
+import './env.js';
 import { createApp } from './app.js';
 import { connectDb } from './db/connect.js';
 import { loadConfig } from './config/configLoader.js';
