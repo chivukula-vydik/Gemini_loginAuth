@@ -1,16 +1,18 @@
 import { TimeCell } from './TimeCell';
 import { DAYS, formatMinutes } from './time';
+import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
 
 type Props = {
   task: Task;
   readOnly?: boolean;
+  lockedDays?: Partial<Record<Day, boolean>>;
   onRename: (name: string) => void;
   onCellChange: (day: keyof Entries, minutes: number) => void;
   onDelete: () => void;
 };
 
-export function TaskRow({ task, readOnly = false, onRename, onCellChange, onDelete }: Props) {
+export function TaskRow({ task, readOnly = false, lockedDays = {}, onRename, onCellChange, onDelete }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   return (
     <tr>
@@ -28,7 +30,11 @@ export function TaskRow({ task, readOnly = false, onRename, onCellChange, onDele
       </td>
       {DAYS.map((d) => (
         <td key={d}>
-          <TimeCell minutes={task.entries[d] || 0} readOnly={readOnly} onChange={(m) => onCellChange(d, m)} />
+          <TimeCell
+            minutes={task.entries[d] || 0}
+            readOnly={readOnly || !!lockedDays[d]}
+            onChange={(m) => onCellChange(d, m)}
+          />
         </td>
       ))}
       <td className="ts-rowtotal">{formatMinutes(rowTotal)}</td>

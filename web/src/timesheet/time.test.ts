@@ -7,6 +7,8 @@ import {
   addDays,
   columnDates,
   isPastWeek,
+  isFutureDate,
+  dayDates,
 } from './time.ts';
 
 test('parseTimeInput: hours and minutes', () => {
@@ -57,4 +59,17 @@ test('isPastWeek: only weeks before the current Monday are past', () => {
   assert.equal(isPastWeek('2026-06-08', today), true);
   assert.equal(isPastWeek('2026-06-15', today), false);
   assert.equal(isPastWeek('2026-06-22', today), false);
+});
+
+test('isFutureDate: only dates strictly after today are future', () => {
+  const today = new Date('2026-06-17T12:00:00Z');
+  assert.equal(isFutureDate('2026-06-16', today), false);
+  assert.equal(isFutureDate('2026-06-17', today), false);
+  assert.equal(isFutureDate('2026-06-18', today), true);
+});
+
+test('dayDates: maps each weekday to its ISO date', () => {
+  const dates = dayDates('2026-06-15');
+  assert.equal(dates.mon, '2026-06-15');
+  assert.equal(dates.fri, '2026-06-19');
 });

@@ -407,6 +407,7 @@ body {
 .ts-cell::placeholder { color: #cbd5e1; }
 .ts-cell-ro { font-size: 13px; color: var(--text); }
 .ts-cell-ro-empty { color: #cbd5e1; }
+.ts-table th.ts-day-future { color: #cbd5e1; font-weight: 500; }
 .ts-rowtotal { font-weight: 700; color: var(--primary); }
 .ts-coltotal { font-weight: 600; }
 .ts-actions { width: 40px; }

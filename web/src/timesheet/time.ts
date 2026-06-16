@@ -58,6 +58,20 @@ export function isPastWeek(weekStart: string, today: Date = new Date()): boolean
   return weekStart < mondayOf(today);
 }
 
+export function todayISO(today: Date = new Date()): string {
+  return toISODate(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())));
+}
+
+export function isFutureDate(isoDate: string, today: Date = new Date()): boolean {
+  return isoDate > todayISO(today);
+}
+
+export function dayDates(weekStart: string): Record<Day, string> {
+  const out = {} as Record<Day, string>;
+  DAYS.forEach((day, i) => { out[day] = addDays(weekStart, i); });
+  return out;
+}
+
 export function columnDates(weekStart: string): Record<Day, string> {
   const out = {} as Record<Day, string>;
   DAYS.forEach((day, i) => {

@@ -1,5 +1,6 @@
 import { TaskRow } from './TaskRow';
-import { DAYS, formatMinutes, columnDates } from './time';
+import { DAYS, formatMinutes, columnDates, dayDates, isFutureDate } from './time';
+import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
 
 type Props = {
@@ -16,6 +17,9 @@ export function TimesheetGrid({
   weekStart, tasks, readOnly = false, onRename, onCellChange, onDelete, onAddTask,
 }: Props) {
   const cols = columnDates(weekStart);
+  const dates = dayDates(weekStart);
+  const lockedDays = {} as Record<Day, boolean>;
+  DAYS.forEach((d) => { lockedDays[d] = isFutureDate(dates[d]); });
   const dayTotal = (day: keyof Entries) =>
     tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
 
@@ -25,7 +29,9 @@ export function TimesheetGrid({
         <thead>
           <tr>
             <th className="ts-task">Task</th>
-            {DAYS.map((d) => <th key={d}>{cols[d]}</th>)}
+            {DAYS.map((d) => (
+              <th key={d} className={lockedDays[d] ? 'ts-day-future' : undefined}>{cols[d]}</th>
+            ))}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>
           </tr>
@@ -43,6 +49,7 @@ export function TimesheetGrid({
               key={t.id}
               task={t}
               readOnly={readOnly}
+              lockedDays={lockedDays}
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
               onDelete={() => onDelete(t.id)}
