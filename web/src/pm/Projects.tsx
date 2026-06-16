@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask,
-  listSkills, listDirectory, updateProjectMembers,
-  Project, TaskDetail, Person, Skill,
+  listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
+  Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
 
 export function Projects() {
@@ -53,7 +53,7 @@ export function Projects() {
 }
 
 function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const [project, setProject] = useState<(Omit<Project, 'members'> & { members: Person[] }) | null>(null);
+  const [project, setProject] = useState<ProjectDetailShape | null>(null);
   const [tasks, setTasks] = useState<TaskDetail[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [directory, setDirectory] = useState<Person[]>([]);
@@ -115,9 +115,25 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     });
   }
 
+  async function reassignOwner(ownerId: string) {
+    if (!ownerId) return;
+    setError('');
+    try { await setProjectOwner(id, ownerId); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function removeProject() {
+    if (!project) return;
+    if (!window.confirm(`Delete project "${project.name}" and all its tasks? This cannot be undone.`)) return;
+    setError('');
+    try { await deleteProject(id); onBack(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
   if (!project) return <div className="ts-page"><p className="center-loading">Loading…</p></div>;
 
   const nonMembers = directory.filter((d) => !project.members.some((m) => m._id === d._id));
+  const ownerCandidates = directory.filter((d) => (d.role === 'pm' || d.role === 'admin') && d._id !== project.ownerPm._id);
 
   return (
     <div className="ts-page">
@@ -126,6 +142,20 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <h1 className="ts-h1">{project.name}</h1>
       </header>
       {error && <p className="ts-error">{error}</p>}
+
+      <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
+        <strong>Owner</strong>
+        <div className="ts-nav-left" style={{ marginTop: 8 }}>
+          <span className="ts-sub">{project.ownerPm.displayName || project.ownerPm.email}</span>
+          <select className="input" value="" onChange={(e) => reassignOwner(e.target.value)}>
+            <option value="">Reassign owner…</option>
+            {ownerCandidates.map((d) => <option key={d._id} value={d._id}>{d.displayName || d.email}</option>)}
+          </select>
+          <button className="btn btn-ghost" style={{ width: 'auto', color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={removeProject}>
+            Delete project
+          </button>
+        </div>
+      </div>
 
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <strong>Members</strong>

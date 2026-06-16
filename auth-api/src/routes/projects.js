@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Project } from '../models/Project.js';
 import { Task } from '../models/Task.js';
 import { Skill } from '../models/Skill.js';
+import { User } from '../models/User.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 
@@ -40,6 +41,7 @@ export function createProjectsRouter() {
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canViewProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
     await project.populate('members', 'displayName email');
+    await project.populate('ownerPm', 'displayName email role');
     const tasks = await Task.find({ project: project._id })
       .populate('assignee', 'displayName email')
       .sort('createdAt');
@@ -56,8 +58,24 @@ export function createProjectsRouter() {
       if (f in (req.body || {})) project[f] = req.body[f];
     }
     if (Array.isArray(req.body?.members)) project.members = req.body.members;
+    if ('ownerPm' in (req.body || {}) && req.body.ownerPm) {
+      const owner = await User.findById(req.body.ownerPm).select('role');
+      if (!owner || !['pm', 'admin'].includes(owner.role)) {
+        return res.status(400).json({ error: 'new owner must be a PM or admin' });
+      }
+      project.ownerPm = owner._id;
+    }
     await project.save();
     res.json(project);
+  }));
+
+  router.delete('/:id', asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    await Task.deleteMany({ project: project._id });
+    await Project.deleteOne({ _id: project._id });
+    res.json({ ok: true });
   }));
 
   router.post('/:id/tasks', asyncHandler(async (req, res) => {

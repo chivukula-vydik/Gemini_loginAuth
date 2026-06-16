@@ -17,7 +17,7 @@ async function authed(path: string, method = 'GET', body?: unknown) {
 
 export type Skill = { _id: string; name: string; active: boolean };
 export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean };
-export type Person = { _id: string; displayName: string; email: string };
+export type Person = { _id: string; displayName: string; email: string; role?: Role };
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
@@ -48,13 +48,17 @@ export const setMySkills = (skillIds: string[]) => authed('/me/skills', 'PATCH',
 
 export const listProjects = () => authed('/projects') as Promise<Project[]>;
 export const createProject = (body: Partial<Project>) => authed('/projects', 'POST', body) as Promise<Project>;
+export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm'> & { members: Person[]; ownerPm: Person };
 export const getProject = (id: string) =>
-  authed(`/projects/${id}`) as Promise<{ project: Omit<Project, 'members'> & { members: Person[] }; tasks: TaskDetail[] }>;
+  authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
 export const updateProjectMembers = (id: string, members: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { members });
+export const setProjectOwner = (id: string, ownerPm: string) =>
+  authed(`/projects/${id}`, 'PATCH', { ownerPm });
+export const deleteProject = (id: string) => authed(`/projects/${id}`, 'DELETE');
 
 export const myTasks = () => authed('/tasks/mine') as Promise<Task[]>;
 export const listDirectory = () => authed('/users') as Promise<Person[]>;

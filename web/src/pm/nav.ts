@@ -5,7 +5,12 @@ export type NavItem = { key: NavKey; label: string };
 export function navForRole(role: Role): NavItem[] {
   const timesheet: NavItem = { key: 'timesheet', label: 'Timesheet' };
   if (role === 'admin') {
-    return [{ key: 'users', label: 'Users' }, { key: 'skills', label: 'Skills' }, timesheet];
+    return [
+      { key: 'users', label: 'Users' },
+      { key: 'skills', label: 'Skills' },
+      { key: 'projects', label: 'Projects' },
+      timesheet,
+    ];
   }
   if (role === 'pm') {
     return [{ key: 'projects', label: 'Projects' }, timesheet];

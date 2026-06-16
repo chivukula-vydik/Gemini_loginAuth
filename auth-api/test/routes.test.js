@@ -188,6 +188,44 @@ test('DELETE /admin/users/:id: blocks self and project owners, deletes others an
   assert.equal(p.members.some((m) => String(m) === String(emp._id)), false);
 });
 
+test('PATCH /projects/:id reassigns owner (PM/admin only) and clears the delete block', async () => {
+  const admin = await User.create({ email: 'ro-a@x.com', displayName: 'A', role: 'admin' });
+  const pm1 = await User.create({ email: 'ro-pm1@x.com', displayName: 'PM1', role: 'pm' });
+  const pm2 = await User.create({ email: 'ro-pm2@x.com', displayName: 'PM2', role: 'pm' });
+  const emp = await User.create({ email: 'ro-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm1._id, members: [] });
+
+  // cannot reassign to an employee
+  const bad = await request(app).patch(`/projects/${project._id}`)
+    .set('Authorization', bearer(admin)).send({ ownerPm: String(emp._id) });
+  assert.equal(bad.status, 400);
+
+  // reassign to another PM
+  const ok = await request(app).patch(`/projects/${project._id}`)
+    .set('Authorization', bearer(admin)).send({ ownerPm: String(pm2._id) });
+  assert.equal(ok.status, 200);
+  assert.equal(String(ok.body.ownerPm), String(pm2._id));
+
+  // pm1 no longer owns anything -> can be hard-deleted
+  const del = await request(app).delete(`/admin/users/${pm1._id}`).set('Authorization', bearer(admin));
+  assert.equal(del.status, 200);
+});
+
+test('DELETE /projects/:id removes the project and its tasks; non-owner PM forbidden', async () => {
+  const owner = await User.create({ email: 'pd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const other = await User.create({ email: 'pd-pm2@x.com', displayName: 'PM2', role: 'pm' });
+  const project = await Project.create({ name: 'P', ownerPm: owner._id, members: [] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: owner._id });
+
+  const forbidden = await request(app).delete(`/projects/${project._id}`).set('Authorization', bearer(other));
+  assert.equal(forbidden.status, 403);
+
+  const ok = await request(app).delete(`/projects/${project._id}`).set('Authorization', bearer(owner));
+  assert.equal(ok.status, 200);
+  assert.equal(await Project.findById(project._id), null);
+  assert.equal(await Task.findById(task._id), null);
+});
+
 test('refresh is rejected for a deactivated user', async () => {
   const { issueRefreshToken } = await import('../src/services/tokens.js');
   const u = await User.create({ email: 'ref@x.com', displayName: 'R', role: 'employee', active: true });
