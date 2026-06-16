@@ -34,6 +34,33 @@ export function createTasksRouter() {
     res.json(task);
   }));
 
+  router.patch('/:id/estimate', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
+    task.proposedHours = Math.max(0, Math.round(Number(req.body?.proposedHours) || 0));
+    task.estimateStatus = 'proposed';
+    await task.save();
+    res.json(task);
+  }));
+
+  router.patch('/:id/estimate/decision', asyncHandler(async (req, res) => {
+    const decision = req.body?.decision;
+    if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    const project = await Project.findById(task.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    if (decision === 'approve') {
+      task.estimatedHours = task.proposedHours;
+      task.estimateStatus = 'approved';
+    } else {
+      task.estimateStatus = 'rejected';
+    }
+    await task.save();
+    res.json(task);
+  }));
+
   router.patch('/:id', asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
