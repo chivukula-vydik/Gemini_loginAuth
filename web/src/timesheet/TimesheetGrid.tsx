@@ -1,5 +1,5 @@
 import { TaskRow } from './TaskRow';
-import { DAYS, formatMinutes, columnDates } from './time';
+import { DAYS, formatMinutes, columnDates, dayDates, todayISO } from './time';
 import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
 
@@ -8,6 +8,7 @@ type Props = {
   tasks: Task[];
   readOnly?: boolean;
   editableDays: string[];
+  pendingDays?: string[];
   onRequestEdit: (day: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
@@ -17,11 +18,14 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, readOnly = false, editableDays, onRequestEdit,
+  weekStart, tasks, readOnly = false, editableDays, pendingDays = [], onRequestEdit,
   onRename, onCellChange, onDelete, onAddTask, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
+  const dates = dayDates(weekStart);
+  const today = todayISO();
   const editable = new Set(editableDays);
+  const pending = new Set(pendingDays);
   const lockedDays = {} as Record<Day, boolean>;
   DAYS.forEach((d) => { lockedDays[d] = !editable.has(d); });
 
@@ -34,14 +38,19 @@ export function TimesheetGrid({
         <thead>
           <tr>
             <th className="ts-task">Task</th>
-            {DAYS.map((d) => (
-              <th key={d} className={editable.has(d) ? undefined : 'ts-day-future'}>
-                {cols[d]}
-                {!editable.has(d) && (
-                  <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d)}>request</button>
-                )}
-              </th>
-            ))}
+            {DAYS.map((d) => {
+              const isPast = dates[d] < today;
+              return (
+                <th key={d} className={editable.has(d) ? undefined : 'ts-day-future'}>
+                  {cols[d]}
+                  {!editable.has(d) && isPast && (
+                    pending.has(d)
+                      ? <span className="ts-req ts-pending">pending</span>
+                      : <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d)}>request</button>
+                  )}
+                </th>
+              );
+            })}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>
           </tr>

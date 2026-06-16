@@ -19,6 +19,7 @@ export function TimesheetPage() {
   const [loadError, setLoadError] = useState('');
   const [editableDays, setEditableDays] = useState<string[]>([]);
   const [readOnly, setReadOnly] = useState(false);
+  const [pendingDays, setPendingDays] = useState<string[]>([]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -45,6 +46,7 @@ export function TimesheetPage() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     dirty.current = false;
     setStatus('idle');
+    setPendingDays([]);
     load(weekStart);
   }, [weekStart, load]);
 
@@ -111,8 +113,12 @@ export function TimesheetPage() {
 
   async function onRequestEdit(day: string) {
     const reason = window.prompt('Reason for editing this past day?') ?? '';
-    try { await createEditRequest(weekStart, day as never, reason); window.alert('Request sent to your PM.'); }
-    catch (e) { window.alert((e as Error).message); }
+    try {
+      await createEditRequest(weekStart, day as never, reason);
+      setPendingDays((prev) => (prev.includes(day) ? prev : [...prev, day]));
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
   }
 
   const dayTotals = DAYS.map((d) => ({
@@ -159,6 +165,7 @@ export function TimesheetPage() {
         tasks={tasks}
         readOnly={readOnly}
         editableDays={editableDays}
+        pendingDays={pendingDays}
         onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}

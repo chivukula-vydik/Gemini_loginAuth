@@ -292,3 +292,13 @@ test('PATCH /tasks/:id/estimate: assignee proposes, non-assignee 403; PM approve
   assert.equal(approve.body.estimateStatus, 'approved');
   assert.equal(approve.body.estimatedHours, 8);
 });
+
+test('a PM who is also the assignee cannot approve their own proposed estimate', async () => {
+  const pm = await User.create({ email: 'self-pm@x.com', displayName: 'PM', role: 'pm' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [pm._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: pm._id, createdBy: pm._id });
+  await request(app).patch(`/tasks/${task._id}/estimate`).set('Authorization', bearer(pm)).send({ proposedHours: 6 });
+  const res = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
+  assert.equal(res.status, 403);
+});

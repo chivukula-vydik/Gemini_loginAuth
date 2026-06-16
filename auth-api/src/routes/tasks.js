@@ -51,6 +51,9 @@ export function createTasksRouter() {
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    if (task.assignee && String(task.assignee) === String(req.user.sub)) {
+      return res.status(403).json({ error: 'the proposer cannot approve their own estimate' });
+    }
     if (decision === 'approve') {
       task.estimatedHours = task.proposedHours;
       task.estimateStatus = 'approved';
@@ -71,7 +74,7 @@ export function createTasksRouter() {
         return res.status(400).json({ error: 'assignee must be a project member' });
       }
     }
-    for (const f of ['title', 'description', 'estimatedHours', 'assignee', 'status', 'dueDate']) {
+    for (const f of ['title', 'description', 'assignee', 'status', 'dueDate']) {
       if (f in (req.body || {})) task[f] = req.body[f];
     }
     if (Array.isArray(req.body?.requiredSkills)) {
