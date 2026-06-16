@@ -31,7 +31,7 @@ export function TimesheetPage() {
     try {
       const loaded = await getWeek(week);
       if (weekStartRef.current !== week) return;
-      setTasks(loaded);
+      setTasks(loaded.tasks);
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -100,8 +100,8 @@ export function TimesheetPage() {
     if (readOnly) return;
     try {
       const prev = await getWeek(prevWeek(weekStart));
-      if (prev.length === 0) { setLoadError('Nothing to copy from last week.'); return; }
-      update(prev.map((t) => newTask(t.name)));
+      if (prev.tasks.length === 0) { setLoadError('Nothing to copy from last week.'); return; }
+      update(prev.tasks.map((t) => newTask(t.name)));
     } catch (e) {
       setLoadError((e as Error).message);
     }
