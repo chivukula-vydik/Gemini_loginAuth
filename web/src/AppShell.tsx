@@ -7,12 +7,14 @@ import { AdminSkills } from './pm/AdminSkills';
 import { Projects } from './pm/Projects';
 import { MyTasks } from './pm/MyTasks';
 import { MySkills } from './pm/MySkills';
+import { Requests } from './pm/Requests';
 
 function viewFor(key: NavKey) {
   switch (key) {
     case 'users': return <AdminUsers />;
     case 'skills': return <AdminSkills />;
     case 'projects': return <Projects />;
+    case 'requests': return <Requests />;
     case 'my-tasks': return <MyTasks />;
     case 'my-skills': return <MySkills />;
     case 'timesheet': return <TimesheetPage />;
