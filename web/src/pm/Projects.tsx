@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
+  decideEstimate,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
 
@@ -58,7 +59,6 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [directory, setDirectory] = useState<Person[]>([]);
   const [title, setTitle] = useState('');
-  const [estimate, setEstimate] = useState('');
   const [assignee, setAssignee] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [newMember, setNewMember] = useState('');
@@ -98,13 +98,18 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     try {
       await createTask(id, {
         title: title.trim(),
-        estimatedHours: Number(estimate) || 0,
         assignee: assignee || null,
         requiredSkills: [...reqSkills],
       });
-      setTitle(''); setEstimate(''); setAssignee(''); setReqSkills(new Set());
+      setTitle(''); setAssignee(''); setReqSkills(new Set());
       reload();
     } catch (e) { setError((e as Error).message); }
+  }
+
+  async function decide(taskId: string, decision: 'approve' | 'reject') {
+    setError('');
+    try { await decideEstimate(taskId, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
   }
 
   function toggleSkill(sid: string) {
@@ -180,7 +185,6 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <div className="ts-nav-left" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="input" placeholder="Task title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input className="input" style={{ width: 110 }} placeholder="Est. hrs" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
           <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
             <option value="">Unassigned</option>
             {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName || m.email}</option>)}
@@ -205,7 +209,16 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
                 <td>{t.assignee ? (t.assignee.displayName || t.assignee.email) : 'Unassigned'}</td>
-                <td>{t.estimatedHours}h</td>
+                <td>
+                  {t.estimateStatus === 'proposed' ? (
+                    <span className="ts-nav-left">
+                      {t.proposedHours ?? 0}h?
+                      <button className="link-btn" onClick={() => decide(t._id, 'approve')}>approve</button>
+                      <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decide(t._id, 'reject')}>reject</button>
+                    </span>
+                  ) : t.estimateStatus === 'approved' ? `${t.estimatedHours}h`
+                    : <span className="ts-sub">{t.estimateStatus === 'rejected' ? 'rejected' : 'no estimate'}</span>}
+                </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
                 <td>{t.status}</td>
