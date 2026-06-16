@@ -8,7 +8,7 @@ export function createUsersRouter() {
   const router = express.Router();
 
   router.get('/', requireAuth, requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
-    const users = await User.find().select('displayName email').sort('displayName');
+    const users = await User.find({ active: { $ne: false } }).select('displayName email').sort('displayName');
     res.json(users);
   }));
 

@@ -61,6 +61,11 @@ export function createAuthRouter(enabledProviders) {
       res.clearCookie(COOKIE_NAME, cookieOptions());
       return res.status(401).json({ error: 'invalid refresh token' });
     }
+    if (user.active === false) {
+      await revokeRefreshToken(token);
+      res.clearCookie(COOKIE_NAME, cookieOptions());
+      return res.status(401).json({ error: 'account disabled' });
+    }
     await revokeRefreshToken(token);
     const accessToken = await completeLogin(res, user);
     res.json({ accessToken });

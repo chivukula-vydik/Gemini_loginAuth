@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, default: null },
   providers: { type: [linkSchema], default: [] },
   role: { type: String, enum: ['admin', 'pm', 'employee'], default: 'employee' },
+  active: { type: Boolean, default: true },
   skills: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }], default: [] },
   createdAt: { type: Date, default: Date.now },
 });

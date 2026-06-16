@@ -39,6 +39,7 @@ export default {
       passport.authenticate('google', { session: false }, async (err, user) => {
         const webUrl = process.env.WEB_URL;
         if (err || !user) return res.redirect(`${webUrl}/?error=google_failed`);
+        if (user.active === false) return res.redirect(`${webUrl}/?error=account_disabled`);
         const accessToken = await completeLogin(res, user);
         return res.redirect(`${webUrl}/#access_token=${accessToken}`);
       })(req, res, next);

@@ -142,3 +142,36 @@ test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine re
   const mineRow = res.body.find((t) => t.title === 'Mine');
   assert.equal(mineRow.actualMinutes, 120);
 });
+
+test('PATCH /admin/users/:id/active: admin deactivates an employee but not themselves', async () => {
+  const admin = await User.create({ email: 'aa1@x.com', displayName: 'A', role: 'admin' });
+  const emp = await User.create({ email: 'ee1@x.com', displayName: 'E', role: 'employee' });
+  const ok = await request(app).patch(`/admin/users/${emp._id}/active`)
+    .set('Authorization', bearer(admin)).send({ active: false });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.active, false);
+  const self = await request(app).patch(`/admin/users/${admin._id}/active`)
+    .set('Authorization', bearer(admin)).send({ active: false });
+  assert.equal(self.status, 400);
+});
+
+test('GET /users directory excludes deactivated users', async () => {
+  const pm = await User.create({ email: 'dpm@x.com', displayName: 'PM', role: 'pm' });
+  await User.create({ email: 'act@x.com', displayName: 'Act', role: 'employee', active: true });
+  await User.create({ email: 'ina@x.com', displayName: 'Ina', role: 'employee', active: false });
+  const res = await request(app).get('/users').set('Authorization', bearer(pm));
+  assert.equal(res.status, 200);
+  const emails = res.body.map((u) => u.email);
+  assert.ok(emails.includes('act@x.com'));
+  assert.ok(!emails.includes('ina@x.com'));
+});
+
+test('refresh is rejected for a deactivated user', async () => {
+  const { issueRefreshToken } = await import('../src/services/tokens.js');
+  const u = await User.create({ email: 'ref@x.com', displayName: 'R', role: 'employee', active: true });
+  const token = await issueRefreshToken(u);
+  u.active = false;
+  await u.save();
+  const res = await request(app).post('/auth/refresh').set('Cookie', [`refresh_token=${token}`]);
+  assert.equal(res.status, 401);
+});

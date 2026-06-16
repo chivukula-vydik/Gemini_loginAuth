@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { listUsers, setUserRole, UserRow } from './pmApi';
+import { listUsers, setUserRole, setUserActive, UserRow } from './pmApi';
+import { useAuth } from '../authContext';
 import type { Role } from './nav';
 
 const ROLES: Role[] = ['admin', 'pm', 'employee'];
 
 export function AdminUsers() {
+  const { user: me } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [error, setError] = useState('');
 
@@ -14,7 +16,17 @@ export function AdminUsers() {
     setError('');
     try {
       const updated = await setUserRole(id, role);
-      setUsers((us) => us.map((u) => (u._id === id ? updated : u)));
+      setUsers((us) => us.map((u) => (u._id === id ? { ...u, ...updated } : u)));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function toggleActive(u: UserRow) {
+    setError('');
+    try {
+      const updated = await setUserActive(u._id, u.active === false);
+      setUsers((us) => us.map((x) => (x._id === u._id ? { ...x, ...updated } : x)));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -26,19 +38,31 @@ export function AdminUsers() {
       {error && <p className="ts-error">{error}</p>}
       <div className="ts-card">
         <table className="ts-table">
-          <thead><tr><th className="ts-task">User</th><th>Email</th><th>Role</th></tr></thead>
+          <thead><tr><th className="ts-task">User</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u._id}>
-                <td className="ts-task">{u.displayName || '—'}</td>
-                <td>{u.email}</td>
-                <td>
-                  <select className="input" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
-                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </td>
-              </tr>
-            ))}
+            {users.map((u) => {
+              const inactive = u.active === false;
+              const isSelf = u.email === me?.email;
+              return (
+                <tr key={u._id} style={inactive ? { opacity: 0.55 } : undefined}>
+                  <td className="ts-task">{u.displayName || '—'}</td>
+                  <td>{u.email}</td>
+                  <td>
+                    <select className="input" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
+                      {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </td>
+                  <td>{inactive ? 'Inactive' : 'Active'}</td>
+                  <td>
+                    {!isSelf && (
+                      <button className="link-btn" onClick={() => toggleActive(u)}>
+                        {inactive ? 'Activate' : 'Deactivate'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

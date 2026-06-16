@@ -16,7 +16,7 @@ export function createAdminRouter() {
   router.use(requireAuth, requireRole('admin'));
 
   router.get('/users', asyncHandler(async (req, res) => {
-    const users = await User.find().select('email displayName role').sort('email');
+    const users = await User.find().select('email displayName role active').sort('email');
     res.json(users);
   }));
 
@@ -24,9 +24,27 @@ export function createAdminRouter() {
     const { role } = req.body || {};
     if (!ROLES.includes(role)) return res.status(400).json({ error: 'invalid role' });
     const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true })
-      .select('email displayName role');
+      .select('email displayName role active');
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
+  }));
+
+  router.patch('/users/:id/active', asyncHandler(async (req, res) => {
+    const active = !!req.body?.active;
+    if (!active && String(req.user.sub) === String(req.params.id)) {
+      return res.status(400).json({ error: 'you cannot deactivate yourself' });
+    }
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ error: 'not found' });
+    if (!active && target.role === 'admin') {
+      const otherActiveAdmins = await User.countDocuments({
+        _id: { $ne: target._id }, role: 'admin', active: { $ne: false },
+      });
+      if (otherActiveAdmins === 0) return res.status(400).json({ error: 'cannot deactivate the last admin' });
+    }
+    target.active = active;
+    await target.save();
+    res.json({ _id: target._id, email: target.email, displayName: target.displayName, role: target.role, active: target.active });
   }));
 
   router.post('/skills', asyncHandler(async (req, res) => {

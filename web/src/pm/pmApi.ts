@@ -16,7 +16,7 @@ async function authed(path: string, method = 'GET', body?: unknown) {
 }
 
 export type Skill = { _id: string; name: string; active: boolean };
-export type UserRow = { _id: string; email: string; displayName: string; role: Role };
+export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean };
 export type Person = { _id: string; displayName: string; email: string };
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
@@ -36,6 +36,8 @@ export type TaskDetail = {
 
 export const listUsers = () => authed('/admin/users') as Promise<UserRow[]>;
 export const setUserRole = (id: string, role: Role) => authed(`/admin/users/${id}/role`, 'PATCH', { role });
+export const setUserActive = (id: string, active: boolean) =>
+  authed(`/admin/users/${id}/active`, 'PATCH', { active }) as Promise<UserRow>;
 
 export const listSkills = () => authed('/skills') as Promise<Skill[]>;
 export const addSkill = (name: string) => authed('/admin/skills', 'POST', { name }) as Promise<Skill>;

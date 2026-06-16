@@ -20,6 +20,7 @@ export default {
         try {
           const user = await User.findOne({ email: String(email).toLowerCase().trim() });
           if (!user || !user.passwordHash) return done(null, false);
+          if (user.active === false) return done(null, false);
           const ok = await bcrypt.compare(password, user.passwordHash);
           return ok ? done(null, user) : done(null, false);
         } catch (err) {

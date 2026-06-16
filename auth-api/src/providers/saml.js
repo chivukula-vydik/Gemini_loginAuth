@@ -49,6 +49,7 @@ export default {
           return res.redirect(`${webUrl}/?error=saml_failed`);
         }
         console.log('[saml] login ok for', user.email);
+        if (user.active === false) return res.redirect(`${webUrl}/?error=account_disabled`);
         const accessToken = await completeLogin(res, user);
         return res.redirect(`${webUrl}/#access_token=${accessToken}`);
       })(req, res, next);
