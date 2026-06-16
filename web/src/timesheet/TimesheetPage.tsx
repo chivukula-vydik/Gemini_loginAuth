@@ -3,6 +3,7 @@ import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
 import { getWeek, saveWeek, Task, Entries } from './timesheetApi';
+import { setTaskProgress } from '../pm/pmApi';
 import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, isPastWeek } from './time';
 
 function newTask(name = ''): Task {
@@ -79,6 +80,13 @@ export function TimesheetPage() {
 
   const onAddTask = () => update([...tasks, newTask()]);
 
+  function onProgress(id: string, patch: { percentComplete?: number; status?: string }) {
+    const row = tasks.find((t) => t.id === id);
+    if (!row?.taskId) return;
+    setTaskProgress(row.taskId, patch).catch(() => {});
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }
+
   function goToWeek(target: string) {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     if (dirty.current) {
@@ -146,6 +154,7 @@ export function TimesheetPage() {
         onCellChange={onCellChange}
         onDelete={onDelete}
         onAddTask={onAddTask}
+        onProgress={onProgress}
       />
     </div>
   );

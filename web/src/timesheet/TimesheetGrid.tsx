@@ -11,10 +11,11 @@ type Props = {
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
   onDelete: (taskId: string) => void;
   onAddTask: () => void;
+  onProgress: (taskId: string, patch: { percentComplete?: number; status?: string }) => void;
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, readOnly = false, onRename, onCellChange, onDelete, onAddTask,
+  weekStart, tasks, readOnly = false, onRename, onCellChange, onDelete, onAddTask, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
@@ -53,6 +54,7 @@ export function TimesheetGrid({
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
               onDelete={() => onDelete(t.id)}
+              onProgress={(patch) => onProgress(t.id, patch)}
             />
           ))}
         </tbody>

@@ -17,6 +17,7 @@ async function authed(path: string, method = 'GET', body?: unknown) {
 
 export type Skill = { _id: string; name: string; active: boolean };
 export type UserRow = { _id: string; email: string; displayName: string; role: Role };
+export type Person = { _id: string; displayName: string; email: string };
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
@@ -25,6 +26,12 @@ export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
   description: string; estimatedHours: number; requiredSkills: string[];
   assignee: string | null; status: string; dueDate: string | null;
+  percentComplete?: number;
+  actualMinutes?: number;
+};
+export type TaskDetail = {
+  _id: string; title: string; description: string; estimatedHours: number;
+  assignee: Person | null; status: string; percentComplete: number; actualMinutes: number;
 };
 
 export const listUsers = () => authed('/admin/users') as Promise<UserRow[]>;
@@ -39,8 +46,11 @@ export const setMySkills = (skillIds: string[]) => authed('/me/skills', 'PATCH',
 export const listProjects = () => authed('/projects') as Promise<Project[]>;
 export const createProject = (body: Partial<Project>) => authed('/projects', 'POST', body) as Promise<Project>;
 export const getProject = (id: string) =>
-  authed(`/projects/${id}`) as Promise<{ project: Project; tasks: Task[] }>;
+  authed(`/projects/${id}`) as Promise<{ project: Omit<Project, 'members'> & { members: Person[] }; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
 export const myTasks = () => authed('/tasks/mine') as Promise<Task[]>;
+export const listDirectory = () => authed('/users') as Promise<Person[]>;
+export const setTaskProgress = (id: string, patch: { percentComplete?: number; status?: string }) =>
+  authed(`/tasks/${id}/progress`, 'PATCH', patch);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask,
-  listSkills, Project, Task, Skill,
+  listSkills, Project, Task, TaskDetail, Person, Skill,
 } from './pmApi';
 
 export function Projects() {
@@ -51,9 +51,11 @@ export function Projects() {
   );
 }
 
+type PopulatedProject = Omit<Project, 'members'> & { members: Person[] };
+
 function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [project, setProject] = useState<PopulatedProject | null>(null);
+  const [tasks, setTasks] = useState<TaskDetail[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [title, setTitle] = useState('');
   const [estimate, setEstimate] = useState('');
@@ -106,7 +108,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <input className="input" style={{ width: 110 }} placeholder="Est. hrs" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
           <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
             <option value="">Unassigned</option>
-            {project.members.map((m) => <option key={m} value={m}>{m}</option>)}
+            {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName}</option>)}
           </select>
           <button className="btn btn-primary" onClick={add}>Add task</button>
         </div>
@@ -128,7 +130,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
                 <td>{t.estimatedHours}</td>
-                <td>{t.assignee || 'Unassigned'}</td>
+                <td>{t.assignee ? t.assignee.displayName : 'Unassigned'}</td>
                 <td>{t.status}</td>
               </tr>
             ))}

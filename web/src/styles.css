@@ -427,3 +427,9 @@ body {
 @media (max-width: 720px) {
   .ts-tiles { grid-template-columns: repeat(2, 1fr); }
 }
+
+.ts-pm-badge { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700; color: var(--primary); background: var(--primary-soft); padding: 1px 6px; border-radius: 999px; vertical-align: middle; }
+.ts-pm-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ts-progress { display: flex; align-items: center; gap: 4px; }
+.ts-pct { width: 52px; text-align: center; border: 1px solid var(--border); border-radius: 8px; padding: 5px 4px; font-size: 12px; }
+.ts-status { padding: 5px 6px; font-size: 12px; width: auto; }

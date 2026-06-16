@@ -4,7 +4,17 @@ import type { Day } from './time';
 const API = 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
-export type Task = { id: string; name: string; entries: Entries };
+export type Task = {
+  id: string;
+  name: string;
+  entries: Entries;
+  taskId?: string | null;
+  locked?: boolean;
+  percentComplete?: number;
+  estimatedHours?: number;
+  actualMinutes?: number;
+  status?: string;
+};
 
 function authHeaders(): Record<string, string> {
   const token = getAccessToken();
