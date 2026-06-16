@@ -11,6 +11,7 @@ const { createApp } = await import('../src/app.js');
 const { User } = await import('../src/models/User.js');
 const { Project } = await import('../src/models/Project.js');
 const { Task } = await import('../src/models/Task.js');
+const { Timesheet } = await import('../src/models/Timesheet.js');
 const { signAccessToken } = await import('../src/services/tokens.js');
 
 let mongod;
@@ -72,4 +73,72 @@ test('PATCH /tasks/:id rejects an assignee who is not a project member', async (
     .set('Authorization', bearer(pm))
     .send({ assignee: String(outsider._id) });
   assert.equal(res.status, 400);
+});
+
+test('GET /users is forbidden for employees, allowed for PM', async () => {
+  const emp = await User.create({ email: 'dir-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'dir-pm@x.com', displayName: 'PM', role: 'pm' });
+  const r1 = await request(app).get('/users').set('Authorization', bearer(emp));
+  assert.equal(r1.status, 403);
+  const r2 = await request(app).get('/users').set('Authorization', bearer(pm));
+  assert.equal(r2.status, 200);
+  assert.ok(Array.isArray(r2.body));
+});
+
+test('PATCH /tasks/:id/progress: assignee can set, non-assignee gets 403, value clamps', async () => {
+  const pm = await User.create({ email: 'pp@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ee@x.com', displayName: 'E', role: 'employee' });
+  const other = await User.create({ email: 'oo@x.com', displayName: 'O', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: emp._id, createdBy: pm._id });
+  const forbidden = await request(app).patch(`/tasks/${task._id}/progress`)
+    .set('Authorization', bearer(other)).send({ percentComplete: 50 });
+  assert.equal(forbidden.status, 403);
+  const ok = await request(app).patch(`/tasks/${task._id}/progress`)
+    .set('Authorization', bearer(emp)).send({ percentComplete: 250, status: 'in_progress' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.percentComplete, 100);
+  assert.equal(ok.body.status, 'in_progress');
+});
+
+test('GET /timesheets injects assigned tasks for current week but not a past week', async () => {
+  const pm = await User.create({ email: 'tpm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'temp@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  await Task.create({ project: project._id, title: 'Assigned work', assignee: emp._id, createdBy: pm._id });
+
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const thisMon = currentMonday();
+  const cur = await request(app).get(`/timesheets/${thisMon}`).set('Authorization', bearer(emp));
+  assert.equal(cur.status, 200);
+  assert.equal(cur.body.tasks.some((t) => t.name === 'Assigned work' && t.locked === true), true);
+
+  const past = await request(app).get('/timesheets/2020-01-06').set('Authorization', bearer(emp));
+  assert.equal(past.status, 200);
+  assert.equal(past.body.tasks.length, 0);
+});
+
+test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine reports actualMinutes', async () => {
+  const pm = await User.create({ email: 'apm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'aemp@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const mine = await Task.create({ project: project._id, title: 'Mine', assignee: emp._id, createdBy: pm._id });
+  const notMine = await Task.create({ project: project._id, title: 'NotMine', assignee: pm._id, createdBy: pm._id });
+
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const wk = currentMonday();
+  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
+    tasks: [
+      { id: 'r1', name: 'Mine', taskId: String(mine._id), entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } },
+      { id: 'r2', name: 'Hack', taskId: String(notMine._id), entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } },
+    ],
+  });
+
+  const saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
+  const hackRow = saved.tasks.find((t) => t.id === 'r2');
+  assert.equal(hackRow.taskId, null);
+
+  const res = await request(app).get('/tasks/mine').set('Authorization', bearer(emp));
+  const mineRow = res.body.find((t) => t.title === 'Mine');
+  assert.equal(mineRow.actualMinutes, 120);
 });
