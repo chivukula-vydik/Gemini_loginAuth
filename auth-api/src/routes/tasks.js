@@ -4,7 +4,8 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Task } from '../models/Task.js';
 import { Project } from '../models/Project.js';
 import { Skill } from '../models/Skill.js';
-import { canEditProject } from '../services/authz.js';
+import { canEditProject, canLogProgress } from '../services/authz.js';
+import { actualMinutesByTask } from '../services/actuals.js';
 
 export function createTasksRouter() {
   const router = express.Router();
@@ -14,7 +15,23 @@ export function createTasksRouter() {
     const tasks = await Task.find({ assignee: req.user.sub })
       .populate('project', 'name')
       .sort('dueDate');
-    res.json(tasks);
+    const map = await actualMinutesByTask(tasks.map((t) => t._id));
+    res.json(tasks.map((t) => ({ ...t.toObject(), actualMinutes: map.get(String(t._id)) || 0 })));
+  }));
+
+  router.patch('/:id/progress', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
+    if ('percentComplete' in (req.body || {})) {
+      const p = Math.round(Number(req.body.percentComplete) || 0);
+      task.percentComplete = Math.max(0, Math.min(100, p));
+    }
+    if ('status' in (req.body || {}) && ['todo', 'in_progress', 'blocked', 'done'].includes(req.body.status)) {
+      task.status = req.body.status;
+    }
+    await task.save();
+    res.json(task);
   }));
 
   router.patch('/:id', asyncHandler(async (req, res) => {
