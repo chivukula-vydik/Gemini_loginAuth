@@ -5,6 +5,11 @@ import passport from 'passport';
 import { createAuthRouter } from './routes/auth.js';
 import { mountProviders } from './providers/index.js';
 import { createTimesheetRouter } from './routes/timesheets.js';
+import { createAdminRouter } from './routes/admin.js';
+import { createSkillsRouter } from './routes/skills.js';
+import { createProfileRouter } from './routes/profile.js';
+import { createProjectsRouter } from './routes/projects.js';
+import { createTasksRouter } from './routes/tasks.js';
 
 export function createApp(config) {
   const app = express();
@@ -20,6 +25,11 @@ export function createApp(config) {
   mountProviders(authRouter, config.enabled, {});
   app.use('/auth', authRouter);
   app.use('/timesheets', createTimesheetRouter());
+  app.use('/admin', createAdminRouter());
+  app.use('/skills', createSkillsRouter());
+  app.use('/me', createProfileRouter());
+  app.use('/projects', createProjectsRouter());
+  app.use('/tasks', createTasksRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
