@@ -8,6 +8,7 @@ const taskSchema = new mongoose.Schema({
   requiredSkills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
   assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   status: { type: String, enum: ['todo', 'in_progress', 'blocked', 'done'], default: 'todo' },
+  percentComplete: { type: Number, default: 0, min: 0, max: 100 },
   dependsOn: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
   dueDate: { type: Date, default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

@@ -16,6 +16,7 @@ const taskSchema = new mongoose.Schema(
     id: { type: String, required: true },
     name: { type: String, default: '' },
     entries: { type: entriesSchema, default: () => ({}) },
+    taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task', default: null },
   },
   { _id: false }
 );
