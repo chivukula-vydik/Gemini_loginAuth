@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listUsers, setUserRole, setUserActive, UserRow } from './pmApi';
+import { listUsers, setUserRole, setUserActive, deleteUser, UserRow } from './pmApi';
 import { useAuth } from '../authContext';
 import type { Role } from './nav';
 
@@ -32,6 +32,17 @@ export function AdminUsers() {
     }
   }
 
+  async function remove(u: UserRow) {
+    if (!window.confirm(`Permanently delete ${u.email}? This cannot be undone.`)) return;
+    setError('');
+    try {
+      await deleteUser(u._id);
+      setUsers((us) => us.filter((x) => x._id !== u._id));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   return (
     <div className="ts-page">
       <header className="ts-header"><h1 className="ts-h1">Users</h1></header>
@@ -55,9 +66,14 @@ export function AdminUsers() {
                   <td>{inactive ? 'Inactive' : 'Active'}</td>
                   <td>
                     {!isSelf && (
-                      <button className="link-btn" onClick={() => toggleActive(u)}>
-                        {inactive ? 'Activate' : 'Deactivate'}
-                      </button>
+                      <div className="ts-nav-left">
+                        <button className="link-btn" onClick={() => toggleActive(u)}>
+                          {inactive ? 'Activate' : 'Deactivate'}
+                        </button>
+                        <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => remove(u)}>
+                          Delete
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

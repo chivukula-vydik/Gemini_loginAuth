@@ -166,6 +166,28 @@ test('GET /users directory excludes deactivated users', async () => {
   assert.ok(!emails.includes('ina@x.com'));
 });
 
+test('DELETE /admin/users/:id: blocks self and project owners, deletes others and cleans up refs', async () => {
+  const admin = await User.create({ email: 'del-a@x.com', displayName: 'A', role: 'admin' });
+  const pm = await User.create({ email: 'del-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'del-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: emp._id, createdBy: pm._id });
+
+  const selfRes = await request(app).delete(`/admin/users/${admin._id}`).set('Authorization', bearer(admin));
+  assert.equal(selfRes.status, 400);
+
+  const ownerRes = await request(app).delete(`/admin/users/${pm._id}`).set('Authorization', bearer(admin));
+  assert.equal(ownerRes.status, 409);
+
+  const ok = await request(app).delete(`/admin/users/${emp._id}`).set('Authorization', bearer(admin));
+  assert.equal(ok.status, 200);
+  assert.equal(await User.findById(emp._id), null);
+  const t = await Task.findById(task._id);
+  assert.equal(t.assignee, null);
+  const p = await Project.findById(project._id);
+  assert.equal(p.members.some((m) => String(m) === String(emp._id)), false);
+});
+
 test('refresh is rejected for a deactivated user', async () => {
   const { issueRefreshToken } = await import('../src/services/tokens.js');
   const u = await User.create({ email: 'ref@x.com', displayName: 'R', role: 'employee', active: true });

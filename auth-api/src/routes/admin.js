@@ -4,6 +4,11 @@ import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { User } from '../models/User.js';
 import { Skill } from '../models/Skill.js';
+import { Project } from '../models/Project.js';
+import { Task } from '../models/Task.js';
+import { Timesheet } from '../models/Timesheet.js';
+import { RefreshToken } from '../models/RefreshToken.js';
+import { PasswordResetToken } from '../models/PasswordResetToken.js';
 
 const ROLES = ['admin', 'pm', 'employee'];
 
@@ -45,6 +50,30 @@ export function createAdminRouter() {
     target.active = active;
     await target.save();
     res.json({ _id: target._id, email: target.email, displayName: target.displayName, role: target.role, active: target.active });
+  }));
+
+  router.delete('/users/:id', asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    if (String(req.user.sub) === String(id)) {
+      return res.status(400).json({ error: 'you cannot delete yourself' });
+    }
+    const target = await User.findById(id);
+    if (!target) return res.status(404).json({ error: 'not found' });
+    if (target.role === 'admin') {
+      const otherAdmins = await User.countDocuments({ _id: { $ne: target._id }, role: 'admin' });
+      if (otherAdmins === 0) return res.status(400).json({ error: 'cannot delete the last admin' });
+    }
+    const ownedCount = await Project.countDocuments({ ownerPm: target._id });
+    if (ownedCount > 0) {
+      return res.status(409).json({ error: `reassign or archive their ${ownedCount} owned project(s) first` });
+    }
+    await Task.updateMany({ assignee: target._id }, { $set: { assignee: null } });
+    await Project.updateMany({ members: target._id }, { $pull: { members: target._id } });
+    await Timesheet.deleteMany({ userId: target._id });
+    await RefreshToken.deleteMany({ userId: target._id });
+    await PasswordResetToken.deleteMany({ userId: target._id });
+    await User.deleteOne({ _id: target._id });
+    res.json({ ok: true });
   }));
 
   router.post('/skills', asyncHandler(async (req, res) => {

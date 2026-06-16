@@ -38,6 +38,7 @@ export const listUsers = () => authed('/admin/users') as Promise<UserRow[]>;
 export const setUserRole = (id: string, role: Role) => authed(`/admin/users/${id}/role`, 'PATCH', { role });
 export const setUserActive = (id: string, active: boolean) =>
   authed(`/admin/users/${id}/active`, 'PATCH', { active }) as Promise<UserRow>;
+export const deleteUser = (id: string) => authed(`/admin/users/${id}`, 'DELETE');
 
 export const listSkills = () => authed('/skills') as Promise<Skill[]>;
 export const addSkill = (name: string) => authed('/admin/skills', 'POST', { name }) as Promise<Skill>;
