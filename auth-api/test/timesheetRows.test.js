@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeWeekRows, sanitizeRows, currentMonday } from '../src/services/timesheetRows.js';
+import { mergeWeekRows, sanitizeRows, currentMonday, editableDaysFor, applyDayLock } from '../src/services/timesheetRows.js';
 
 const z = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
 
@@ -56,4 +56,34 @@ test('currentMonday returns a Monday ISO date', () => {
   const m = currentMonday();
   assert.match(m, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(new Date(`${m}T00:00:00Z`).getUTCDay(), 1);
+});
+
+test('editableDaysFor: only today is editable with no approvals', () => {
+  const days = editableDaysFor('2026-06-15', '2026-06-17', []);
+  assert.deepEqual(days, ['wed']);
+});
+
+test('editableDaysFor: an approved PAST day is also editable; future never', () => {
+  const days = editableDaysFor('2026-06-15', '2026-06-17', ['mon', 'fri']);
+  assert.deepEqual(days.sort(), ['mon', 'wed']);
+});
+
+test('editableDaysFor: past week with an approved day', () => {
+  const days = editableDaysFor('2026-06-08', '2026-06-17', ['thu']);
+  assert.deepEqual(days, ['thu']);
+});
+
+test('applyDayLock: editable-day minutes apply, locked-day minutes keep saved values', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 99, tue: 99, wed: 60, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r1', name: 'A', entries: { mon: 30, tue: 45, wed: 0, thu: 0, fri: 0 } }];
+  const out = applyDayLock(submitted, saved, ['wed']);
+  assert.equal(out[0].entries.wed, 60);
+  assert.equal(out[0].entries.mon, 30);
+  assert.equal(out[0].entries.tue, 45);
+});
+
+test('applyDayLock: a new row cannot put minutes on a locked day', () => {
+  const submitted = [{ id: 'new', name: 'X', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const out = applyDayLock(submitted, [], ['wed']);
+  assert.equal(out[0].entries.mon, 0);
 });
