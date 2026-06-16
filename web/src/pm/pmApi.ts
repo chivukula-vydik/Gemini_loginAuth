@@ -50,6 +50,9 @@ export const getProject = (id: string) =>
 export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
+export const updateProjectMembers = (id: string, members: string[]) =>
+  authed(`/projects/${id}`, 'PATCH', { members });
+
 export const myTasks = () => authed('/tasks/mine') as Promise<Task[]>;
 export const listDirectory = () => authed('/users') as Promise<Person[]>;
 export const setTaskProgress = (id: string, patch: { percentComplete?: number; status?: string }) =>

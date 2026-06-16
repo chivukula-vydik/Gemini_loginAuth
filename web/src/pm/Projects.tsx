@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask,
-  listSkills, Project, Task, TaskDetail, Person, Skill,
+  listSkills, listDirectory, updateProjectMembers,
+  Project, TaskDetail, Person, Skill,
 } from './pmApi';
 
 export function Projects() {
@@ -51,23 +52,45 @@ export function Projects() {
   );
 }
 
-type PopulatedProject = Omit<Project, 'members'> & { members: Person[] };
-
 function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const [project, setProject] = useState<PopulatedProject | null>(null);
+  const [project, setProject] = useState<(Omit<Project, 'members'> & { members: Person[] }) | null>(null);
   const [tasks, setTasks] = useState<TaskDetail[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [directory, setDirectory] = useState<Person[]>([]);
   const [title, setTitle] = useState('');
   const [estimate, setEstimate] = useState('');
   const [assignee, setAssignee] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
+  const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
 
   function reload() {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
       .catch((e) => setError(e.message));
   }
-  useEffect(() => { reload(); listSkills().then(setSkills).catch(() => {}); }, [id]);
+  useEffect(() => {
+    reload();
+    listSkills().then(setSkills).catch(() => {});
+    listDirectory().then(setDirectory).catch(() => {});
+  }, [id]);
+
+  async function addMember() {
+    if (!newMember || !project) return;
+    setError('');
+    try {
+      await updateProjectMembers(id, [...project.members.map((m) => m._id), newMember]);
+      setNewMember('');
+      reload();
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function removeMember(mid: string) {
+    if (!project) return;
+    try {
+      await updateProjectMembers(id, project.members.map((m) => m._id).filter((x) => x !== mid));
+      reload();
+    } catch (e) { setError((e as Error).message); }
+  }
 
   async function add() {
     if (!title.trim()) return;
@@ -94,6 +117,8 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   if (!project) return <div className="ts-page"><p className="center-loading">Loading…</p></div>;
 
+  const nonMembers = directory.filter((d) => !project.members.some((m) => m._id === d._id));
+
   return (
     <div className="ts-page">
       <header className="ts-header">
@@ -103,12 +128,32 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {error && <p className="ts-error">{error}</p>}
 
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
+        <strong>Members</strong>
+        <div className="chips" style={{ justifyContent: 'flex-start', margin: '8px 0' }}>
+          {project.members.length === 0 && <span className="ts-sub">No members yet.</span>}
+          {project.members.map((m) => (
+            <span key={m._id} className="chip">
+              {m.displayName || m.email}
+              <button className="link-btn" style={{ marginLeft: 6 }} onClick={() => removeMember(m._id)}>×</button>
+            </span>
+          ))}
+        </div>
+        <div className="ts-nav-left">
+          <select className="input" value={newMember} onChange={(e) => setNewMember(e.target.value)}>
+            <option value="">Add member…</option>
+            {nonMembers.map((d) => <option key={d._id} value={d._id}>{d.displayName || d.email}</option>)}
+          </select>
+          <button className="btn btn-primary" onClick={addMember}>Add</button>
+        </div>
+      </div>
+
+      <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <div className="ts-nav-left" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="input" placeholder="Task title" value={title} onChange={(e) => setTitle(e.target.value)} />
           <input className="input" style={{ width: 110 }} placeholder="Est. hrs" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
           <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
             <option value="">Unassigned</option>
-            {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName}</option>)}
+            {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName || m.email}</option>)}
           </select>
           <button className="btn btn-primary" onClick={add}>Add task</button>
         </div>
@@ -123,14 +168,16 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
       <div className="ts-card">
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Task</th><th>Est. hrs</th><th>Assignee</th><th>Status</th></tr></thead>
+          <thead><tr><th className="ts-task">Task</th><th>Assignee</th><th>Planned</th><th>Actual</th><th>%</th><th>Status</th></tr></thead>
           <tbody>
-            {tasks.length === 0 && <tr><td colSpan={4} className="ts-empty">No tasks yet.</td></tr>}
+            {tasks.length === 0 && <tr><td colSpan={6} className="ts-empty">No tasks yet.</td></tr>}
             {tasks.map((t) => (
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
-                <td>{t.estimatedHours}</td>
-                <td>{t.assignee ? t.assignee.displayName : 'Unassigned'}</td>
+                <td>{t.assignee ? (t.assignee.displayName || t.assignee.email) : 'Unassigned'}</td>
+                <td>{t.estimatedHours}h</td>
+                <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
+                <td>{t.percentComplete ?? 0}%</td>
                 <td>{t.status}</td>
               </tr>
             ))}
