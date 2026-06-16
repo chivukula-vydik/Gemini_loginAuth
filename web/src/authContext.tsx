@@ -1,7 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { fetchMe, refresh, setAccessToken, logout as apiLogout } from './api';
 
-type User = { email: string; displayName: string; providers: { provider: string }[] };
+type User = {
+  email: string;
+  displayName: string;
+  providers: { provider: string }[];
+  role: 'admin' | 'pm' | 'employee';
+  skills: string[];
+};
 type AuthState = { user: User | null; loading: boolean; reload: () => Promise<void>; signOut: () => Promise<void> };
 
 const Ctx = createContext<AuthState>(null!);
