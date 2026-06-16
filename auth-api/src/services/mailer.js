@@ -4,7 +4,7 @@ let transport = null;
 
 function getTransport() {
   if (transport) return transport;
-  if (!process.env.SMTP_HOST) return null; // dev: no SMTP configured
+  if (!process.env.SMTP_HOST) return null;
   transport = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),

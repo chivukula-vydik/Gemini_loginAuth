@@ -22,7 +22,7 @@ const taskSchema = new mongoose.Schema(
 
 const timesheetSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  weekStart: { type: String, required: true }, // 'YYYY-MM-DD', a Monday
+  weekStart: { type: String, required: true },
   tasks: { type: [taskSchema], default: [] },
   updatedAt: { type: Date, default: Date.now },
 });

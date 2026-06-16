@@ -4,17 +4,13 @@ export const DAY_LABELS: Record<Day, string> = {
   mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri',
 };
 
-// Parse flexible time text into whole minutes. Unparseable/empty -> 0.
-// Accepts: "2h 30m", "2h", "30m", "90m", "2:30", "1.5h", "1.5", "2".
 export function parseTimeInput(raw: string): number {
   const s = (raw ?? '').trim().toLowerCase();
   if (s === '') return 0;
 
-  // H:MM colon format
   const colon = s.match(/^(\d+):([0-5]?\d)$/);
   if (colon) return Number(colon[1]) * 60 + Number(colon[2]);
 
-  // unit-based: any combination of "<num>h" and "<num>m"
   if (/[hm]/.test(s)) {
     let minutes = 0;
     let matched = false;
@@ -25,13 +21,11 @@ export function parseTimeInput(raw: string): number {
     return matched ? minutes : 0;
   }
 
-  // bare number -> hours (decimal allowed)
   const num = Number(s);
   if (Number.isFinite(num) && num >= 0) return Math.round(num * 60);
   return 0;
 }
 
-// Whole minutes -> "Hh MMm" with zero-padded minutes.
 export function formatMinutes(min: number): string {
   const total = Math.max(0, Math.round(min || 0));
   const h = Math.floor(total / 60);
@@ -39,17 +33,14 @@ export function formatMinutes(min: number): string {
   return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
-// --- week helpers (all UTC to avoid TZ drift) ---
-
 function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Monday (YYYY-MM-DD) of the week containing `date` (defaults to today).
 export function mondayOf(date: Date = new Date()): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const dow = d.getUTCDay(); // 0=Sun..6=Sat
-  const diff = (dow === 0 ? -6 : 1 - dow); // shift back to Monday
+  const dow = d.getUTCDay();
+  const diff = (dow === 0 ? -6 : 1 - dow);
   d.setUTCDate(d.getUTCDate() + diff);
   return toISODate(d);
 }
@@ -63,13 +54,10 @@ export function addDays(isoDate: string, days: number): string {
 export const prevWeek = (weekStart: string) => addDays(weekStart, -7);
 export const nextWeek = (weekStart: string) => addDays(weekStart, 7);
 
-// A week is "past" (read-only) if it starts before the current week's Monday.
-// ISO YYYY-MM-DD strings compare lexicographically in chronological order.
 export function isPastWeek(weekStart: string, today: Date = new Date()): boolean {
   return weekStart < mondayOf(today);
 }
 
-// Per-column label like "Mon 16" for a given weekStart Monday.
 export function columnDates(weekStart: string): Record<Day, string> {
   const out = {} as Record<Day, string>;
   DAYS.forEach((day, i) => {
@@ -79,7 +67,6 @@ export function columnDates(weekStart: string): Record<Day, string> {
   return out;
 }
 
-// Human label for the whole week, e.g. "Jun 15 – 19, 2026".
 export function weekRangeLabel(weekStart: string): string {
   const start = new Date(`${weekStart}T00:00:00Z`);
   const end = new Date(`${addDays(weekStart, 4)}T00:00:00Z`);

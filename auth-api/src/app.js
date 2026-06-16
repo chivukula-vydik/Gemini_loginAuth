@@ -21,8 +21,6 @@ export function createApp(config) {
   app.use('/auth', authRouter);
   app.use('/timesheets', createTimesheetRouter());
 
-  // Central error handler: turn thrown/rejected handler errors into a 500
-  // instead of crashing the process. Must be registered last.
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
     if (res.headersSent) return next(err);

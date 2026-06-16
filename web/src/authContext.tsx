@@ -12,7 +12,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function reload() {
-    // Pick up an access token left in the URL fragment by OAuth/SAML callbacks.
     const frag = new URLSearchParams(window.location.hash.slice(1));
     const fromFragment = frag.get('access_token');
     if (fromFragment) {

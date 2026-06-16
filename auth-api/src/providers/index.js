@@ -9,7 +9,6 @@ const MODULES = {
   saml,
 };
 
-// Mount only the enabled providers' strategies and routes.
 export function mountProviders(router, enabledProviders, deps) {
   for (const p of enabledProviders) {
     const mod = MODULES[p.id];

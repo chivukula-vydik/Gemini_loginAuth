@@ -5,12 +5,11 @@ import { Timesheet } from '../models/Timesheet.js';
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
-// 'YYYY-MM-DD' that is a real date AND a Monday (UTC).
 function isValidMonday(s) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return false;
-  return d.getUTCDay() === 1; // Monday
+  return d.getUTCDay() === 1;
 }
 
 function cleanMinutes(v) {
@@ -18,7 +17,6 @@ function cleanMinutes(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-// Coerce incoming tasks into the stored shape, dropping anything unexpected.
 function sanitizeTasks(tasks) {
   if (!Array.isArray(tasks)) return [];
   return tasks.map((t) => {

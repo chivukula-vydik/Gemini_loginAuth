@@ -63,13 +63,12 @@ export default {
       const { email } = req.body || {};
       const normalized = String(email || '').toLowerCase().trim();
       const user = normalized ? await User.findOne({ email: normalized }) : null;
-      // Always 200 — never reveal whether the account exists.
       if (user && user.passwordHash) {
         const raw = crypto.randomBytes(32).toString('hex');
         await PasswordResetToken.create({
           userId: user._id,
           tokenHash: sha256(raw),
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         });
         const resetUrl = `${process.env.WEB_URL}/reset?token=${raw}`;
         await sendPasswordReset(user.email, resetUrl);
@@ -90,7 +89,7 @@ export default {
       await user.save();
       record.usedAt = new Date();
       await record.save();
-      await revokeAllForUser(user._id); // force re-login everywhere
+      await revokeAllForUser(user._id);
       res.json({ ok: true });
     }));
   },

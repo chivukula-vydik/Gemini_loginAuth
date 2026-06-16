@@ -21,7 +21,6 @@ export function verifyAccessToken(token) {
   return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
 }
 
-// Issue a refresh JWT and persist its hash so it can be rotated/revoked.
 export async function issueRefreshToken(user) {
   const jti = crypto.randomUUID();
   const token = jwt.sign({ sub: String(user._id), jti }, process.env.JWT_REFRESH_SECRET, {
@@ -36,7 +35,6 @@ export async function issueRefreshToken(user) {
   return token;
 }
 
-// Validate a refresh token against the DB; returns the stored record or null.
 export async function findValidRefreshToken(token) {
   try {
     jwt.verify(token, process.env.JWT_REFRESH_SECRET);

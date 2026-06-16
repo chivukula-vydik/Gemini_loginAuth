@@ -20,7 +20,6 @@ export function cookieOptions() {
   };
 }
 
-// Shared helper used by every provider after a successful login.
 export async function completeLogin(res, user) {
   const refresh = await issueRefreshToken(user);
   res.cookie(COOKIE_NAME, refresh, cookieOptions());
@@ -52,12 +51,11 @@ export function createAuthRouter(enabledProviders) {
     }
     const user = await User.findById(record.userId);
     if (!user) {
-      // Refresh token outlived its user (e.g. deleted account).
       await revokeRefreshToken(token);
       res.clearCookie(COOKIE_NAME, cookieOptions());
       return res.status(401).json({ error: 'invalid refresh token' });
     }
-    await revokeRefreshToken(token); // rotate
+    await revokeRefreshToken(token);
     const accessToken = await completeLogin(res, user);
     res.json({ accessToken });
   }));

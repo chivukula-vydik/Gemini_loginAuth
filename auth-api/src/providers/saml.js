@@ -2,7 +2,6 @@ import { Strategy as SamlStrategy } from '@node-saml/passport-saml';
 import { findOrCreateByProvider } from '../services/users.js';
 import { completeLogin } from '../routes/auth.js';
 
-// The test-saml-idp image's PEM cert may arrive base64-encoded; normalize it.
 function normalizeCert(value) {
   if (value.includes('BEGIN CERTIFICATE')) return value;
   return Buffer.from(value, 'base64').toString('utf8');
@@ -35,7 +34,7 @@ export default {
             return done(err);
           }
         },
-        (profile, done) => done(null, {}) // logout verify (unused)
+        (profile, done) => done(null, {})
       )
     );
 

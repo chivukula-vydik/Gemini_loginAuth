@@ -40,7 +40,6 @@ export default {
         const webUrl = process.env.WEB_URL;
         if (err || !user) return res.redirect(`${webUrl}/?error=google_failed`);
         const accessToken = await completeLogin(res, user);
-        // Hand the access token to the SPA via URL fragment (refresh is in cookie).
         return res.redirect(`${webUrl}/#access_token=${accessToken}`);
       })(req, res, next);
     });

@@ -7,15 +7,11 @@ type Props = {
   readOnly?: boolean;
 };
 
-// Shows normalized "Hh MMm" when not focused; lets the user type freely while
-// focused; parses + normalizes on blur. Empty (0) renders as a blank cell.
-// In read-only mode (past weeks) it renders a static value instead of an input.
 export function TimeCell({ minutes, onChange, readOnly = false }: Props) {
   const display = minutes > 0 ? formatMinutes(minutes) : '';
   const [text, setText] = useState(display);
   const [editing, setEditing] = useState(false);
 
-  // Keep local text in sync when not actively editing (e.g. week switch, copy).
   useEffect(() => {
     if (!editing) setText(display);
   }, [display, editing]);

@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 
 const VALID_IDS = ['local', 'google', 'saml'];
 
-// Replace any "env:NAME" string value with process.env.NAME.
 function resolveEnv(value) {
   if (typeof value === 'string' && value.startsWith('env:')) {
     return process.env[value.slice(4)] || '';

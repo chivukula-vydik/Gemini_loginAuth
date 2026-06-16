@@ -20,18 +20,16 @@ export function TimesheetPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
 
-  // Always holds the latest selected week so async callbacks can detect a stale result.
   const weekStartRef = useRef(weekStart);
   weekStartRef.current = weekStart;
 
-  // Past weeks are history — view only. Current and future weeks are editable.
   const readOnly = isPastWeek(weekStart);
 
   const load = useCallback(async (week: string) => {
     setLoadError('');
     try {
       const loaded = await getWeek(week);
-      if (weekStartRef.current !== week) return; // a newer week was selected; ignore stale response
+      if (weekStartRef.current !== week) return;
       setTasks(loaded);
     } catch (e) {
       if (weekStartRef.current !== week) return;
@@ -40,7 +38,6 @@ export function TimesheetPage() {
     }
   }, []);
 
-  // Load whenever the week changes; cancel any pending save first.
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     dirty.current = false;
@@ -48,7 +45,6 @@ export function TimesheetPage() {
     load(weekStart);
   }, [weekStart, load]);
 
-  // Debounced autosave after edits.
   useEffect(() => {
     if (!dirty.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -67,8 +63,6 @@ export function TimesheetPage() {
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [tasks, weekStart]);
 
-  // All mutations go through here so they mark dirty + trigger autosave.
-  // Read-only (past) weeks never mutate.
   function update(next: Task[]) {
     if (readOnly) return;
     dirty.current = true;
@@ -85,12 +79,10 @@ export function TimesheetPage() {
 
   const onAddTask = () => update([...tasks, newTask()]);
 
-  // Switch weeks, flushing any pending edit for the CURRENT week first so a
-  // quick edit-then-navigate (within the autosave debounce) never loses data.
   function goToWeek(target: string) {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     if (dirty.current) {
-      saveWeek(weekStart, tasks).catch(() => {}); // flush the week we're leaving
+      saveWeek(weekStart, tasks).catch(() => {});
       dirty.current = false;
     }
     setWeekStart(target);
@@ -107,7 +99,6 @@ export function TimesheetPage() {
     }
   }
 
-  // --- live derived stats ---
   const dayTotals = DAYS.map((d) => ({
     day: d,
     total: tasks.reduce((s, t) => s + (t.entries[d] || 0), 0),

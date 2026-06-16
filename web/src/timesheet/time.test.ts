@@ -53,8 +53,8 @@ test('columnDates labels', () => {
 });
 
 test('isPastWeek: only weeks before the current Monday are past', () => {
-  const today = new Date('2026-06-17T12:00:00Z'); // current week Monday = 2026-06-15
-  assert.equal(isPastWeek('2026-06-08', today), true);  // last week
-  assert.equal(isPastWeek('2026-06-15', today), false); // current week
-  assert.equal(isPastWeek('2026-06-22', today), false); // next week
+  const today = new Date('2026-06-17T12:00:00Z');
+  assert.equal(isPastWeek('2026-06-08', today), true);
+  assert.equal(isPastWeek('2026-06-15', today), false);
+  assert.equal(isPastWeek('2026-06-22', today), false);
 });

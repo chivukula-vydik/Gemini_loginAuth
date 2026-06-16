@@ -1,7 +1,5 @@
 import { User } from '../models/User.js';
 
-// Find a user by email and ensure the given provider link exists.
-// Used by Google/SAML callbacks. Email is the linking key.
 export async function findOrCreateByProvider({ email, displayName, provider, providerUserId }) {
   const normalized = String(email).toLowerCase().trim();
   let user = await User.findOne({ email: normalized });

@@ -32,7 +32,6 @@ body {
   background: linear-gradient(160deg, var(--bg-from) 0%, var(--bg-to) 60%);
 }
 
-/* Centered page layout */
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -263,7 +262,6 @@ body {
   text-align: center;
 }
 
-/* Welcome / signed-in screen */
 .welcome {
   text-align: center;
 }
@@ -320,7 +318,6 @@ body {
   gap: 14px;
 }
 
-/* ---- App shell ---- */
 .shell {
   min-height: 100vh;
   display: grid;
@@ -346,7 +343,6 @@ body {
 .shell-user-email { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .shell-content { padding: 28px 32px; }
 
-/* ---- Timesheet (dashboard) ---- */
 .ts-page { max-width: 1000px; }
 .ts-header { margin-bottom: 18px; }
 .ts-h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
@@ -381,7 +377,6 @@ body {
   padding: 10px 14px; border-radius: 11px; font-size: 13px; margin-bottom: 16px;
 }
 
-/* summary tiles */
 .ts-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
 .ts-tile {
   background: #fff; border: 1px solid var(--border); border-radius: 14px;
@@ -395,7 +390,6 @@ body {
 .ts-tile-foot { font-size: 12px; color: var(--muted); }
 .ts-tile-accent .ts-tile-foot { color: rgba(255, 255, 255, 0.8); }
 
-/* grid card */
 .ts-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
 .ts-table { width: 100%; border-collapse: collapse; }
 .ts-table th, .ts-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; font-size: 14px; }
