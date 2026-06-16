@@ -6,6 +6,7 @@ import { Project } from '../models/Project.js';
 import { Task } from '../models/Task.js';
 import { Skill } from '../models/Skill.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
+import { actualMinutesByTask } from '../services/actuals.js';
 
 export function createProjectsRouter() {
   const router = express.Router();
@@ -38,8 +39,13 @@ export function createProjectsRouter() {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canViewProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    const tasks = await Task.find({ project: project._id }).sort('createdAt');
-    res.json({ project, tasks });
+    await project.populate('members', 'displayName email');
+    const tasks = await Task.find({ project: project._id })
+      .populate('assignee', 'displayName email')
+      .sort('createdAt');
+    const map = await actualMinutesByTask(tasks.map((t) => t._id));
+    const tasksOut = tasks.map((t) => ({ ...t.toObject(), actualMinutes: map.get(String(t._id)) || 0 }));
+    res.json({ project, tasks: tasksOut });
   }));
 
   router.patch('/:id', asyncHandler(async (req, res) => {
