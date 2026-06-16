@@ -238,3 +238,57 @@ test('refresh is rejected for a deactivated user', async () => {
   const res = await request(app).post('/auth/refresh').set('Cookie', [`refresh_token=${token}`]);
   assert.equal(res.status, 401);
 });
+
+test('edit-requests: GET is forbidden for employees', async () => {
+  const emp = await User.create({ email: 'er-e@x.com', displayName: 'E', role: 'employee' });
+  const res = await request(app).get('/edit-requests').set('Authorization', bearer(emp));
+  assert.equal(res.status, 403);
+});
+
+test('PUT /timesheets ignores a locked past day until it is approved', async () => {
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const emp = await User.create({ email: 'lock-e@x.com', displayName: 'E', role: 'employee' });
+  const wk = currentMonday();
+  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
+    tasks: [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }],
+  });
+  let saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
+  const monBefore = saved.tasks.find((t) => t.id === 'r1')?.entries.mon ?? 0;
+
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', status: 'approved' });
+  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
+    tasks: [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }],
+  });
+  saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
+  const monAfter = saved.tasks.find((t) => t.id === 'r1')?.entries.mon ?? 0;
+
+  const todayDow = new Date().getUTCDay();
+  if (todayDow !== 1) {
+    assert.equal(monBefore, 0); // Monday was locked before approval (today isn't Monday)
+  }
+  assert.equal(monAfter, 120); // editable after approval
+});
+
+test('PATCH /tasks/:id/estimate: assignee proposes, non-assignee 403; PM approves', async () => {
+  const pm = await User.create({ email: 'est-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'est-e@x.com', displayName: 'E', role: 'employee' });
+  const other = await User.create({ email: 'est-o@x.com', displayName: 'O', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: emp._id, createdBy: pm._id });
+
+  const forbidden = await request(app).patch(`/tasks/${task._id}/estimate`)
+    .set('Authorization', bearer(other)).send({ proposedHours: 5 });
+  assert.equal(forbidden.status, 403);
+
+  const propose = await request(app).patch(`/tasks/${task._id}/estimate`)
+    .set('Authorization', bearer(emp)).send({ proposedHours: 8 });
+  assert.equal(propose.status, 200);
+  assert.equal(propose.body.estimateStatus, 'proposed');
+  assert.equal(propose.body.proposedHours, 8);
+
+  const approve = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
+  assert.equal(approve.status, 200);
+  assert.equal(approve.body.estimateStatus, 'approved');
+  assert.equal(approve.body.estimatedHours, 8);
+});
