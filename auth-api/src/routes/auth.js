@@ -8,6 +8,7 @@ import {
   signAccessToken,
 } from '../services/tokens.js';
 import { User } from '../models/User.js';
+import { resolveRole } from '../services/authz.js';
 
 const COOKIE_NAME = 'refresh_token';
 
@@ -21,6 +22,11 @@ export function cookieOptions() {
 }
 
 export async function completeLogin(res, user) {
+  const desiredRole = resolveRole(user, process.env);
+  if (desiredRole !== user.role) {
+    user.role = desiredRole;
+    await user.save();
+  }
   const refresh = await issueRefreshToken(user);
   res.cookie(COOKIE_NAME, refresh, cookieOptions());
   return signAccessToken(user);
@@ -68,7 +74,7 @@ export function createAuthRouter(enabledProviders) {
   }));
 
   router.get('/me', requireAuth, asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.sub).select('email displayName providers');
+    const user = await User.findById(req.user.sub).select('email displayName providers role skills');
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
   }));

@@ -11,7 +11,7 @@ function sha256(value) {
 
 export function signAccessToken(user) {
   return jwt.sign(
-    { sub: String(user._id), email: user.email, name: user.displayName },
+    { sub: String(user._id), email: user.email, name: user.displayName, role: user.role || 'employee' },
     process.env.JWT_ACCESS_SECRET,
     { expiresIn: ACCESS_TTL }
   );
