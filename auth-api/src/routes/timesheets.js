@@ -78,15 +78,9 @@ export function createTimesheetRouter() {
 
     const doc = await Timesheet.findOne({ userId, weekStart });
     const savedRows = doc ? doc.tasks : [];
-    const isPastWeek = weekStart < currentMonday();
-    let tasks;
-    if (isPastWeek) {
-      const approved = await approvedDaysFor(userId, weekStart);
-      const editableDays = editableDaysFor(weekStart, todayISO(), approved);
-      tasks = applyDayLock(sanitized, savedRows, editableDays);
-    } else {
-      tasks = sanitized;
-    }
+    const approved = await approvedDaysFor(userId, weekStart);
+    const editableDays = editableDaysFor(weekStart, todayISO(), approved);
+    const tasks = applyDayLock(sanitized, savedRows, editableDays);
 
     const updatedAt = new Date();
     await Timesheet.updateOne(

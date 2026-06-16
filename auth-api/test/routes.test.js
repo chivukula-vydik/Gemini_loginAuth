@@ -12,6 +12,7 @@ const { User } = await import('../src/models/User.js');
 const { Project } = await import('../src/models/Project.js');
 const { Task } = await import('../src/models/Task.js');
 const { Timesheet } = await import('../src/models/Timesheet.js');
+const { EditRequest } = await import('../src/models/EditRequest.js');
 const { signAccessToken } = await import('../src/services/tokens.js');
 
 let mongod;
@@ -127,6 +128,8 @@ test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine re
 
   const { currentMonday } = await import('../src/services/timesheetRows.js');
   const wk = currentMonday();
+  // Monday is a past/locked day unless today is Monday; approve it so the write applies.
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', status: 'approved' });
   await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
     tasks: [
       { id: 'r1', name: 'Mine', taskId: String(mine._id), entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } },
