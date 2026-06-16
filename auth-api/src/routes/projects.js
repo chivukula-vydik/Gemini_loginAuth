@@ -64,7 +64,7 @@ export function createProjectsRouter() {
       return res.status(400).json({ error: 'assignee must be a project member' });
     }
     const skillIds = Array.isArray(requiredSkills) ? requiredSkills : [];
-    const validSkills = await Skill.find({ _id: { $in: skillIds } }).select('_id');
+    const validSkills = await Skill.find({ _id: { $in: skillIds }, active: true }).select('_id');
     const task = await Task.create({
       project: project._id,
       title: String(title).trim(),

@@ -10,6 +10,7 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 const { createApp } = await import('../src/app.js');
 const { User } = await import('../src/models/User.js');
 const { Project } = await import('../src/models/Project.js');
+const { Task } = await import('../src/models/Task.js');
 const { signAccessToken } = await import('../src/services/tokens.js');
 
 let mongod;
@@ -59,4 +60,16 @@ test('employee sees only their assigned tasks via /tasks/mine', async () => {
   const res = await request(app).get('/tasks/mine').set('Authorization', bearer(emp));
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, []);
+});
+
+test('PATCH /tasks/:id rejects an assignee who is not a project member', async () => {
+  const pm = await User.create({ email: 'pm9@x.com', displayName: 'PM9', role: 'pm' });
+  const outsider = await User.create({ email: 'out@x.com', displayName: 'Out', role: 'employee' });
+  const project = await Project.create({ name: 'PJ', ownerPm: pm._id, members: [] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const res = await request(app)
+    .patch(`/tasks/${task._id}`)
+    .set('Authorization', bearer(pm))
+    .send({ assignee: String(outsider._id) });
+  assert.equal(res.status, 400);
 });
