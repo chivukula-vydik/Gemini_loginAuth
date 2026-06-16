@@ -1,5 +1,5 @@
 import { TaskRow } from './TaskRow';
-import { DAYS, formatMinutes, columnDates, dayDates, isFutureDate } from './time';
+import { DAYS, formatMinutes, columnDates } from './time';
 import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
 
@@ -7,6 +7,8 @@ type Props = {
   weekStart: string;
   tasks: Task[];
   readOnly?: boolean;
+  editableDays: string[];
+  onRequestEdit: (day: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
   onDelete: (taskId: string) => void;
@@ -15,12 +17,14 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, readOnly = false, onRename, onCellChange, onDelete, onAddTask, onProgress,
+  weekStart, tasks, readOnly = false, editableDays, onRequestEdit,
+  onRename, onCellChange, onDelete, onAddTask, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
-  const dates = dayDates(weekStart);
+  const editable = new Set(editableDays);
   const lockedDays = {} as Record<Day, boolean>;
-  DAYS.forEach((d) => { lockedDays[d] = isFutureDate(dates[d]); });
+  DAYS.forEach((d) => { lockedDays[d] = !editable.has(d); });
+
   const dayTotal = (day: keyof Entries) =>
     tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
 
@@ -31,7 +35,12 @@ export function TimesheetGrid({
           <tr>
             <th className="ts-task">Task</th>
             {DAYS.map((d) => (
-              <th key={d} className={lockedDays[d] ? 'ts-day-future' : undefined}>{cols[d]}</th>
+              <th key={d} className={editable.has(d) ? undefined : 'ts-day-future'}>
+                {cols[d]}
+                {!editable.has(d) && (
+                  <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d)}>request</button>
+                )}
+              </th>
             ))}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
-import { getWeek, saveWeek, Task, Entries } from './timesheetApi';
+import { getWeek, saveWeek, createEditRequest, Task, Entries } from './timesheetApi';
 import { setTaskProgress } from '../pm/pmApi';
-import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, isPastWeek } from './time';
+import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek } from './time';
 
 function newTask(name = ''): Task {
   const entries = {} as Entries;
@@ -17,6 +17,8 @@ export function TimesheetPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [loadError, setLoadError] = useState('');
+  const [editableDays, setEditableDays] = useState<string[]>([]);
+  const [readOnly, setReadOnly] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -24,14 +26,14 @@ export function TimesheetPage() {
   const weekStartRef = useRef(weekStart);
   weekStartRef.current = weekStart;
 
-  const readOnly = isPastWeek(weekStart);
-
   const load = useCallback(async (week: string) => {
     setLoadError('');
     try {
       const loaded = await getWeek(week);
       if (weekStartRef.current !== week) return;
       setTasks(loaded.tasks);
+      setEditableDays(loaded.editableDays);
+      setReadOnly(loaded.readOnly);
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -107,6 +109,12 @@ export function TimesheetPage() {
     }
   }
 
+  async function onRequestEdit(day: string) {
+    const reason = window.prompt('Reason for editing this past day?') ?? '';
+    try { await createEditRequest(weekStart, day as never, reason); window.alert('Request sent to your PM.'); }
+    catch (e) { window.alert((e as Error).message); }
+  }
+
   const dayTotals = DAYS.map((d) => ({
     day: d,
     total: tasks.reduce((s, t) => s + (t.entries[d] || 0), 0),
@@ -150,6 +158,8 @@ export function TimesheetPage() {
         weekStart={weekStart}
         tasks={tasks}
         readOnly={readOnly}
+        editableDays={editableDays}
+        onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}
         onDelete={onDelete}
