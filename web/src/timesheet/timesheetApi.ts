@@ -16,19 +16,31 @@ export type Task = {
   status?: string;
 };
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function getWeek(weekStart: string): Promise<Task[]> {
-  const r = await fetch(`${API}/timesheets/${weekStart}`, {
-    headers: authHeaders(),
-    credentials: 'include',
-  });
+export type WeekData = { weekStart: string; tasks: Task[]; editableDays: Day[]; readOnly: boolean };
+
+export async function getWeek(weekStart: string): Promise<WeekData> {
+  const r = await fetch(`${API}/timesheets/${weekStart}`, { headers: authHeaders(), credentials: 'include' });
   if (!r.ok) throw new Error(`load failed (${r.status})`);
   const data = await r.json();
-  return data.tasks as Task[];
+  return { weekStart: data.weekStart, tasks: data.tasks as Task[], editableDays: data.editableDays as Day[], readOnly: !!data.readOnly };
+}
+
+export async function createEditRequest(weekStart: string, day: Day, reason: string): Promise<void> {
+  const r = await fetch(`${API}/timesheets/${weekStart}/edit-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    body: JSON.stringify({ day, reason }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `request failed (${r.status})`);
+  }
 }
 
 export async function saveWeek(weekStart: string, tasks: Task[]): Promise<void> {
