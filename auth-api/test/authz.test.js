@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRole, canViewProject, canEditProject, canCreateTask } from '../src/services/authz.js';
+import { resolveRole, canViewProject, canEditProject, canCreateTask, canLogProgress } from '../src/services/authz.js';
 
 test('resolveRole: promotes the configured ADMIN_EMAIL', () => {
   const user = { email: 'boss@acme.com', role: 'employee' };
@@ -37,4 +37,11 @@ test('canCreateTask: matches canEditProject rule', () => {
   const project = { ownerPm: 'pm1', members: [] };
   assert.equal(canCreateTask({ sub: 'pm1', role: 'pm' }, project), true);
   assert.equal(canCreateTask({ sub: 'pm2', role: 'pm' }, project), false);
+});
+
+test('canLogProgress: only the assignee may log progress', () => {
+  const task = { assignee: 'emp1' };
+  assert.equal(canLogProgress({ sub: 'emp1' }, task), true);
+  assert.equal(canLogProgress({ sub: 'emp2' }, task), false);
+  assert.equal(canLogProgress({ sub: 'emp1' }, { assignee: null }), false);
 });

@@ -23,3 +23,7 @@ export function canEditProject(user, project) {
 export function canCreateTask(user, project) {
   return canEditProject(user, project);
 }
+
+export function canLogProgress(user, task) {
+  return task.assignee != null && String(task.assignee) === userId(user);
+}
