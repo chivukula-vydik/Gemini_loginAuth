@@ -93,6 +93,9 @@ export type ClaimReq = {
   _id: string; user: Person; task: { _id: string; title: string }; project: { name: string };
   status: string; createdAt: string;
 };
+export type AssignmentOffer = {
+  _id: string; task: { _id: string; title: string }; project: { name: string }; createdAt: string;
+};
 
 export const listMarketplace = () => authed('/marketplace') as Promise<MarketTask[]>;
 export const claimTask = (id: string) => authed(`/tasks/${id}/claim`, 'POST');
@@ -105,3 +108,7 @@ export const proposeEstimate = (id: string, value: number, unit: EstimateUnit) =
   authed(`/tasks/${id}/estimate`, 'PATCH', { value, unit });
 export const decideEstimate = (id: string, decision: 'approve' | 'reject') =>
   authed(`/tasks/${id}/estimate/decision`, 'PATCH', { decision });
+
+export const listMyOffers = () => authed('/assignment-offers/mine') as Promise<AssignmentOffer[]>;
+export const decideOffer = (id: string, decision: 'accept' | 'decline') =>
+  authed(`/assignment-offers/${id}`, 'PATCH', { decision });
