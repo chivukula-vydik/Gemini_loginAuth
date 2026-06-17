@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
-import { getWeek, saveWeek, createEditRequest, Task, Entries, Grant } from './timesheetApi';
+import { getWeek, saveWeek, submitWeek, createEditRequest, Task, Entries, Grant } from './timesheetApi';
+import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
 import { setTaskProgress } from '../pm/pmApi';
 import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek } from './time';
@@ -22,6 +23,9 @@ export function TimesheetPage() {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [readOnly, setReadOnly] = useState(false);
   const [pendingKeys, setPendingKeys] = useState<string[]>([]);
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('draft');
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [reviewedAt, setReviewedAt] = useState<string | null>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -39,6 +43,9 @@ export function TimesheetPage() {
       setGrants(loaded.grants);
       setPendingKeys(loaded.pending.map((g) => `${g.day}:${g.projectId}`));
       setReadOnly(loaded.readOnly);
+      setSubmitStatus(loaded.status);
+      setSubmittedAt(loaded.submittedAt);
+      setReviewedAt(loaded.reviewedAt);
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -115,6 +122,21 @@ export function TimesheetPage() {
     }
   }
 
+  const submittable = canSubmit(submitStatus, weekStart, mondayOf());
+
+  async function onSubmit() {
+    if (!submittable) return;
+    if (!window.confirm('Submit this week for review? You won’t be able to edit it after.')) return;
+    try {
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+      if (dirty.current) { await saveWeek(weekStart, tasks); dirty.current = false; }
+      await submitWeek(weekStart);
+      await load(weekStart);
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
+  }
+
   async function onRequestEdit(day: Day, projectId: string) {
     const reason = window.prompt('Reason for editing this past day?') ?? '';
     try {
@@ -144,16 +166,27 @@ export function TimesheetPage() {
         weekStart={weekStart}
         status={status}
         readOnly={readOnly}
+        submitStatus={submitStatus}
+        submittedAt={submittedAt}
+        submittable={submittable}
         onPrev={() => goToWeek(prevWeek(weekStart))}
         onNext={() => goToWeek(nextWeek(weekStart))}
         onToday={() => goToWeek(mondayOf())}
         onCopyLastWeek={onCopyLastWeek}
+        onSubmit={onSubmit}
       />
 
       {readOnly && (
         <div className="ts-readonly-banner">
-          Viewing a past week — read only. Use <strong>Today</strong> to return to the current week and make changes.
+          {submitStatus === 'submitted'
+            ? <>Submitted{submittedAt ? ` on ${submittedAt.slice(0, 10)}` : ''} — awaiting PM review.</>
+            : submitStatus === 'approved'
+              ? <>Approved{reviewedAt ? ` on ${reviewedAt.slice(0, 10)}` : ''}.</>
+              : <>Viewing a past week — read only. Use <strong>Today</strong> to return to the current week and make changes.</>}
         </div>
+      )}
+      {submitStatus === 'returned' && (
+        <div className="ts-returned-banner">Your PM sent this back — review and resubmit.</div>
       )}
 
       <SummaryTiles
