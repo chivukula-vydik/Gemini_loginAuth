@@ -16,6 +16,7 @@ export type Task = {
   status?: string;
   startDate?: string | null;
   endDate?: string | null;
+  projectId?: string | null;
 };
 
 export function authHeaders(): Record<string, string> {
@@ -23,21 +24,29 @@ export function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export type WeekData = { weekStart: string; tasks: Task[]; editableDays: Day[]; readOnly: boolean };
+export type Grant = { day: Day; projectId: string };
+
+export type WeekData = { weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; readOnly: boolean };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
   const r = await fetch(`${API}/timesheets/${weekStart}`, { headers: authHeaders(), credentials: 'include' });
   if (!r.ok) throw new Error(`load failed (${r.status})`);
   const data = await r.json();
-  return { weekStart: data.weekStart, tasks: data.tasks as Task[], editableDays: data.editableDays as Day[], readOnly: !!data.readOnly };
+  return {
+    weekStart: data.weekStart,
+    tasks: data.tasks as Task[],
+    todayDay: (data.todayDay ?? null) as Day | null,
+    grants: (data.grants ?? []) as Grant[],
+    readOnly: !!data.readOnly,
+  };
 }
 
-export async function createEditRequest(weekStart: string, day: Day, reason: string): Promise<void> {
+export async function createEditRequest(weekStart: string, day: Day, projectId: string, reason: string): Promise<void> {
   const r = await fetch(`${API}/timesheets/${weekStart}/edit-requests`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     credentials: 'include',
-    body: JSON.stringify({ day, reason }),
+    body: JSON.stringify({ day, projectId, reason }),
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
