@@ -39,8 +39,8 @@ export function createClaimRequestsRouter() {
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
 
     if (decision === 'approved') {
-      if (task.assignee) return res.status(409).json({ error: 'task already assigned' });
-      task.assignee = claim.userId;
+      if (task.assignees.length > 0) return res.status(409).json({ error: 'task already assigned' });
+      task.assignees = [{ user: claim.userId, sharePct: 100 }];
       await task.save();
       claim.status = 'approved';
       claim.decidedBy = req.user.sub;

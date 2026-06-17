@@ -33,8 +33,8 @@ export function createAssignmentOffersRouter() {
     if (decision === 'accept') {
       const task = await Task.findById(offer.taskId);
       if (!task) return res.status(404).json({ error: 'task not found' });
-      if (task.assignee || task.status === 'done') return res.status(409).json({ error: 'task no longer available' });
-      task.assignee = offer.userId;
+      if (task.assignees.length > 0 || task.status === 'done') return res.status(409).json({ error: 'task no longer available' });
+      task.assignees = [{ user: offer.userId, sharePct: 100 }];
       await task.save();
     }
     offer.status = decision === 'accept' ? 'accepted' : 'declined';

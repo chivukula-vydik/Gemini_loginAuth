@@ -17,7 +17,7 @@ export function createMarketplaceRouter() {
     const projNameById = new Map(projects.map((p) => [String(p._id), p.name]));
     const tasks = await Task.find({
       project: { $in: projects.map((p) => p._id) },
-      assignee: null,
+      assignees: { $size: 0 },
       status: { $ne: 'done' },
     }).populate('requiredSkills', 'name').sort('-createdAt');
 
