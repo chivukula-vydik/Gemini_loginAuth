@@ -2,11 +2,13 @@ import { TimeCell } from './TimeCell';
 import { DAYS, formatMinutes } from './time';
 import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
+import type { BarSegment } from './bar';
 
 type Props = {
   task: Task;
   readOnly?: boolean;
   lockedDays?: Partial<Record<Day, boolean>>;
+  bar?: BarSegment | null;
   onRename: (name: string) => void;
   onCellChange: (day: keyof Entries, minutes: number) => void;
   onDelete: () => void;
@@ -15,7 +17,7 @@ type Props = {
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, lockedDays = {}, onRename, onCellChange, onDelete, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, lockedDays = {}, bar = null, onRename, onCellChange, onDelete, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   return (
@@ -40,15 +42,26 @@ export function TaskRow({ task, readOnly = false, lockedDays = {}, onRename, onC
           />
         )}
       </td>
-      {DAYS.map((d) => (
-        <td key={d}>
-          <TimeCell
-            minutes={task.entries[d] || 0}
-            readOnly={readOnly || !!lockedDays[d]}
-            onChange={(m) => onCellChange(d, m)}
-          />
-        </td>
-      ))}
+      {DAYS.map((d, i) => {
+        const inBar = bar && i >= bar.startCol && i <= bar.endCol;
+        const capL = inBar && i === bar!.startCol && !bar!.continuesLeft;
+        const capR = inBar && i === bar!.endCol && !bar!.continuesRight;
+        return (
+          <td key={d} className="ts-cell">
+            {inBar && (
+              <div
+                className={`ts-bar ts-bar-${task.status ?? 'todo'}${capL ? ' ts-bar-l' : ''}${capR ? ' ts-bar-r' : ''}`}
+                title={`${task.startDate ?? ''} → ${task.endDate ?? ''}`}
+              />
+            )}
+            <TimeCell
+              minutes={task.entries[d] || 0}
+              readOnly={readOnly || !!lockedDays[d]}
+              onChange={(m) => onCellChange(d, m)}
+            />
+          </td>
+        );
+      })}
       <td className="ts-rowtotal">{formatMinutes(rowTotal)}</td>
       <td className="ts-actions">
         {isPm ? (

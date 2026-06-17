@@ -393,3 +393,19 @@ body {
 .ts-status { padding: 5px 6px; font-size: 12px; width: auto; }
 .ts-req { font-size: 10px; margin-left: 6px; font-weight: 600; }
 .ts-pending { color: var(--muted); font-style: italic; }
+
+.ts-cell { position: relative; }
+.ts-bar {
+  position: absolute;
+  left: 0; right: 0; top: 2px;
+  height: 4px;
+  background: var(--accent, #6b7280);
+  opacity: 0.8;
+  pointer-events: none;
+}
+.ts-bar-l { left: 4px; border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.ts-bar-r { right: 4px; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+.ts-bar-todo { background: #9ca3af; }
+.ts-bar-in_progress { background: #3b82f6; }
+.ts-bar-blocked { background: #ef4444; }
+.ts-bar-done { background: #10b981; }

@@ -1,4 +1,5 @@
 import { TaskRow } from './TaskRow';
+import { weekBarSegment } from './bar';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO } from './time';
 import type { Day } from './time';
 import type { Task, Entries } from './timesheetApi';
@@ -69,6 +70,7 @@ export function TimesheetGrid({
               task={t}
               readOnly={readOnly}
               lockedDays={lockedDays}
+              bar={weekBarSegment(weekStart, t.startDate, t.endDate)}
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
               onDelete={() => onDelete(t.id)}
