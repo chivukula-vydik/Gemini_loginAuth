@@ -1,5 +1,6 @@
 import { getAccessToken } from '../api';
 import type { Day } from './time';
+import type { SubmitStatus } from './submit';
 
 const API = 'http://localhost:4000';
 
@@ -25,7 +26,10 @@ export function authHeaders(): Record<string, string> {
 
 export type Grant = { day: Day; projectId: string };
 
-export type WeekData = { weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; pending: Grant[]; readOnly: boolean };
+export type WeekData = {
+  weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
+  readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
+};
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
   const r = await fetch(`${API}/timesheets/${weekStart}`, { headers: authHeaders(), credentials: 'include' });
@@ -38,6 +42,9 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     grants: (data.grants ?? []) as Grant[],
     pending: (data.pending ?? []) as Grant[],
     readOnly: !!data.readOnly,
+    status: (data.status ?? 'draft') as SubmitStatus,
+    submittedAt: (data.submittedAt ?? null) as string | null,
+    reviewedAt: (data.reviewedAt ?? null) as string | null,
   };
 }
 
@@ -62,4 +69,16 @@ export async function saveWeek(weekStart: string, tasks: Task[]): Promise<void> 
     body: JSON.stringify({ tasks }),
   });
   if (!r.ok) throw new Error(`save failed (${r.status})`);
+}
+
+export async function submitWeek(weekStart: string): Promise<void> {
+  const r = await fetch(`${API}/timesheets/${weekStart}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `submit failed (${r.status})`);
+  }
 }
