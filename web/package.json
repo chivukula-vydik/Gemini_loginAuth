@@ -6,7 +6,7 @@
     "dev": "vite --host --port 5173",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host --port 5173",
-    "test": "node --test \"src/timesheet/**/*.test.ts\""
+    "test": "node --test \"src/timesheet/**/*.test.ts\" \"src/pm/**/*.test.ts\""
   },
   "dependencies": {
     "react": "^19.0.0",
