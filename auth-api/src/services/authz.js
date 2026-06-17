@@ -25,5 +25,6 @@ export function canCreateTask(user, project) {
 }
 
 export function canLogProgress(user, task) {
-  return task.assignee != null && String(task.assignee) === userId(user);
+  const uid = userId(user);
+  return Array.isArray(task.assignees) && task.assignees.some((a) => String(a.user) === uid);
 }

@@ -40,8 +40,15 @@ test('canCreateTask: matches canEditProject rule', () => {
 });
 
 test('canLogProgress: only the assignee may log progress', () => {
-  const task = { assignee: 'emp1' };
+  const task = { assignees: [{ user: 'emp1', sharePct: 100 }] };
   assert.equal(canLogProgress({ sub: 'emp1' }, task), true);
   assert.equal(canLogProgress({ sub: 'emp2' }, task), false);
-  assert.equal(canLogProgress({ sub: 'emp1' }, { assignee: null }), false);
+  assert.equal(canLogProgress({ sub: 'emp1' }, { assignees: [] }), false);
+});
+
+test('canLogProgress: true when user is among assignees, false otherwise', () => {
+  const task = { assignees: [{ user: 'u1', sharePct: 50 }, { user: 'u2', sharePct: 50 }] };
+  assert.equal(canLogProgress({ sub: 'u2' }, task), true);
+  assert.equal(canLogProgress({ sub: 'u3' }, task), false);
+  assert.equal(canLogProgress({ sub: 'u1' }, { assignees: [] }), false);
 });

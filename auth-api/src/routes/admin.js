@@ -67,7 +67,7 @@ export function createAdminRouter() {
     if (ownedCount > 0) {
       return res.status(409).json({ error: `reassign or archive their ${ownedCount} owned project(s) first` });
     }
-    await Task.updateMany({ assignee: target._id }, { $set: { assignee: null } });
+    await Task.updateMany({ 'assignees.user': target._id }, { $pull: { assignees: { user: target._id } } });
     await Project.updateMany({ members: target._id }, { $pull: { members: target._id } });
     await Timesheet.deleteMany({ userId: target._id });
     await RefreshToken.deleteMany({ userId: target._id });
