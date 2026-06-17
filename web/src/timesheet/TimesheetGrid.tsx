@@ -2,15 +2,16 @@ import { TaskRow } from './TaskRow';
 import { weekBarSegment } from './bar';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO } from './time';
 import type { Day } from './time';
-import type { Task, Entries } from './timesheetApi';
+import type { Task, Entries, Grant } from './timesheetApi';
 
 type Props = {
   weekStart: string;
   tasks: Task[];
   readOnly?: boolean;
-  editableDays: string[];
-  pendingDays?: string[];
-  onRequestEdit: (day: string) => void;
+  todayDay: Day | null;
+  grants: Grant[];
+  pendingKeys: Set<string>;
+  onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
   onDelete: (taskId: string) => void;
@@ -19,16 +20,12 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, readOnly = false, editableDays, pendingDays = [], onRequestEdit,
+  weekStart, tasks, readOnly = false, todayDay, grants, pendingKeys, onRequestEdit,
   onRename, onCellChange, onDelete, onAddTask, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
   const today = todayISO();
-  const editable = new Set(editableDays);
-  const pending = new Set(pendingDays);
-  const lockedDays = {} as Record<Day, boolean>;
-  DAYS.forEach((d) => { lockedDays[d] = !editable.has(d); });
 
   const dayTotal = (day: keyof Entries) =>
     tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
@@ -40,17 +37,8 @@ export function TimesheetGrid({
           <tr>
             <th className="ts-task">Task</th>
             {DAYS.map((d) => {
-              const isPast = dates[d] < today;
-              return (
-                <th key={d} className={editable.has(d) ? undefined : 'ts-day-future'}>
-                  {cols[d]}
-                  {!editable.has(d) && isPast && (
-                    pending.has(d)
-                      ? <span className="ts-req ts-pending">pending</span>
-                      : <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d)}>request</button>
-                  )}
-                </th>
-              );
+              const isFuture = dates[d] > today;
+              return <th key={d} className={isFuture ? 'ts-day-future' : undefined}>{cols[d]}</th>;
             })}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>
@@ -69,11 +57,16 @@ export function TimesheetGrid({
               key={t.id}
               task={t}
               readOnly={readOnly}
-              lockedDays={lockedDays}
+              todayDay={todayDay}
+              grants={grants}
+              dates={dates}
+              today={today}
+              pendingKeys={pendingKeys}
               bar={weekBarSegment(weekStart, t.startDate, t.endDate)}
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
               onDelete={() => onDelete(t.id)}
+              onRequestEdit={onRequestEdit}
               onProgress={(patch) => onProgress(t.id, patch)}
             />
           ))}

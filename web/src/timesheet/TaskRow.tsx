@@ -1,23 +1,29 @@
 import { TimeCell } from './TimeCell';
 import { DAYS, formatMinutes } from './time';
 import type { Day } from './time';
-import type { Task, Entries } from './timesheetApi';
+import type { Task, Entries, Grant } from './timesheetApi';
 import type { BarSegment } from './bar';
+import { isCellEditable } from './cellLock';
 
 type Props = {
   task: Task;
   readOnly?: boolean;
-  lockedDays?: Partial<Record<Day, boolean>>;
+  todayDay: Day | null;
+  grants: Grant[];
+  dates: Record<Day, string>;
+  today: string;
+  pendingKeys: Set<string>;
   bar?: BarSegment | null;
   onRename: (name: string) => void;
   onCellChange: (day: keyof Entries, minutes: number) => void;
   onDelete: () => void;
+  onRequestEdit: (day: Day, projectId: string) => void;
   onProgress: (patch: { percentComplete?: number; status?: string }) => void;
 };
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, lockedDays = {}, bar = null, onRename, onCellChange, onDelete, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, pendingKeys, bar = null, onRename, onCellChange, onDelete, onRequestEdit, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   return (
@@ -46,6 +52,10 @@ export function TaskRow({ task, readOnly = false, lockedDays = {}, bar = null, o
         const inBar = bar && i >= bar.startCol && i <= bar.endCol;
         const capL = inBar && i === bar!.startCol && !bar!.continuesLeft;
         const capR = inBar && i === bar!.endCol && !bar!.continuesRight;
+        const editable = isCellEditable(d, task.projectId, todayDay, grants);
+        const isPast = dates[d] < today;
+        const canRequest = !editable && isPast && !!task.taskId && !!task.projectId;
+        const pending = canRequest && pendingKeys.has(`${d}:${task.projectId}`);
         return (
           <td key={d} className="ts-cell">
             {inBar && (
@@ -56,9 +66,14 @@ export function TaskRow({ task, readOnly = false, lockedDays = {}, bar = null, o
             )}
             <TimeCell
               minutes={task.entries[d] || 0}
-              readOnly={readOnly || !!lockedDays[d]}
+              readOnly={readOnly || !editable}
               onChange={(m) => onCellChange(d, m)}
             />
+            {canRequest && (
+              pending
+                ? <span className="ts-req ts-pending">pending</span>
+                : <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d, task.projectId as string)}>request</button>
+            )}
           </td>
         );
       })}
