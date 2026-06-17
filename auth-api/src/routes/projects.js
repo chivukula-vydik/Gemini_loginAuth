@@ -8,6 +8,8 @@ import { Skill } from '../models/Skill.js';
 import { User } from '../models/User.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
+import { AssignmentOffer } from '../models/AssignmentOffer.js';
+import { hasActiveTask } from '../services/assignment.js';
 
 export function createProjectsRouter() {
   const router = express.Router();
@@ -89,17 +91,22 @@ export function createProjectsRouter() {
     }
     const skillIds = Array.isArray(requiredSkills) ? requiredSkills : [];
     const validSkills = await Skill.find({ _id: { $in: skillIds }, active: true }).select('_id');
+    const busy = assignee ? await hasActiveTask(assignee) : false;
     const task = await Task.create({
       project: project._id,
       title: String(title).trim(),
       description: String(description || ''),
       requiredSkills: validSkills.map((s) => s._id),
-      assignee: assignee || null,
+      assignee: assignee && !busy ? assignee : null,
       dueDate: dueDate || null,
       startDate: startDate || null,
       dependsOn: Array.isArray(dependsOn) ? dependsOn : [],
       createdBy: req.user.sub,
     });
+    if (assignee && busy) {
+      await AssignmentOffer.create({ taskId: task._id, userId: assignee, offeredBy: req.user.sub });
+      return res.status(201).json({ ...task.toObject(), offered: true });
+    }
     res.status(201).json(task);
   }));
 

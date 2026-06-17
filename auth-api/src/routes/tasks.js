@@ -10,6 +10,8 @@ import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
 import { toHours } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
+import { AssignmentOffer } from '../models/AssignmentOffer.js';
+import { hasActiveTask } from '../services/assignment.js';
 
 export function createTasksRouter() {
   const router = express.Router();
@@ -97,21 +99,28 @@ export function createTasksRouter() {
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    let offered = false;
     if ('assignee' in (req.body || {}) && req.body.assignee) {
       if (!project.members.some((m) => String(m) === String(req.body.assignee))) {
         return res.status(400).json({ error: 'assignee must be a project member' });
       }
+      const sameAssignee = task.assignee && String(task.assignee) === String(req.body.assignee);
+      if (!sameAssignee && (await hasActiveTask(req.body.assignee))) {
+        await AssignmentOffer.create({ taskId: task._id, userId: req.body.assignee, offeredBy: req.user.sub });
+        offered = true;
+      }
     }
-    for (const f of ['title', 'description', 'assignee', 'status', 'dueDate', 'startDate']) {
+    for (const f of ['title', 'description', 'status', 'dueDate', 'startDate']) {
       if (f in (req.body || {})) task[f] = req.body[f];
     }
+    if ('assignee' in (req.body || {}) && !offered) task.assignee = req.body.assignee;
     if (Array.isArray(req.body?.requiredSkills)) {
       const validSkills = await Skill.find({ _id: { $in: req.body.requiredSkills }, active: true }).select('_id');
       task.requiredSkills = validSkills.map((s) => s._id);
     }
     if (Array.isArray(req.body?.dependsOn)) task.dependsOn = req.body.dependsOn;
     await task.save();
-    res.json(task);
+    res.json(offered ? { ...task.toObject(), offered: true } : task);
   }));
 
   return router;
