@@ -83,6 +83,16 @@ test('computeRowLock: a granted project past day applies and is consumed on chan
   assert.deepEqual(consumed, [{ day: 'mon', projectId: 'pA' }]); // consumed
 });
 
+test('computeRowLock: a no-op save does not consume an existing grant', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const grants = [{ day: 'mon', projectId: 'pA' }];
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  assert.equal(rows[0].entries.mon, 45); // granted day, unchanged value stays
+  assert.deepEqual(consumed, []); // no change → not consumed
+});
+
 test('computeRowLock: an unrelated project change does not apply or consume another project grant', () => {
   const submitted = [{ id: 'r2', name: 'B', taskId: 't2', entries: { mon: 90, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const saved = [{ id: 'r2', name: 'B', taskId: 't2', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];

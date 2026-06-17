@@ -112,7 +112,7 @@ export function todayDayFor(weekStart, today) {
 export function computeRowLock({
   submittedRows = [], savedRows = [], taskProjectById = new Map(), todayDay = null, grants = [],
 }) {
-  const grantSet = new Set(grants.map((g) => `${g.day}:${g.projectId}`));
+  const grantSet = new Set(grants.map((g) => `${g.day}:${String(g.projectId)}`));
   const savedById = new Map((savedRows || []).map((r) => [String(r.id), r]));
   const projectOf = (row) => {
     if (!row || !row.taskId) return null;
