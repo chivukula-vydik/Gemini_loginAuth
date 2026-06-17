@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { myTasks, proposeEstimate, EstimateUnit, Task } from './pmApi';
+import { myTasks, proposeEstimate, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
 
 const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
 
@@ -21,9 +21,19 @@ function ProposeEstimate({ task, onPropose }: { task: Task; onPropose: (value: n
 
 export function MyTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [offers, setOffers] = useState<AssignmentOffer[]>([]);
   const [error, setError] = useState('');
 
-  function reload() { myTasks().then(setTasks).catch((e) => setError(e.message)); }
+  function reload() {
+    myTasks().then(setTasks).catch((e) => setError(e.message));
+    listMyOffers().then(setOffers).catch(() => {});
+  }
+
+  async function decide(id: string, decision: 'accept' | 'decline') {
+    setError('');
+    try { await decideOffer(id, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
   useEffect(() => { reload(); }, []);
 
   async function propose(id: string, value: number, unit: EstimateUnit) {
@@ -36,6 +46,28 @@ export function MyTasks() {
     <div className="ts-page">
       <header className="ts-header"><h1 className="ts-h1">My Tasks</h1></header>
       {error && <p className="ts-error">{error}</p>}
+      {offers.length > 0 && (
+        <div className="ts-card" style={{ marginBottom: 16 }}>
+          <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '4px 0 10px' }}>Task offers</h2>
+          <table className="ts-table">
+            <thead><tr><th className="ts-task">Task</th><th>Project</th><th></th></tr></thead>
+            <tbody>
+              {offers.map((o) => (
+                <tr key={o._id}>
+                  <td className="ts-task">{o.task.title}</td>
+                  <td>{o.project.name}</td>
+                  <td>
+                    <div className="ts-nav-left">
+                      <button className="link-btn" onClick={() => decide(o._id, 'accept')}>Accept</button>
+                      <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decide(o._id, 'decline')}>Decline</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="ts-card">
         <table className="ts-table">
           <thead>
