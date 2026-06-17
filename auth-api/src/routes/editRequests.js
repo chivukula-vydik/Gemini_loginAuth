@@ -10,7 +10,7 @@ export function createEditRequestsRouter() {
 
   router.get('/', asyncHandler(async (req, res) => {
     const status = req.query.status || 'pending';
-    const reqs = await EditRequest.find({ status })
+    const reqs = await EditRequest.find({ status, projectId: { $exists: true } })
       .populate('userId', 'displayName email')
       .populate('projectId', 'name')
       .sort('-createdAt');

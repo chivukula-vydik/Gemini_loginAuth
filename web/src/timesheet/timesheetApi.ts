@@ -26,7 +26,7 @@ export function authHeaders(): Record<string, string> {
 
 export type Grant = { day: Day; projectId: string };
 
-export type WeekData = { weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; readOnly: boolean };
+export type WeekData = { weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; pending: Grant[]; readOnly: boolean };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
   const r = await fetch(`${API}/timesheets/${weekStart}`, { headers: authHeaders(), credentials: 'include' });
@@ -37,6 +37,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     tasks: data.tasks as Task[],
     todayDay: (data.todayDay ?? null) as Day | null,
     grants: (data.grants ?? []) as Grant[],
+    pending: (data.pending ?? []) as Grant[],
     readOnly: !!data.readOnly,
   };
 }

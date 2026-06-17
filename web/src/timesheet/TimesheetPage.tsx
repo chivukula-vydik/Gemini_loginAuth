@@ -37,6 +37,7 @@ export function TimesheetPage() {
       setTasks(loaded.tasks);
       setTodayDay(loaded.todayDay);
       setGrants(loaded.grants);
+      setPendingKeys(loaded.pending.map((g) => `${g.day}:${g.projectId}`));
       setReadOnly(loaded.readOnly);
     } catch (e) {
       if (weekStartRef.current !== week) return;

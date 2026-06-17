@@ -247,6 +247,23 @@ test('edit-requests: GET is forbidden for employees', async () => {
   assert.equal(res.status, 403);
 });
 
+test('GET /edit-requests omits legacy requests that have no projectId', async () => {
+  const pm = await User.create({ email: 'leg-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'leg-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  // legacy doc (old per-day model) inserted raw to bypass the now-required projectId
+  await EditRequest.collection.insertOne({
+    userId: emp._id, weekStart: '2020-01-06', day: 'mon', status: 'pending', reason: 'legacy', createdAt: new Date(),
+  });
+  await EditRequest.create({ userId: emp._id, weekStart: '2020-01-06', day: 'tue', projectId: project._id, status: 'pending', reason: 'scoped' });
+
+  const res = await request(app).get('/edit-requests').set('Authorization', bearer(pm));
+  assert.equal(res.status, 200);
+  const reasons = res.body.map((r) => r.reason);
+  assert.ok(reasons.includes('scoped'));
+  assert.ok(!reasons.includes('legacy')); // legacy projectId-less doc filtered out
+});
+
 test('PUT /timesheets: project-scoped grant unlocks only that project and is consumed on change', async () => {
   const pm = await User.create({ email: 'ps-pm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'ps-e@x.com', displayName: 'E', role: 'employee' });
@@ -311,6 +328,11 @@ test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and row
   assert.deepEqual(res.body.grants, [{ day: 'mon', projectId: String(project._id) }]);
   const row = res.body.tasks.find((t) => t.taskId === String(task._id));
   assert.equal(row.projectId, String(project._id)); // injected row carries projectId
+
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'tue', projectId: project._id, status: 'pending' });
+  // re-fetch so the pending request is included
+  const res2 = await request(app).get(`/timesheets/${wk}`).set('Authorization', bearer(emp));
+  assert.deepEqual(res2.body.pending, [{ day: 'tue', projectId: String(project._id) }]);
 });
 
 test('POST edit-request requires a projectId the caller has a task on, and dedupes', async () => {

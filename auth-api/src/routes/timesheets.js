@@ -22,6 +22,11 @@ async function approvedGrantsFor(userId, weekStart) {
   return reqs.map((r) => ({ day: r.day, projectId: String(r.projectId) }));
 }
 
+async function pendingGrantsFor(userId, weekStart) {
+  const reqs = await EditRequest.find({ userId, weekStart, status: 'pending' }).select('day projectId');
+  return reqs.map((r) => ({ day: r.day, projectId: String(r.projectId) }));
+}
+
 export function createTimesheetRouter() {
   const router = express.Router();
   router.use(requireAuth);
@@ -67,9 +72,10 @@ export function createTimesheetRouter() {
     const tasks = mergeWeekRows({ savedRows, assignedTasks: assignedForMerge, taskInfoById, editable: injectable });
 
     const grants = await approvedGrantsFor(userId, weekStart);
+    const pending = await pendingGrantsFor(userId, weekStart);
     const todayDay = todayDayFor(weekStart, todayISO());
     const readOnly = weekStart < currentMonday() && grants.length === 0;
-    res.json({ weekStart, tasks, todayDay, grants, readOnly });
+    res.json({ weekStart, tasks, todayDay, grants, pending, readOnly });
   }));
 
   router.put('/:weekStart', asyncHandler(async (req, res) => {
