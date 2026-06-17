@@ -14,6 +14,8 @@ export type Task = {
   estimatedHours?: number;
   actualMinutes?: number;
   status?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 export function authHeaders(): Record<string, string> {
