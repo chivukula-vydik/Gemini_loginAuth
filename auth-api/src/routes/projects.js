@@ -9,8 +9,7 @@ import { User } from '../models/User.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 import { effectiveDueDate, proposedDueDate } from '../services/estimate.js';
-import { AssignmentOffer } from '../models/AssignmentOffer.js';
-import { hasActiveTask } from '../services/assignment.js';
+import { equalShares } from '../services/workload.js';
 
 export function createProjectsRouter() {
   const router = express.Router();
@@ -46,7 +45,7 @@ export function createProjectsRouter() {
     await project.populate('members', 'displayName email');
     await project.populate('ownerPm', 'displayName email role');
     const tasks = await Task.find({ project: project._id })
-      .populate('assignee', 'displayName email')
+      .populate('assignees.user', 'displayName email')
       .sort('createdAt');
     const map = await actualMinutesByTask(tasks.map((t) => t._id));
     const tasksOut = tasks.map((t) => {
@@ -95,30 +94,31 @@ export function createProjectsRouter() {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canCreateTask(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    const { title, description, requiredSkills, assignee, dueDate, startDate, dependsOn } = req.body || {};
+    const { title, description, requiredSkills, assignees, assignee, dueDate, startDate, dependsOn } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
-    if (assignee && !project.members.some((m) => String(m) === String(assignee))) {
-      return res.status(400).json({ error: 'assignee must be a project member' });
+
+    // Accept `assignees: [userId]` (preferred) or legacy single `assignee`.
+    const requested = Array.isArray(assignees) ? assignees.map(String) : (assignee ? [String(assignee)] : []);
+    const memberSet = new Set(project.members.map((m) => String(m)));
+    if (!requested.every((uid) => memberSet.has(uid))) {
+      return res.status(400).json({ error: 'every assignee must be a project member' });
     }
+    const shares = equalShares(requested.length);
+    const assigneeDocs = requested.map((user, i) => ({ user, sharePct: shares[i] }));
+
     const skillIds = Array.isArray(requiredSkills) ? requiredSkills : [];
     const validSkills = await Skill.find({ _id: { $in: skillIds }, active: true }).select('_id');
-    const busy = assignee ? await hasActiveTask(assignee) : false;
     const task = await Task.create({
       project: project._id,
       title: String(title).trim(),
       description: String(description || ''),
       requiredSkills: validSkills.map((s) => s._id),
-      assignee: assignee && !busy ? assignee : null,
+      assignees: assigneeDocs,
       dueDate: dueDate || null,
       startDate: startDate || null,
       dependsOn: Array.isArray(dependsOn) ? dependsOn : [],
       createdBy: req.user.sub,
     });
-    if (assignee && busy) {
-      const dup = await AssignmentOffer.exists({ taskId: task._id, userId: assignee, status: 'pending' });
-      if (!dup) await AssignmentOffer.create({ taskId: task._id, userId: assignee, offeredBy: req.user.sub });
-      return res.status(201).json({ ...task.toObject(), offered: true });
-    }
     res.status(201).json(task);
   }));
 
