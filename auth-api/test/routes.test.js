@@ -131,7 +131,7 @@ test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine re
   const { currentMonday } = await import('../src/services/timesheetRows.js');
   const wk = currentMonday();
   // Monday is a past/locked day unless today is Monday; approve it so the write applies.
-  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', status: 'approved' });
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: project._id, status: 'approved' });
   await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
     tasks: [
       { id: 'r1', name: 'Mine', taskId: String(mine._id), entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } },
@@ -247,28 +247,85 @@ test('edit-requests: GET is forbidden for employees', async () => {
   assert.equal(res.status, 403);
 });
 
-test('PUT /timesheets ignores a locked past day until it is approved', async () => {
+test('PUT /timesheets: project-scoped grant unlocks only that project and is consumed on change', async () => {
   const { currentMonday } = await import('../src/services/timesheetRows.js');
-  const emp = await User.create({ email: 'lock-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'ps-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ps-e@x.com', displayName: 'E', role: 'employee' });
+  const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
+  const projB = await Project.create({ name: 'B', ownerPm: pm._id, members: [emp._id] });
+  const taskA = await Task.create({ project: projA._id, title: 'TA', assignee: emp._id, createdBy: pm._id });
+  const taskB = await Task.create({ project: projB._id, title: 'TB', assignee: emp._id, createdBy: pm._id });
   const wk = currentMonday();
-  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
-    tasks: [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }],
-  });
-  let saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
-  const monBefore = saved.tasks.find((t) => t.id === 'r1')?.entries.mon ?? 0;
 
-  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', status: 'approved' });
-  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({
-    tasks: [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }],
-  });
-  saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
-  const monAfter = saved.tasks.find((t) => t.id === 'r1')?.entries.mon ?? 0;
+  // seed saved rows with zero minutes on Monday
+  await Timesheet.create({ userId: emp._id, weekStart: wk, tasks: [
+    { id: String(taskA._id), name: 'TA', taskId: taskA._id, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } },
+    { id: String(taskB._id), name: 'TB', taskId: taskB._id, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ] });
 
+  // approve a Monday grant for project A only
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id, status: 'approved' });
+
+  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({ tasks: [
+    { id: String(taskA._id), name: 'TA', taskId: String(taskA._id), entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } },
+    { id: String(taskB._id), name: 'TB', taskId: String(taskB._id), entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ] });
+
+  const saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
+  const monA = saved.tasks.find((t) => t.id === String(taskA._id)).entries.mon;
+  const monB = saved.tasks.find((t) => t.id === String(taskB._id)).entries.mon;
   const todayDow = new Date().getUTCDay();
   if (todayDow !== 1) {
-    assert.equal(monBefore, 0); // Monday was locked before approval (today isn't Monday)
+    assert.equal(monA, 120); // project A unlocked by grant
+    assert.equal(monB, 0);   // project B stays locked
+    const grant = await EditRequest.findOne({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id });
+    assert.equal(grant.status, 'used'); // grant consumed by the change
   }
-  assert.equal(monAfter, 120); // editable after approval
+});
+
+test('PUT /timesheets: a no-op save leaves an approved grant approved', async () => {
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const pm = await User.create({ email: 'noop-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'noop-e@x.com', displayName: 'E', role: 'employee' });
+  const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
+  const taskA = await Task.create({ project: projA._id, title: 'TA', assignee: emp._id, createdBy: pm._id });
+  const wk = currentMonday();
+  await Timesheet.create({ userId: emp._id, weekStart: wk, tasks: [
+    { id: String(taskA._id), name: 'TA', taskId: taskA._id, entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ] });
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id, status: 'approved' });
+
+  await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({ tasks: [
+    { id: String(taskA._id), name: 'TA', taskId: String(taskA._id), entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ] });
+
+  const grant = await EditRequest.findOne({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id });
+  assert.equal(grant.status, 'approved'); // unchanged → not consumed
+});
+
+test('POST edit-request requires a projectId the caller has a task on, and dedupes', async () => {
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const pm = await User.create({ email: 'req-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'req-e@x.com', displayName: 'E', role: 'employee' });
+  const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
+  const projOther = await Project.create({ name: 'O', ownerPm: pm._id, members: [] });
+  await Task.create({ project: projA._id, title: 'TA', assignee: emp._id, createdBy: pm._id });
+  const wk = currentMonday();
+  // a guaranteed past day: previous week's Monday
+  const prevMon = new Date(`${wk}T00:00:00Z`); prevMon.setUTCDate(prevMon.getUTCDate() - 7);
+  const pastWeek = prevMon.toISOString().slice(0, 10);
+
+  const noTask = await request(app).post(`/timesheets/${pastWeek}/edit-requests`)
+    .set('Authorization', bearer(emp)).send({ day: 'mon', projectId: String(projOther._id) });
+  assert.equal(noTask.status, 400); // no task on that project
+
+  const ok = await request(app).post(`/timesheets/${pastWeek}/edit-requests`)
+    .set('Authorization', bearer(emp)).send({ day: 'mon', projectId: String(projA._id) });
+  assert.equal(ok.status, 201);
+
+  const dup = await request(app).post(`/timesheets/${pastWeek}/edit-requests`)
+    .set('Authorization', bearer(emp)).send({ day: 'mon', projectId: String(projA._id) });
+  assert.equal(dup.status, 409); // pending duplicate
 });
 
 test('PATCH /tasks/:id/estimate: assignee proposes, non-assignee 403; PM approves', async () => {

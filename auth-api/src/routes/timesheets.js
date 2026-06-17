@@ -1,11 +1,12 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
 import {
-  mergeWeekRows, sanitizeRows, applyDayLock, currentMonday, editableDaysFor, todayISO, DAYS,
+  mergeWeekRows, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
 } from '../services/timesheetRows.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 
@@ -16,9 +17,9 @@ function isValidMonday(s) {
   return d.getUTCDay() === 1;
 }
 
-async function approvedDaysFor(userId, weekStart) {
-  const reqs = await EditRequest.find({ userId, weekStart, status: 'approved' }).select('day');
-  return reqs.map((r) => r.day);
+async function approvedGrantsFor(userId, weekStart) {
+  const reqs = await EditRequest.find({ userId, weekStart, status: 'approved' }).select('day projectId');
+  return reqs.map((r) => ({ day: r.day, projectId: String(r.projectId) }));
 }
 
 export function createTimesheetRouter() {
@@ -38,7 +39,7 @@ export function createTimesheetRouter() {
     let assignedTasks = [];
     if (injectable) {
       assignedTasks = await Task.find({ assignee: userId, status: { $ne: 'done' } })
-        .select('title percentComplete estimatedHours status startDate');
+        .select('title percentComplete estimatedHours status startDate project');
     }
 
     const ids = new Set();
@@ -48,48 +49,56 @@ export function createTimesheetRouter() {
     const actualMap = await actualMinutesByTask(idList);
 
     const infoTasks = idList.length
-      ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status startDate')
+      ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status startDate project')
       : [];
     const taskInfoById = new Map(infoTasks.map((t) => [String(t._id), {
       title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
       status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
       startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
+      projectId: t.project ? String(t.project) : null,
     }]));
     const assignedForMerge = assignedTasks.map((t) => ({
       _id: String(t._id), title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
       status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
       startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
+      projectId: t.project ? String(t.project) : null,
     }));
 
     const tasks = mergeWeekRows({ savedRows, assignedTasks: assignedForMerge, taskInfoById, editable: injectable });
 
-    const approved = await approvedDaysFor(userId, weekStart);
-    const editableDays = editableDaysFor(weekStart, todayISO(), approved);
-    const readOnly = weekStart < currentMonday() && editableDays.length === 0;
-
-    res.json({ weekStart, tasks, editableDays, readOnly });
+    const grants = await approvedGrantsFor(userId, weekStart);
+    const todayDay = todayDayFor(weekStart, todayISO());
+    const readOnly = weekStart < currentMonday() && grants.length === 0;
+    res.json({ weekStart, tasks, todayDay, grants, readOnly });
   }));
 
   router.put('/:weekStart', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     const userId = req.user.sub;
-    const assigned = await Task.find({ assignee: userId }).select('_id');
+    const assigned = await Task.find({ assignee: userId }).select('_id project');
     const allowed = assigned.map((t) => String(t._id));
+    const taskProjectById = new Map(assigned.map((t) => [String(t._id), String(t.project)]));
     const sanitized = sanitizeRows(req.body?.tasks, allowed);
 
     const doc = await Timesheet.findOne({ userId, weekStart });
     const savedRows = doc ? doc.tasks : [];
-    const approved = await approvedDaysFor(userId, weekStart);
-    const editableDays = editableDaysFor(weekStart, todayISO(), approved);
-    const tasks = applyDayLock(sanitized, savedRows, editableDays);
+    const grants = await approvedGrantsFor(userId, weekStart);
+    const todayDay = todayDayFor(weekStart, todayISO());
+    const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, todayDay, grants });
 
     const updatedAt = new Date();
     await Timesheet.updateOne(
       { userId, weekStart },
-      { $set: { tasks, updatedAt }, $setOnInsert: { userId, weekStart } },
+      { $set: { tasks: rows, updatedAt }, $setOnInsert: { userId, weekStart } },
       { upsert: true },
     );
+    for (const g of consumed) {
+      await EditRequest.updateOne(
+        { userId, weekStart, day: g.day, projectId: g.projectId, status: 'approved' },
+        { $set: { status: 'used' } },
+      );
+    }
     res.json({ ok: true, updatedAt });
   }));
 
@@ -98,18 +107,21 @@ export function createTimesheetRouter() {
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     const day = req.body?.day;
     if (!DAYS.includes(day)) return res.status(400).json({ error: 'invalid day' });
+    const projectId = req.body?.projectId;
+    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'invalid projectId' });
     const userId = req.user.sub;
-    const editableDays = editableDaysFor(weekStart, todayISO(), []);
-    if (editableDays.includes(day)) return res.status(400).json({ error: 'that day is already editable' });
+    if (todayDayFor(weekStart, todayISO()) === day) return res.status(400).json({ error: 'that day is already editable' });
     const idx = DAYS.indexOf(day);
     const dayDate = new Date(`${weekStart}T00:00:00Z`);
     dayDate.setUTCDate(dayDate.getUTCDate() + idx);
     if (dayDate.toISOString().slice(0, 10) >= todayISO()) {
       return res.status(400).json({ error: 'can only request edits for a past day' });
     }
-    const existing = await EditRequest.findOne({ userId, weekStart, day, status: { $in: ['pending', 'approved'] } });
+    const hasTask = await Task.exists({ assignee: userId, project: projectId });
+    if (!hasTask) return res.status(400).json({ error: 'no task on that project' });
+    const existing = await EditRequest.findOne({ userId, weekStart, day, projectId, status: { $in: ['pending', 'approved'] } });
     if (existing) return res.status(409).json({ error: 'a request for this day already exists' });
-    const reqDoc = await EditRequest.create({ userId, weekStart, day, reason: String(req.body?.reason || '') });
+    const reqDoc = await EditRequest.create({ userId, weekStart, day, projectId, reason: String(req.body?.reason || '') });
     res.status(201).json(reqDoc);
   }));
 
