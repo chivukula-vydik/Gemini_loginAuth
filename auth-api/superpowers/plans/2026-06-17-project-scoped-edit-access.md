@@ -276,7 +276,13 @@ git commit -m "feat(edit-access): mergeWeekRows carries projectId"
 
 - [ ] **Step 1: Write/rewrite the failing route tests**
 
-In `auth-api/test/routes.test.js`, **replace** the test `'PUT /timesheets ignores a locked past day until it is approved'` (≈ lines 250–272) with the two project-scoped tests below, and add the POST validation test:
+First, **fix the existing test** `'PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine reports actualMinutes'` (≈ line 124): its `EditRequest.create(...)` call (≈ line 134) lacks the now-required `projectId`. Add it so the grant unlocks that project's Monday for row `r1` (which has `taskId: String(mine._id)`):
+
+```js
+await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: project._id, status: 'approved' });
+```
+
+Then **replace** the test `'PUT /timesheets ignores a locked past day until it is approved'` (≈ lines 250–272) with the two project-scoped tests below, and add the POST validation test:
 
 ```js
 test('PUT /timesheets: project-scoped grant unlocks only that project and is consumed on change', async () => {
