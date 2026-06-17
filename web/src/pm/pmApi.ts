@@ -85,7 +85,7 @@ export const createProject = (body: Partial<Project>) => authed('/projects', 'PO
 export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm'> & { members: Person[]; ownerPm: Person };
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
-export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[]; assignees?: string[] }) =>
+export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
 export const setTaskAssignees = (taskId: string, assignees: { user: string; sharePct: number }[]) =>

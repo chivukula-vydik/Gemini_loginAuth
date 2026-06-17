@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  listProjects, createProject, getProject, createTask,
+  listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
   decideEstimate, updateTask, decideExtension,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
@@ -8,6 +8,8 @@ import {
 import { ProgressRing } from './ProgressRing';
 import { dueUrgency } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
+import { AssigneesEditor } from './AssigneesEditor';
+import { assigneeHours } from './workload';
 
 function DueCell({ task, onSave, onDecideExt }: {
   task: TaskDetail;
@@ -97,12 +99,13 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [directory, setDirectory] = useState<Person[]>([]);
   const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState('');
+  const [assignees, setAssignees] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [editingAssignees, setEditingAssignees] = useState<string | null>(null);
 
   function reload() {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
@@ -136,16 +139,14 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     if (!title.trim()) return;
     setError('');
     try {
-      const created = await createTask(id, {
+      await createTask(id, {
         title: title.trim(),
-        assignee: assignee || null,
+        assignees: [...assignees],
         startDate: startDate || null,
         requiredSkills: [...reqSkills],
       });
-      setNotice(created.offered
-        ? 'That employee already has an active task — sent them an offer to accept.'
-        : '');
-      setTitle(''); setAssignee(''); setStartDate(''); setReqSkills(new Set());
+      setNotice('');
+      setTitle(''); setAssignees(new Set()); setStartDate(''); setReqSkills(new Set());
       reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -173,6 +174,12 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   async function decideExt(taskId: string, decision: 'approve' | 'reject') {
     setError('');
     try { await decideExtension(taskId, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveAssignees(taskId: string, next: { user: string; sharePct: number }[]) {
+    setError('');
+    try { await setTaskAssignees(taskId, next); setEditingAssignees(null); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -275,10 +282,18 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <div className="ts-nav-left" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="input" placeholder="Task title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <select className="input" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">Unassigned</option>
-            {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName || m.email}</option>)}
-          </select>
+          <div className="chips" style={{ justifyContent: 'flex-start' }}>
+            {project.members.length === 0 && <span className="ts-sub">Add members to assign</span>}
+            {project.members.map((m) => (
+              <button key={m._id} type="button" className="chip"
+                style={{ cursor: 'pointer', opacity: assignees.has(m._id) ? 1 : 0.4 }}
+                onClick={() => setAssignees((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(m._id)) next.delete(m._id); else next.add(m._id);
+                  return next;
+                })}>{m.displayName || m.email}</button>
+            ))}
+          </div>
           <input className="input" type="date" value={startDate}
             onChange={(e) => setStartDate(e.target.value)} title="Start date" />
           <button className="btn btn-primary" onClick={add}>Add task</button>
@@ -300,7 +315,26 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {tasks.map((t) => (
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
-                <td>{t.assignee ? (t.assignee.displayName || t.assignee.email) : 'Unassigned'}</td>
+                <td>
+                  {editingAssignees === t._id ? (
+                    <AssigneesEditor
+                      members={project.members}
+                      value={t.assignees.map((a) => ({ userId: a.user._id, sharePct: a.sharePct }))}
+                      onSave={(next) => saveAssignees(t._id, next)}
+                      onClose={() => setEditingAssignees(null)}
+                    />
+                  ) : (
+                    <button className="assignees-cell" type="button" onClick={() => setEditingAssignees(t._id)}>
+                      {t.assignees.length === 0
+                        ? <span className="ts-sub">Unassigned</span>
+                        : t.assignees.map((a) => (
+                            <span key={a.user._id} className="chip assignee-chip">
+                              {a.user.displayName || a.user.email} - {a.sharePct}% ({assigneeHours(t.estimatedHours, a.sharePct)}h)
+                            </span>
+                          ))}
+                    </button>
+                  )}
+                </td>
                 <td>
                   {t.estimateStatus === 'proposed' ? (
                     <span className="ts-nav-left">
