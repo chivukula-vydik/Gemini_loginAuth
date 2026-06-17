@@ -109,8 +109,10 @@ export function createTimesheetRouter() {
 
     const grants = await approvedGrantsFor(userId, weekStart);
     const pending = await pendingGrantsFor(userId, weekStart);
-    const todayDay = todayDayFor(weekStart, todayISO());
     const status = doc?.status || 'draft';
+    // Once submitted/approved, "today" is no longer auto-editable — only approved
+    // grants punch through. Mirrors the PUT handler's lock logic.
+    const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
     const readOnly = (weekStart < currentMonday() && grants.length === 0) || weekLocked(status);
     res.json({
       weekStart, tasks, todayDay, grants, pending, readOnly,

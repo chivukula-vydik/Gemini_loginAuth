@@ -72,7 +72,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
             )}
             <TimeCell
               minutes={task.entries[d] || 0}
-              readOnly={readOnly || !editable}
+              readOnly={!editable}
               onChange={(m) => onCellChange(d, m)}
             />
             {canRequest && (
