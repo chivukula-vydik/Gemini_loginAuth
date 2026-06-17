@@ -9,7 +9,16 @@ const taskSchema = new mongoose.Schema({
   estimateUnit: { type: String, enum: ['hours', 'days', 'weeks'], default: 'hours' },
   startDate: { type: Date, default: null },
   requiredSkills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
-  assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  assignees: {
+    type: [new mongoose.Schema(
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        sharePct: { type: Number, default: 0, min: 0, max: 100 },
+      },
+      { _id: false },
+    )],
+    default: [],
+  },
   status: { type: String, enum: ['todo', 'in_progress', 'blocked', 'done'], default: 'todo' },
   percentComplete: { type: Number, default: 0, min: 0, max: 100 },
   proposedHours: { type: Number, default: 0 },
