@@ -148,6 +148,9 @@ export function MyTasks() {
                   {t.estimateStatus === 'approved'
                     ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
+                  {(t.mySharePct ?? 0) > 0 && (t.assignees?.length ?? 0) > 1 && (
+                    <div className="ts-sub">Your share {t.mySharePct}% - {t.myPlannedHours}h</div>
+                  )}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
