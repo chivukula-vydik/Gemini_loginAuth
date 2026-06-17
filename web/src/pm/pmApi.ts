@@ -20,6 +20,7 @@ export type UserRow = { _id: string; email: string; displayName: string; role: R
 export type Person = { _id: string; displayName: string; email: string; role?: Role };
 export type EditReq = {
   _id: string; userId: Person; weekStart: string; day: string; reason: string; status: string; createdAt: string;
+  projectId?: { _id: string; name: string } | null;
 };
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;

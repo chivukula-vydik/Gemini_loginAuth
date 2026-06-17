@@ -37,14 +37,15 @@ export function Requests() {
       <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Timesheet edit requests</h2>
       <div className="ts-card" style={{ marginBottom: 22 }}>
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Employee</th><th>Week</th><th>Day</th><th>Reason</th><th></th></tr></thead>
+          <thead><tr><th className="ts-task">Employee</th><th>Week</th><th>Day</th><th>Project</th><th>Reason</th><th></th></tr></thead>
           <tbody>
-            {reqs.length === 0 && <tr><td colSpan={5} className="ts-empty">No pending edit requests.</td></tr>}
+            {reqs.length === 0 && <tr><td colSpan={6} className="ts-empty">No pending edit requests.</td></tr>}
             {reqs.map((r) => (
               <tr key={r._id}>
                 <td className="ts-task">{r.userId?.displayName || r.userId?.email || '—'}</td>
                 <td>{r.weekStart}</td>
                 <td>{DAY_LABEL[r.day] || r.day}</td>
+                <td>{r.projectId?.name || '—'}</td>
                 <td>{r.reason || '—'}</td>
                 <td>
                   <div className="ts-nav-left">
