@@ -79,7 +79,7 @@ export function createTimesheetRouter() {
 
     let assignedTasks = [];
     if (injectable) {
-      assignedTasks = await Task.find({ assignee: userId, status: { $ne: 'done' } })
+      assignedTasks = await Task.find({ 'assignees.user': userId, status: { $ne: 'done' } })
         .select('title percentComplete estimatedHours status startDate project');
     }
 
@@ -126,7 +126,7 @@ export function createTimesheetRouter() {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     const userId = req.user.sub;
-    const assigned = await Task.find({ assignee: userId }).select('_id project');
+    const assigned = await Task.find({ 'assignees.user': userId }).select('_id project');
     const allowed = assigned.map((t) => String(t._id));
     const taskProjectById = new Map(assigned.map((t) => [String(t._id), String(t.project)]));
     const sanitized = sanitizeRows(req.body?.tasks, allowed);
@@ -188,7 +188,7 @@ export function createTimesheetRouter() {
     if (dayDate.toISOString().slice(0, 10) >= todayISO()) {
       return res.status(400).json({ error: 'can only request edits for a past day' });
     }
-    const hasTask = await Task.exists({ assignee: userId, project: projectId });
+    const hasTask = await Task.exists({ 'assignees.user': userId, project: projectId });
     if (!hasTask) return res.status(400).json({ error: 'no task on that project' });
     const existing = await EditRequest.findOne({ userId, weekStart, day, projectId, status: { $in: ['pending', 'approved'] } });
     if (existing) return res.status(409).json({ error: 'a request for this day already exists' });
