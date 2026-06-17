@@ -60,6 +60,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [directory, setDirectory] = useState<Person[]>([]);
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('');
+  const [startDate, setStartDate] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
@@ -99,9 +100,10 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       await createTask(id, {
         title: title.trim(),
         assignee: assignee || null,
+        startDate: startDate || null,
         requiredSkills: [...reqSkills],
       });
-      setTitle(''); setAssignee(''); setReqSkills(new Set());
+      setTitle(''); setAssignee(''); setStartDate(''); setReqSkills(new Set());
       reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -189,6 +191,8 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <option value="">Unassigned</option>
             {project.members.map((m) => <option key={m._id} value={m._id}>{m.displayName || m.email}</option>)}
           </select>
+          <input className="input" type="date" value={startDate}
+            onChange={(e) => setStartDate(e.target.value)} title="Start date" />
           <button className="btn btn-primary" onClick={add}>Add task</button>
         </div>
         <div className="chips" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
@@ -212,11 +216,11 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
                 <td>
                   {t.estimateStatus === 'proposed' ? (
                     <span className="ts-nav-left">
-                      {t.proposedHours ?? 0}h?
+                      {t.proposedValue ?? 0} {t.proposedUnit ?? 'hours'}?
                       <button className="link-btn" onClick={() => decide(t._id, 'approve')}>approve</button>
                       <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decide(t._id, 'reject')}>reject</button>
                     </span>
-                  ) : t.estimateStatus === 'approved' ? `${t.estimatedHours}h`
+                  ) : t.estimateStatus === 'approved' ? `${t.estimateValue ?? t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <span className="ts-sub">{t.estimateStatus === 'rejected' ? 'rejected' : 'no estimate'}</span>}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
