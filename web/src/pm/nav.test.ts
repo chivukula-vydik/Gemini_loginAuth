@@ -11,5 +11,5 @@ test('pm nav', () => {
 });
 
 test('employee nav', () => {
-  assert.deepEqual(navForRole('employee').map((n) => n.key), ['my-tasks', 'my-skills', 'timesheet']);
+  assert.deepEqual(navForRole('employee').map((n) => n.key), ['my-tasks', 'my-skills', 'marketplace', 'timesheet']);
 });

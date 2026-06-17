@@ -8,6 +8,7 @@ import { Projects } from './pm/Projects';
 import { MyTasks } from './pm/MyTasks';
 import { MySkills } from './pm/MySkills';
 import { Requests } from './pm/Requests';
+import { Marketplace } from './pm/Marketplace';
 
 function viewFor(key: NavKey) {
   switch (key) {
@@ -17,6 +18,7 @@ function viewFor(key: NavKey) {
     case 'requests': return <Requests />;
     case 'my-tasks': return <MyTasks />;
     case 'my-skills': return <MySkills />;
+    case 'marketplace': return <Marketplace />;
     case 'timesheet': return <TimesheetPage />;
   }
 }
