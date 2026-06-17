@@ -14,6 +14,7 @@ const { Task } = await import('../src/models/Task.js');
 const { Timesheet } = await import('../src/models/Timesheet.js');
 const { EditRequest } = await import('../src/models/EditRequest.js');
 const { ClaimRequest } = await import('../src/models/ClaimRequest.js');
+const { AssignmentOffer } = await import('../src/models/AssignmentOffer.js');
 const { signAccessToken } = await import('../src/services/tokens.js');
 
 let mongod;
@@ -396,4 +397,74 @@ test('task create + edit accept a startDate', async () => {
     .set('Authorization', bearer(pm)).send({ startDate: '2026-06-18' });
   assert.equal(edited.status, 200);
   assert.equal(String(edited.body.startDate).slice(0, 10), '2026-06-18');
+});
+
+test('assigning a busy employee creates an offer, not an assignment', async () => {
+  const pm = await User.create({ email: 'of-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'of-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  await Task.create({ project: project._id, title: 'Busy', assignee: emp._id, status: 'in_progress', createdBy: pm._id });
+  const second = await Task.create({ project: project._id, title: 'Second', createdBy: pm._id });
+
+  const res = await request(app).patch(`/tasks/${second._id}`)
+    .set('Authorization', bearer(pm)).send({ assignee: String(emp._id) });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.offered, true);
+  const saved = await Task.findById(second._id);
+  assert.equal(saved.assignee, null);
+  const offer = await AssignmentOffer.findOne({ taskId: second._id, userId: emp._id, status: 'pending' });
+  assert.ok(offer);
+});
+
+test('a free employee is assigned directly (no offer)', async () => {
+  const pm = await User.create({ email: 'fr-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'fr-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const res = await request(app).patch(`/tasks/${task._id}`)
+    .set('Authorization', bearer(pm)).send({ assignee: String(emp._id) });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.offered, undefined);
+  const saved = await Task.findById(task._id);
+  assert.equal(String(saved.assignee), String(emp._id));
+});
+
+test('employee accepts an offer -> task assigned; another employee cannot decide it', async () => {
+  const pm = await User.create({ email: 'ac-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ac-e@x.com', displayName: 'E', role: 'employee' });
+  const other = await User.create({ email: 'ac-o@x.com', displayName: 'O', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const offer = await AssignmentOffer.create({ taskId: task._id, userId: emp._id, offeredBy: pm._id });
+
+  const mine = await request(app).get('/assignment-offers/mine').set('Authorization', bearer(emp));
+  assert.equal(mine.status, 200);
+  assert.equal(mine.body.length, 1);
+  assert.equal(mine.body[0].task.title, 'T');
+
+  const forbidden = await request(app).patch(`/assignment-offers/${offer._id}`)
+    .set('Authorization', bearer(other)).send({ decision: 'accept' });
+  assert.equal(forbidden.status, 403);
+
+  const ok = await request(app).patch(`/assignment-offers/${offer._id}`)
+    .set('Authorization', bearer(emp)).send({ decision: 'accept' });
+  assert.equal(ok.status, 200);
+  const saved = await Task.findById(task._id);
+  assert.equal(String(saved.assignee), String(emp._id));
+});
+
+test('declining an offer leaves the task unassigned', async () => {
+  const pm = await User.create({ email: 'dc-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'dc-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const offer = await AssignmentOffer.create({ taskId: task._id, userId: emp._id, offeredBy: pm._id });
+
+  const res = await request(app).patch(`/assignment-offers/${offer._id}`)
+    .set('Authorization', bearer(emp)).send({ decision: 'decline' });
+  assert.equal(res.status, 200);
+  const saved = await Task.findById(task._id);
+  assert.equal(saved.assignee, null);
+  const updated = await AssignmentOffer.findById(offer._id);
+  assert.equal(updated.status, 'declined');
 });
