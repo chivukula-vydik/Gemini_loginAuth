@@ -33,12 +33,22 @@ export type Task = {
   actualMinutes?: number;
   proposedHours?: number;
   estimateStatus?: string;
+  estimateValue?: number;
+  estimateUnit?: 'hours' | 'days' | 'weeks';
+  startDate?: string | null;
+  proposedValue?: number;
+  proposedUnit?: 'hours' | 'days' | 'weeks';
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
   assignee: Person | null; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
+  estimateValue?: number;
+  estimateUnit?: 'hours' | 'days' | 'weeks';
+  startDate?: string | null;
+  proposedValue?: number;
+  proposedUnit?: 'hours' | 'days' | 'weeks';
 };
 
 export const listUsers = () => authed('/admin/users') as Promise<UserRow[]>;
@@ -90,7 +100,8 @@ export const listClaimRequests = () => authed('/claim-requests?status=pending') 
 export const decideClaimRequest = (id: string, decision: 'approved' | 'denied') =>
   authed(`/claim-requests/${id}`, 'PATCH', { decision });
 
-export const proposeEstimate = (id: string, proposedHours: number) =>
-  authed(`/tasks/${id}/estimate`, 'PATCH', { proposedHours });
+export type EstimateUnit = 'hours' | 'days' | 'weeks';
+export const proposeEstimate = (id: string, value: number, unit: EstimateUnit) =>
+  authed(`/tasks/${id}/estimate`, 'PATCH', { value, unit });
 export const decideEstimate = (id: string, decision: 'approve' | 'reject') =>
   authed(`/tasks/${id}/estimate/decision`, 'PATCH', { decision });

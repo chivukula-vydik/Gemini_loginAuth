@@ -1,15 +1,34 @@
 import { useEffect, useState } from 'react';
-import { myTasks, proposeEstimate, Task } from './pmApi';
+import { myTasks, proposeEstimate, EstimateUnit, Task } from './pmApi';
+
+const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
+
+function ProposeEstimate({ task, onPropose }: { task: Task; onPropose: (value: number, unit: EstimateUnit) => void }) {
+  const [value, setValue] = useState<number>(task.proposedValue ?? 0);
+  const [unit, setUnit] = useState<EstimateUnit>(task.proposedUnit ?? 'hours');
+  return (
+    <span className="ts-nav-left">
+      <input className="ts-pct" type="number" min={0} value={value}
+        onChange={(e) => setValue(Number(e.target.value))} />
+      <select className="input ts-status" value={unit} onChange={(e) => setUnit(e.target.value as EstimateUnit)}>
+        {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <button className="link-btn" onClick={() => onPropose(value, unit)}>propose</button>
+      <span className="ts-sub">{task.estimateStatus === 'proposed' ? 'proposed' : task.estimateStatus === 'rejected' ? 'rejected' : ''}</span>
+    </span>
+  );
+}
 
 export function MyTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState('');
 
-  useEffect(() => { myTasks().then(setTasks).catch((e) => setError(e.message)); }, []);
+  function reload() { myTasks().then(setTasks).catch((e) => setError(e.message)); }
+  useEffect(() => { reload(); }, []);
 
-  async function propose(id: string, hours: number) {
+  async function propose(id: string, value: number, unit: EstimateUnit) {
     setError('');
-    try { await proposeEstimate(id, hours); myTasks().then(setTasks); }
+    try { await proposeEstimate(id, value, unit); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -33,14 +52,8 @@ export function MyTasks() {
                 <td>{typeof t.project === 'object' ? t.project.name : '—'}</td>
                 <td>
                   {t.estimateStatus === 'approved'
-                    ? `${t.estimatedHours}h`
-                    : (
-                      <span className="ts-nav-left">
-                        <input className="ts-pct" type="number" min={0} defaultValue={t.proposedHours ?? 0}
-                          onBlur={(e) => propose(t._id, Number(e.target.value))} />
-                        <span className="ts-sub">{t.estimateStatus === 'proposed' ? 'proposed' : t.estimateStatus === 'rejected' ? 'rejected' : 'propose hrs'}</span>
-                      </span>
-                    )}
+                    ? `${t.estimateValue ?? t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
+                    : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
