@@ -24,11 +24,9 @@ export function weekBarSegment(
 
   let startCol = 0;
   for (let i = 0; i < 5; i++) { if (dates[i] >= startISO) { startCol = i; break; } }
-  if (startISO <= monday) startCol = 0;
 
   let endCol = 4;
   for (let i = 4; i >= 0; i--) { if (dates[i] <= endISO) { endCol = i; break; } }
-  if (endISO >= friday) endCol = 4;
 
   return {
     startCol,

@@ -26,3 +26,18 @@ test('null dates return null', () => {
   assert.equal(weekBarSegment('2026-06-15', null, '2026-06-17'), null);
   assert.equal(weekBarSegment('2026-06-15', '2026-06-16', null), null);
 });
+
+test('start on Monday, end on Friday: both caps, no continuation', () => {
+  assert.deepEqual(weekBarSegment('2026-06-15', '2026-06-15', '2026-06-19'),
+    { startCol: 0, endCol: 4, continuesLeft: false, continuesRight: false });
+});
+
+test('single-day bar: startCol === endCol', () => {
+  assert.deepEqual(weekBarSegment('2026-06-15', '2026-06-17', '2026-06-17'),
+    { startCol: 2, endCol: 2, continuesLeft: false, continuesRight: false });
+});
+
+test('spans the whole week from before to after', () => {
+  assert.deepEqual(weekBarSegment('2026-06-15', '2026-06-08', '2026-06-29'),
+    { startCol: 0, endCol: 4, continuesLeft: true, continuesRight: true });
+});
