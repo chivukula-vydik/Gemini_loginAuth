@@ -362,3 +362,38 @@ test('claim-requests: GET 403 for employee; approve assigns task and auto-denies
   const otherClaim = await ClaimRequest.findById(claimB._id);
   assert.equal(otherClaim.status, 'denied');
 });
+
+test('estimate propose/approve carries unit and derives hours', async () => {
+  const pm = await User.create({ email: 'u-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'u-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: emp._id, createdBy: pm._id });
+
+  const propose = await request(app).patch(`/tasks/${task._id}/estimate`)
+    .set('Authorization', bearer(emp)).send({ value: 2, unit: 'days' });
+  assert.equal(propose.status, 200);
+  assert.equal(propose.body.proposedValue, 2);
+  assert.equal(propose.body.proposedUnit, 'days');
+  assert.equal(propose.body.proposedHours, 16);
+
+  const approve = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
+  assert.equal(approve.status, 200);
+  assert.equal(approve.body.estimateValue, 2);
+  assert.equal(approve.body.estimateUnit, 'days');
+  assert.equal(approve.body.estimatedHours, 16);
+});
+
+test('task create + edit accept a startDate', async () => {
+  const pm = await User.create({ email: 'sd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [] });
+  const created = await request(app).post(`/projects/${project._id}/tasks`)
+    .set('Authorization', bearer(pm)).send({ title: 'T', startDate: '2026-06-16' });
+  assert.equal(created.status, 201);
+  assert.equal(String(created.body.startDate).slice(0, 10), '2026-06-16');
+
+  const edited = await request(app).patch(`/tasks/${created.body._id}`)
+    .set('Authorization', bearer(pm)).send({ startDate: '2026-06-18' });
+  assert.equal(edited.status, 200);
+  assert.equal(String(edited.body.startDate).slice(0, 10), '2026-06-18');
+});
