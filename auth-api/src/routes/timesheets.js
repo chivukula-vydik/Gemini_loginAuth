@@ -7,6 +7,7 @@ import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
 import {
   mergeWeekRows, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
+  canSubmit, weekLocked,
 } from '../services/timesheetRows.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 
@@ -74,8 +75,14 @@ export function createTimesheetRouter() {
     const grants = await approvedGrantsFor(userId, weekStart);
     const pending = await pendingGrantsFor(userId, weekStart);
     const todayDay = todayDayFor(weekStart, todayISO());
-    const readOnly = weekStart < currentMonday() && grants.length === 0;
-    res.json({ weekStart, tasks, todayDay, grants, pending, readOnly });
+    const status = doc?.status || 'draft';
+    const readOnly = (weekStart < currentMonday() && grants.length === 0) || weekLocked(status);
+    res.json({
+      weekStart, tasks, todayDay, grants, pending, readOnly,
+      status,
+      submittedAt: doc?.submittedAt || null,
+      reviewedAt: doc?.reviewedAt || null,
+    });
   }));
 
   router.put('/:weekStart', asyncHandler(async (req, res) => {
@@ -90,7 +97,10 @@ export function createTimesheetRouter() {
     const doc = await Timesheet.findOne({ userId, weekStart });
     const savedRows = doc ? doc.tasks : [];
     const grants = await approvedGrantsFor(userId, weekStart);
-    const todayDay = todayDayFor(weekStart, todayISO());
+    const status = doc?.status || 'draft';
+    // Once submitted/approved, "today" is no longer auto-editable; only approved
+    // grants punch through. Passing todayDay=null achieves exactly that.
+    const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
     const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, todayDay, grants });
 
     const updatedAt = new Date();
@@ -106,6 +116,24 @@ export function createTimesheetRouter() {
       );
     }
     res.json({ ok: true, updatedAt });
+  }));
+
+  router.post('/:weekStart/submit', asyncHandler(async (req, res) => {
+    const { weekStart } = req.params;
+    if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
+    const userId = req.user.sub;
+    const doc = await Timesheet.findOne({ userId, weekStart });
+    const status = doc?.status || 'draft';
+    if (!canSubmit(status, weekStart, currentMonday())) {
+      return res.status(409).json({ error: 'this week cannot be submitted' });
+    }
+    const submittedAt = new Date();
+    await Timesheet.updateOne(
+      { userId, weekStart },
+      { $set: { status: 'submitted', submittedAt, reviewedAt: null, reviewedBy: null }, $setOnInsert: { userId, weekStart } },
+      { upsert: true },
+    );
+    res.json({ ok: true, status: 'submitted', submittedAt });
   }));
 
   router.post('/:weekStart/edit-requests', asyncHandler(async (req, res) => {
