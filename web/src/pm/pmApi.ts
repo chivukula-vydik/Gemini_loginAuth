@@ -26,10 +26,13 @@ export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
 };
+export type Assignee = { user: Person | string; sharePct: number };
 export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
   description: string; estimatedHours: number; requiredSkills: string[];
-  assignee: string | null; status: string; dueDate: string | null;
+  assignees: Assignee[]; status: string; dueDate: string | null;
+  mySharePct?: number;
+  myPlannedHours?: number;
   effectiveDueDate?: string | null;
   dueDateAuto?: boolean;
   dueProposalStatus?: 'none' | 'proposed' | 'approved' | 'rejected';
@@ -48,7 +51,7 @@ export type Task = {
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
-  assignee: Person | null; status: string; percentComplete: number; actualMinutes: number;
+  assignees: { user: Person; sharePct: number }[]; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
   estimateValue?: number;
@@ -82,8 +85,11 @@ export const createProject = (body: Partial<Project>) => authed('/projects', 'PO
 export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm'> & { members: Person[]; ownerPm: Person };
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
-export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
-  authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task & { offered?: boolean }>;
+export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[]; assignees?: string[] }) =>
+  authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
+
+export const setTaskAssignees = (taskId: string, assignees: { user: string; sharePct: number }[]) =>
+  authed(`/tasks/${taskId}/assignees`, 'PATCH', { assignees }) as Promise<Task>;
 
 export const updateTask = (id: string, patch: Partial<Task>) =>
   authed(`/tasks/${id}`, 'PATCH', patch) as Promise<Task>;
