@@ -25,6 +25,10 @@ const timesheetSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   weekStart: { type: String, required: true },
   tasks: { type: [taskSchema], default: [] },
+  status: { type: String, enum: ['draft', 'submitted', 'approved', 'returned'], default: 'draft' },
+  submittedAt: { type: Date, default: null },
+  reviewedAt: { type: Date, default: null },
+  reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   updatedAt: { type: Date, default: Date.now },
 });
 
