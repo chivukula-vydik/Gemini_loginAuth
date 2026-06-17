@@ -248,22 +248,18 @@ test('edit-requests: GET is forbidden for employees', async () => {
 });
 
 test('PUT /timesheets: project-scoped grant unlocks only that project and is consumed on change', async () => {
-  const { currentMonday } = await import('../src/services/timesheetRows.js');
   const pm = await User.create({ email: 'ps-pm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'ps-e@x.com', displayName: 'E', role: 'employee' });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   const projB = await Project.create({ name: 'B', ownerPm: pm._id, members: [emp._id] });
   const taskA = await Task.create({ project: projA._id, title: 'TA', assignee: emp._id, createdBy: pm._id });
   const taskB = await Task.create({ project: projB._id, title: 'TB', assignee: emp._id, createdBy: pm._id });
-  const wk = currentMonday();
+  const wk = '2020-01-06'; // past Monday → all days past, deterministic (todayDay is null)
 
-  // seed saved rows with zero minutes on Monday
   await Timesheet.create({ userId: emp._id, weekStart: wk, tasks: [
     { id: String(taskA._id), name: 'TA', taskId: taskA._id, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } },
     { id: String(taskB._id), name: 'TB', taskId: taskB._id, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } },
   ] });
-
-  // approve a Monday grant for project A only
   await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id, status: 'approved' });
 
   await request(app).put(`/timesheets/${wk}`).set('Authorization', bearer(emp)).send({ tasks: [
@@ -274,22 +270,18 @@ test('PUT /timesheets: project-scoped grant unlocks only that project and is con
   const saved = await Timesheet.findOne({ userId: emp._id, weekStart: wk });
   const monA = saved.tasks.find((t) => t.id === String(taskA._id)).entries.mon;
   const monB = saved.tasks.find((t) => t.id === String(taskB._id)).entries.mon;
-  const todayDow = new Date().getUTCDay();
-  if (todayDow !== 1) {
-    assert.equal(monA, 120); // project A unlocked by grant
-    assert.equal(monB, 0);   // project B stays locked
-    const grant = await EditRequest.findOne({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id });
-    assert.equal(grant.status, 'used'); // grant consumed by the change
-  }
+  assert.equal(monA, 120); // project A unlocked by grant
+  assert.equal(monB, 0);   // project B stays locked
+  const grant = await EditRequest.findOne({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id });
+  assert.equal(grant.status, 'used'); // grant consumed by the change
 });
 
 test('PUT /timesheets: a no-op save leaves an approved grant approved', async () => {
-  const { currentMonday } = await import('../src/services/timesheetRows.js');
   const pm = await User.create({ email: 'noop-pm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'noop-e@x.com', displayName: 'E', role: 'employee' });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   const taskA = await Task.create({ project: projA._id, title: 'TA', assignee: emp._id, createdBy: pm._id });
-  const wk = currentMonday();
+  const wk = '2020-01-06';
   await Timesheet.create({ userId: emp._id, weekStart: wk, tasks: [
     { id: String(taskA._id), name: 'TA', taskId: taskA._id, entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } },
   ] });
@@ -301,6 +293,24 @@ test('PUT /timesheets: a no-op save leaves an approved grant approved', async ()
 
   const grant = await EditRequest.findOne({ userId: emp._id, weekStart: wk, day: 'mon', projectId: projA._id });
   assert.equal(grant.status, 'approved'); // unchanged → not consumed
+});
+
+test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and rows carry projectId', async () => {
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const pm = await User.create({ email: 'get-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'get-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignee: emp._id, createdBy: pm._id });
+  const wk = currentMonday();
+  await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: project._id, status: 'approved' });
+
+  const res = await request(app).get(`/timesheets/${wk}`).set('Authorization', bearer(emp));
+  assert.equal(res.status, 200);
+  assert.ok('todayDay' in res.body); // present (a weekday or null)
+  assert.equal(res.body.readOnly, false); // current week
+  assert.deepEqual(res.body.grants, [{ day: 'mon', projectId: String(project._id) }]);
+  const row = res.body.tasks.find((t) => t.taskId === String(task._id));
+  assert.equal(row.projectId, String(project._id)); // injected row carries projectId
 });
 
 test('POST edit-request requires a projectId the caller has a task on, and dedupes', async () => {
