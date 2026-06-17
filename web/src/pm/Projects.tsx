@@ -64,6 +64,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   function reload() {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
@@ -97,12 +98,15 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     if (!title.trim()) return;
     setError('');
     try {
-      await createTask(id, {
+      const created = await createTask(id, {
         title: title.trim(),
         assignee: assignee || null,
         startDate: startDate || null,
         requiredSkills: [...reqSkills],
       });
+      setNotice((created as { offered?: boolean }).offered
+        ? 'That employee already has an active task — sent them an offer to accept.'
+        : '');
       setTitle(''); setAssignee(''); setStartDate(''); setReqSkills(new Set());
       reload();
     } catch (e) { setError((e as Error).message); }
@@ -149,6 +153,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         <h1 className="ts-h1">{project.name}</h1>
       </header>
       {error && <p className="ts-error">{error}</p>}
+      {notice && <p className="ts-sub">{notice}</p>}
 
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <strong>Owner</strong>
