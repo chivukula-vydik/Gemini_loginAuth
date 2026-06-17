@@ -1,6 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
@@ -31,6 +32,40 @@ async function pendingGrantsFor(userId, weekStart) {
 export function createTimesheetRouter() {
   const router = express.Router();
   router.use(requireAuth);
+
+  // PM/admin review queue. Registered before '/:weekStart' so 'review' is not
+  // parsed as a weekStart. Not PM-scoped — every pm/admin sees all submissions.
+  router.get('/review', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const status = req.query.status || 'submitted';
+    const docs = await Timesheet.find({ status })
+      .populate('userId', 'displayName email')
+      .sort('-submittedAt');
+    res.json(docs.map((d) => ({
+      _id: String(d._id),
+      user: d.userId
+        ? { _id: String(d.userId._id), displayName: d.userId.displayName, email: d.userId.email }
+        : null,
+      weekStart: d.weekStart,
+      submittedAt: d.submittedAt,
+      totalMinutes: d.tasks.reduce(
+        (sum, t) => sum + DAYS.reduce((a, day) => a + (t.entries?.[day] || 0), 0),
+        0,
+      ),
+    })));
+  }));
+
+  router.patch('/review/:id', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const decision = req.body?.decision;
+    if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
+    const doc = await Timesheet.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.status !== 'submitted') return res.status(400).json({ error: 'timesheet is not awaiting review' });
+    doc.status = decision === 'approve' ? 'approved' : 'returned';
+    doc.reviewedBy = req.user.sub;
+    doc.reviewedAt = new Date();
+    await doc.save();
+    res.json({ ok: true, status: doc.status });
+  }));
 
   router.get('/:weekStart', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
