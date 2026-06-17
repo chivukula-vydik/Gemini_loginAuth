@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   listEditRequests, decideEditRequest, EditReq,
   listClaimRequests, decideClaimRequest, ClaimReq,
+  listSubmittedTimesheets, decideTimesheet, SubmittedTimesheet,
 } from './pmApi';
 
 const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' };
@@ -9,13 +10,21 @@ const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', 
 export function Requests() {
   const [reqs, setReqs] = useState<EditReq[]>([]);
   const [claims, setClaims] = useState<ClaimReq[]>([]);
+  const [sheets, setSheets] = useState<SubmittedTimesheet[]>([]);
   const [error, setError] = useState('');
 
   function reload() {
     listEditRequests().then(setReqs).catch((e) => setError(e.message));
     listClaimRequests().then(setClaims).catch((e) => setError(e.message));
+    listSubmittedTimesheets().then(setSheets).catch((e) => setError(e.message));
   }
   useEffect(() => { reload(); }, []);
+
+  async function decideSheet(id: string, decision: 'approve' | 'return') {
+    setError('');
+    try { await decideTimesheet(id, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
 
   async function decideEdit(id: string, decision: 'approved' | 'denied') {
     setError('');
@@ -33,6 +42,30 @@ export function Requests() {
     <div className="ts-page">
       <header className="ts-header"><h1 className="ts-h1">Requests</h1></header>
       {error && <p className="ts-error">{error}</p>}
+
+      <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Submitted timesheets</h2>
+      <div className="ts-card" style={{ marginBottom: 22 }}>
+        <table className="ts-table">
+          <thead><tr><th className="ts-task">Employee</th><th>Week</th><th>Total hours</th><th>Submitted</th><th></th></tr></thead>
+          <tbody>
+            {sheets.length === 0 && <tr><td colSpan={5} className="ts-empty">No submitted timesheets.</td></tr>}
+            {sheets.map((s) => (
+              <tr key={s._id}>
+                <td className="ts-task">{s.user?.displayName || s.user?.email || '—'}</td>
+                <td>{s.weekStart}</td>
+                <td>{(s.totalMinutes / 60).toFixed(1)}h</td>
+                <td>{s.submittedAt ? s.submittedAt.slice(0, 10) : '—'}</td>
+                <td>
+                  <div className="ts-nav-left">
+                    <button className="link-btn" onClick={() => decideSheet(s._id, 'approve')}>Approve</button>
+                    <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decideSheet(s._id, 'return')}>Return</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Timesheet edit requests</h2>
       <div className="ts-card" style={{ marginBottom: 22 }}>

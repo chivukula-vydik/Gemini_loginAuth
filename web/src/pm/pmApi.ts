@@ -134,3 +134,11 @@ export const decideEstimate = (id: string, decision: 'approve' | 'reject') =>
 export const listMyOffers = () => authed('/assignment-offers/mine') as Promise<AssignmentOffer[]>;
 export const decideOffer = (id: string, decision: 'accept' | 'decline') =>
   authed(`/assignment-offers/${id}`, 'PATCH', { decision });
+
+export type SubmittedTimesheet = {
+  _id: string; user: Person | null; weekStart: string; submittedAt: string | null; totalMinutes: number;
+};
+export const listSubmittedTimesheets = () =>
+  authed('/timesheets/review?status=submitted') as Promise<SubmittedTimesheet[]>;
+export const decideTimesheet = (id: string, decision: 'approve' | 'return') =>
+  authed(`/timesheets/review/${id}`, 'PATCH', { decision });
