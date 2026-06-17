@@ -38,7 +38,7 @@ export function createTimesheetRouter() {
     let assignedTasks = [];
     if (injectable) {
       assignedTasks = await Task.find({ assignee: userId, status: { $ne: 'done' } })
-        .select('title percentComplete estimatedHours status');
+        .select('title percentComplete estimatedHours status startDate');
     }
 
     const ids = new Set();
@@ -48,15 +48,17 @@ export function createTimesheetRouter() {
     const actualMap = await actualMinutesByTask(idList);
 
     const infoTasks = idList.length
-      ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status')
+      ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status startDate')
       : [];
     const taskInfoById = new Map(infoTasks.map((t) => [String(t._id), {
       title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
       status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
+      startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
     }]));
     const assignedForMerge = assignedTasks.map((t) => ({
       _id: String(t._id), title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
       status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
+      startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
     }));
 
     const tasks = mergeWeekRows({ savedRows, assignedTasks: assignedForMerge, taskInfoById, editable: injectable });

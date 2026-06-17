@@ -1,3 +1,5 @@
+import { endDateFrom } from './estimate.js';
+
 export const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
 export function cleanMinutes(v) {
@@ -44,6 +46,8 @@ export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById
         estimatedHours: task.estimatedHours || 0,
         actualMinutes: task.actualMinutes || 0,
         status: task.status || 'todo',
+        startDate: task.startDate || null,
+        endDate: endDateFrom(task.startDate || null, task.estimatedHours || 0),
         entries: sr ? entriesOf(sr) : zeroEntries(),
       });
       used.add(tid);
@@ -64,6 +68,8 @@ export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById
         estimatedHours: info.estimatedHours || 0,
         actualMinutes: info.actualMinutes || 0,
         status: info.status || 'todo',
+        startDate: info.startDate || null,
+        endDate: endDateFrom(info.startDate || null, info.estimatedHours || 0),
         entries: entriesOf(r),
       });
       used.add(tid);

@@ -87,3 +87,10 @@ test('applyDayLock: a new row cannot put minutes on a locked day', () => {
   const out = applyDayLock(submitted, [], ['wed']);
   assert.equal(out[0].entries.mon, 0);
 });
+
+test('mergeWeekRows: injects startDate and computed endDate', () => {
+  const assigned = [{ _id: 't1', title: 'Build', percentComplete: 0, estimatedHours: 40, actualMinutes: 0, status: 'todo', startDate: '2026-06-16' }];
+  const rows = mergeWeekRows({ savedRows: [], assignedTasks: assigned, taskInfoById: new Map(), editable: true });
+  assert.equal(rows[0].startDate, '2026-06-16');
+  assert.equal(rows[0].endDate, '2026-06-22'); // 40h = 5 working days from Tue
+});
