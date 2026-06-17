@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
-import { getWeek, saveWeek, createEditRequest, Task, Entries } from './timesheetApi';
+import { getWeek, saveWeek, createEditRequest, Task, Entries, Grant } from './timesheetApi';
+import type { Day } from './time';
 import { setTaskProgress } from '../pm/pmApi';
 import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek } from './time';
 
@@ -17,9 +18,10 @@ export function TimesheetPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [loadError, setLoadError] = useState('');
-  const [editableDays, setEditableDays] = useState<string[]>([]);
+  const [todayDay, setTodayDay] = useState<Day | null>(null);
+  const [grants, setGrants] = useState<Grant[]>([]);
   const [readOnly, setReadOnly] = useState(false);
-  const [pendingDays, setPendingDays] = useState<string[]>([]);
+  const [pendingKeys, setPendingKeys] = useState<string[]>([]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -33,7 +35,8 @@ export function TimesheetPage() {
       const loaded = await getWeek(week);
       if (weekStartRef.current !== week) return;
       setTasks(loaded.tasks);
-      setEditableDays(loaded.editableDays);
+      setTodayDay(loaded.todayDay);
+      setGrants(loaded.grants);
       setReadOnly(loaded.readOnly);
     } catch (e) {
       if (weekStartRef.current !== week) return;
@@ -46,7 +49,7 @@ export function TimesheetPage() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     dirty.current = false;
     setStatus('idle');
-    setPendingDays([]);
+    setPendingKeys([]);
     load(weekStart);
   }, [weekStart, load]);
 
@@ -111,11 +114,12 @@ export function TimesheetPage() {
     }
   }
 
-  async function onRequestEdit(day: string) {
+  async function onRequestEdit(day: Day, projectId: string) {
     const reason = window.prompt('Reason for editing this past day?') ?? '';
     try {
-      await createEditRequest(weekStart, day as never, reason);
-      setPendingDays((prev) => (prev.includes(day) ? prev : [...prev, day]));
+      await createEditRequest(weekStart, day, projectId, reason);
+      const key = `${day}:${projectId}`;
+      setPendingKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
     } catch (e) {
       window.alert((e as Error).message);
     }
@@ -164,8 +168,9 @@ export function TimesheetPage() {
         weekStart={weekStart}
         tasks={tasks}
         readOnly={readOnly}
-        editableDays={editableDays}
-        pendingDays={pendingDays}
+        todayDay={todayDay}
+        grants={grants}
+        pendingKeys={new Set(pendingKeys)}
         onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}
