@@ -13,6 +13,7 @@ const { Project } = await import('../src/models/Project.js');
 const { Task } = await import('../src/models/Task.js');
 const { Timesheet } = await import('../src/models/Timesheet.js');
 const { EditRequest } = await import('../src/models/EditRequest.js');
+const { ClaimRequest } = await import('../src/models/ClaimRequest.js');
 const { signAccessToken } = await import('../src/services/tokens.js');
 
 let mongod;
@@ -301,4 +302,61 @@ test('a PM who is also the assignee cannot approve their own proposed estimate',
   const res = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
     .set('Authorization', bearer(pm)).send({ decision: 'approve' });
   assert.equal(res.status, 403);
+});
+
+test('GET /marketplace returns only unassigned, member-project, skill-matched tasks', async () => {
+  const pm = await User.create({ email: 'mk-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'mk-e@x.com', displayName: 'E', role: 'employee', skills: [] });
+  const memberProject = await Project.create({ name: 'Mine', ownerPm: pm._id, members: [emp._id] });
+  const otherProject = await Project.create({ name: 'Other', ownerPm: pm._id, members: [] });
+  const open = await Task.create({ project: memberProject._id, title: 'Open', createdBy: pm._id });
+  await Task.create({ project: memberProject._id, title: 'Assigned', assignee: pm._id, createdBy: pm._id });
+  await Task.create({ project: otherProject._id, title: 'NotMember', createdBy: pm._id });
+
+  const res = await request(app).get('/marketplace').set('Authorization', bearer(emp));
+  assert.equal(res.status, 200);
+  const titles = res.body.map((t) => t.title);
+  assert.deepEqual(titles, ['Open']);
+  assert.equal(res.body[0].myClaimStatus, 'none');
+
+  // claim, then it shows pending
+  await request(app).post(`/tasks/${open._id}/claim`).set('Authorization', bearer(emp));
+  const res2 = await request(app).get('/marketplace').set('Authorization', bearer(emp));
+  assert.equal(res2.body[0].myClaimStatus, 'pending');
+});
+
+test('POST /tasks/:id/claim rejects a non-member; dedupes a second pending claim', async () => {
+  const pm = await User.create({ email: 'cl-pm@x.com', displayName: 'PM', role: 'pm' });
+  const member = await User.create({ email: 'cl-m@x.com', displayName: 'M', role: 'employee' });
+  const outsider = await User.create({ email: 'cl-o@x.com', displayName: 'O', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [member._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+
+  const out = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(outsider));
+  assert.equal(out.status, 400);
+
+  const first = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(member));
+  assert.equal(first.status, 201);
+  const dup = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(member));
+  assert.equal(dup.status, 409);
+});
+
+test('claim-requests: GET 403 for employee; approve assigns task and auto-denies competitors', async () => {
+  const pm = await User.create({ email: 'cd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const a = await User.create({ email: 'cd-a@x.com', displayName: 'A', role: 'employee' });
+  const b = await User.create({ email: 'cd-b@x.com', displayName: 'B', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [a._id, b._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const claimA = await ClaimRequest.create({ taskId: task._id, userId: a._id });
+  const claimB = await ClaimRequest.create({ taskId: task._id, userId: b._id });
+
+  const empView = await request(app).get('/claim-requests').set('Authorization', bearer(a));
+  assert.equal(empView.status, 403);
+
+  const ok = await request(app).patch(`/claim-requests/${claimA._id}`).set('Authorization', bearer(pm)).send({ decision: 'approved' });
+  assert.equal(ok.status, 200);
+  const savedTask = await Task.findById(task._id);
+  assert.equal(String(savedTask.assignee), String(a._id));
+  const otherClaim = await ClaimRequest.findById(claimB._id);
+  assert.equal(otherClaim.status, 'denied');
 });
