@@ -14,6 +14,7 @@ import { createUsersRouter } from './routes/users.js';
 import { createEditRequestsRouter } from './routes/editRequests.js';
 import { createMarketplaceRouter } from './routes/marketplace.js';
 import { createClaimRequestsRouter } from './routes/claimRequests.js';
+import { createAssignmentOffersRouter } from './routes/assignmentOffers.js';
 
 export function createApp(config) {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp(config) {
   app.use('/edit-requests', createEditRequestsRouter());
   app.use('/marketplace', createMarketplaceRouter());
   app.use('/claim-requests', createClaimRequestsRouter());
+  app.use('/assignment-offers', createAssignmentOffersRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
