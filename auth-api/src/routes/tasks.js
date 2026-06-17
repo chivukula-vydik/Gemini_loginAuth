@@ -10,27 +10,32 @@ import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
 import { toHours, effectiveDueDate, proposedDueDate, endDateFrom } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
-import { AssignmentOffer } from '../models/AssignmentOffer.js';
-import { hasActiveTask } from '../services/assignment.js';
+import { assigneeHours, equalShares, normalizeShares } from '../services/workload.js';
 
 export function createTasksRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
   router.get('/mine', asyncHandler(async (req, res) => {
-    const tasks = await Task.find({ assignee: req.user.sub })
+    const uid = String(req.user.sub);
+    const tasks = await Task.find({ 'assignees.user': req.user.sub })
       .populate('project', 'name')
+      .populate('assignees.user', 'displayName email')
       .sort('dueDate');
     const map = await actualMinutesByTask(tasks.map((t) => t._id));
     res.json(tasks.map((t) => {
       const obj = t.toObject();
       const due = effectiveDueDate(obj);
+      const mine = (obj.assignees || []).find((a) => String(a.user?._id || a.user) === uid);
+      const mySharePct = mine ? mine.sharePct : 0;
       return {
         ...obj,
         actualMinutes: map.get(String(t._id)) || 0,
         effectiveDueDate: due.date,
         dueDateAuto: due.auto,
         dueProposalDate: proposedDueDate(obj),
+        mySharePct,
+        myPlannedHours: assigneeHours(obj.estimatedHours, mySharePct),
       };
     }));
   }));
@@ -38,7 +43,7 @@ export function createTasksRouter() {
   router.post('/:id/claim', asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
-    if (task.assignee || task.status === 'done') return res.status(400).json({ error: 'task is not claimable' });
+    if (task.assignees.length > 0 || task.status === 'done') return res.status(400).json({ error: 'task is not claimable' });
     const project = await Project.findById(task.project);
     if (!project || !project.members.some((m) => String(m) === String(req.user.sub))) {
       return res.status(400).json({ error: 'you are not a member of this project' });
@@ -89,7 +94,7 @@ export function createTasksRouter() {
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    if (task.assignee && String(task.assignee) === String(req.user.sub)) {
+    if (task.assignees.some((a) => String(a.user) === String(req.user.sub))) {
       return res.status(403).json({ error: 'the proposer cannot approve their own estimate' });
     }
     if (decision === 'approve') {
@@ -129,7 +134,7 @@ export function createTasksRouter() {
     if (task.dueProposalStatus !== 'proposed') return res.status(400).json({ error: 'no pending extension' });
     const project = await Project.findById(task.project);
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    if (task.assignee && String(task.assignee) === String(req.user.sub)) {
+    if (task.assignees.some((a) => String(a.user) === String(req.user.sub))) {
       return res.status(403).json({ error: 'the proposer cannot approve their own extension' });
     }
     if (decision === 'approve') {
@@ -148,29 +153,37 @@ export function createTasksRouter() {
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    let offered = false;
-    if ('assignee' in (req.body || {}) && req.body.assignee) {
-      if (!project.members.some((m) => String(m) === String(req.body.assignee))) {
-        return res.status(400).json({ error: 'assignee must be a project member' });
-      }
-      const sameAssignee = task.assignee && String(task.assignee) === String(req.body.assignee);
-      if (!sameAssignee && (await hasActiveTask(req.body.assignee))) {
-        const dup = await AssignmentOffer.exists({ taskId: task._id, userId: req.body.assignee, status: 'pending' });
-        if (!dup) await AssignmentOffer.create({ taskId: task._id, userId: req.body.assignee, offeredBy: req.user.sub });
-        offered = true;
-      }
-    }
     for (const f of ['title', 'description', 'status', 'dueDate', 'startDate']) {
       if (f in (req.body || {})) task[f] = req.body[f];
     }
-    if ('assignee' in (req.body || {}) && !offered) task.assignee = req.body.assignee;
     if (Array.isArray(req.body?.requiredSkills)) {
       const validSkills = await Skill.find({ _id: { $in: req.body.requiredSkills }, active: true }).select('_id');
       task.requiredSkills = validSkills.map((s) => s._id);
     }
     if (Array.isArray(req.body?.dependsOn)) task.dependsOn = req.body.dependsOn;
     await task.save();
-    res.json(offered ? { ...task.toObject(), offered: true } : task);
+    res.json(task);
+  }));
+
+  // PM sets the full assignee team + shares directly (no offers).
+  router.patch('/:id/assignees', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    const project = await Project.findById(task.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const input = Array.isArray(req.body?.assignees) ? req.body.assignees : [];
+    // Accept [userId, ...] or [{ user, sharePct }, ...].
+    const userIds = input.map((a) => String(typeof a === 'object' && a ? a.user : a));
+    const memberSet = new Set(project.members.map((m) => String(m)));
+    if (!userIds.every((id) => memberSet.has(id))) {
+      return res.status(400).json({ error: 'every assignee must be a project member' });
+    }
+    const givenShares = input.map((a) => (typeof a === 'object' && a ? Number(a.sharePct) : NaN));
+    const hasShares = givenShares.length > 0 && givenShares.every((s) => Number.isFinite(s));
+    const shares = hasShares ? normalizeShares(givenShares) : equalShares(userIds.length);
+    task.assignees = userIds.map((user, i) => ({ user, sharePct: shares[i] }));
+    await task.save();
+    res.json(task);
   }));
 
   return router;
