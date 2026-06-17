@@ -52,7 +52,7 @@ export function MyTasks() {
                 <td>{typeof t.project === 'object' ? t.project.name : '—'}</td>
                 <td>
                   {t.estimateStatus === 'approved'
-                    ? `${t.estimateValue ?? t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
+                    ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>

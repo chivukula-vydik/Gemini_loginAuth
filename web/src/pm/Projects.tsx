@@ -220,7 +220,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
                       <button className="link-btn" onClick={() => decide(t._id, 'approve')}>approve</button>
                       <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decide(t._id, 'reject')}>reject</button>
                     </span>
-                  ) : t.estimateStatus === 'approved' ? `${t.estimateValue ?? t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
+                  ) : t.estimateStatus === 'approved' ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <span className="ts-sub">{t.estimateStatus === 'rejected' ? 'rejected' : 'no estimate'}</span>}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
