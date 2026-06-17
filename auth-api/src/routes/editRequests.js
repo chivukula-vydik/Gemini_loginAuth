@@ -12,6 +12,7 @@ export function createEditRequestsRouter() {
     const status = req.query.status || 'pending';
     const reqs = await EditRequest.find({ status })
       .populate('userId', 'displayName email')
+      .populate('projectId', 'name')
       .sort('-createdAt');
     res.json(reqs);
   }));
