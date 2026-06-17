@@ -48,6 +48,7 @@ export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById
         status: task.status || 'todo',
         startDate: task.startDate || null,
         endDate: endDateFrom(task.startDate || null, task.estimatedHours || 0),
+        projectId: task.projectId || null,
         entries: sr ? entriesOf(sr) : zeroEntries(),
       });
       used.add(tid);
@@ -70,11 +71,12 @@ export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById
         status: info.status || 'todo',
         startDate: info.startDate || null,
         endDate: endDateFrom(info.startDate || null, info.estimatedHours || 0),
+        projectId: info.projectId || null,
         entries: entriesOf(r),
       });
       used.add(tid);
     } else {
-      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, entries: entriesOf(r) });
+      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, entries: entriesOf(r) });
     }
   }
   return out;

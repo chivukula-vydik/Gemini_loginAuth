@@ -118,3 +118,13 @@ test('mergeWeekRows: injects startDate and computed endDate', () => {
   assert.equal(rows[0].startDate, '2026-06-16');
   assert.equal(rows[0].endDate, '2026-06-22'); // 40h = 5 working days from Tue
 });
+
+test('mergeWeekRows: rows carry projectId (null for ad-hoc)', () => {
+  const assigned = [{ _id: 't1', title: 'Build', percentComplete: 0, estimatedHours: 8, actualMinutes: 0, status: 'todo', projectId: 'pA' }];
+  const saved = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const rows = mergeWeekRows({ savedRows: saved, assignedTasks: assigned, taskInfoById: new Map(), editable: true });
+  const taskRow = rows.find((r) => r.taskId === 't1');
+  const adhoc = rows.find((r) => r.taskId === null);
+  assert.equal(taskRow.projectId, 'pA');
+  assert.equal(adhoc.projectId, null);
+});
