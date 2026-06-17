@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeWeekRows, sanitizeRows, currentMonday, todayDayFor, computeRowLock } from '../src/services/timesheetRows.js';
+import { mergeWeekRows, sanitizeRows, currentMonday, todayDayFor, computeRowLock, canSubmit, weekLocked } from '../src/services/timesheetRows.js';
 
 const z = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
 
@@ -127,4 +127,22 @@ test('mergeWeekRows: rows carry projectId (null for ad-hoc)', () => {
   const adhoc = rows.find((r) => r.taskId === null);
   assert.equal(taskRow.projectId, 'pA');
   assert.equal(adhoc.projectId, null);
+});
+
+test('canSubmit: draft/returned for a started week are submittable', () => {
+  assert.equal(canSubmit('draft', '2026-06-08', '2026-06-15'), true);
+  assert.equal(canSubmit('returned', '2026-06-15', '2026-06-15'), true);
+});
+
+test('canSubmit: future weeks and submitted/approved are not submittable', () => {
+  assert.equal(canSubmit('draft', '2026-06-22', '2026-06-15'), false);
+  assert.equal(canSubmit('submitted', '2026-06-15', '2026-06-15'), false);
+  assert.equal(canSubmit('approved', '2026-06-08', '2026-06-15'), false);
+});
+
+test('weekLocked: only submitted and approved are locked', () => {
+  assert.equal(weekLocked('submitted'), true);
+  assert.equal(weekLocked('approved'), true);
+  assert.equal(weekLocked('draft'), false);
+  assert.equal(weekLocked('returned'), false);
 });

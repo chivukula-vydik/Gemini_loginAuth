@@ -144,3 +144,14 @@ export function computeRowLock({
 
   return { rows, consumed };
 }
+
+// --- submission lifecycle helpers ---
+// status ∈ 'draft' | 'submitted' | 'approved' | 'returned'
+
+export function canSubmit(status, weekStart, currentMondayISO) {
+  return (status === 'draft' || status === 'returned') && weekStart <= currentMondayISO;
+}
+
+export function weekLocked(status) {
+  return status === 'submitted' || status === 'approved';
+}
