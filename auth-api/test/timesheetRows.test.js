@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeWeekRows, sanitizeRows, currentMonday, editableDaysFor, applyDayLock } from '../src/services/timesheetRows.js';
+import { mergeWeekRows, sanitizeRows, currentMonday, todayDayFor, computeRowLock } from '../src/services/timesheetRows.js';
 
 const z = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
 
@@ -58,34 +58,48 @@ test('currentMonday returns a Monday ISO date', () => {
   assert.equal(new Date(`${m}T00:00:00Z`).getUTCDay(), 1);
 });
 
-test('editableDaysFor: only today is editable with no approvals', () => {
-  const days = editableDaysFor('2026-06-15', '2026-06-17', []);
-  assert.deepEqual(days, ['wed']);
+test('todayDayFor: returns the weekday matching today, else null', () => {
+  assert.equal(todayDayFor('2026-06-15', '2026-06-17'), 'wed');
+  assert.equal(todayDayFor('2026-06-08', '2026-06-17'), null); // past week
 });
 
-test('editableDaysFor: an approved PAST day is also editable; future never', () => {
-  const days = editableDaysFor('2026-06-15', '2026-06-17', ['mon', 'fri']);
-  assert.deepEqual(days.sort(), ['mon', 'wed']);
+test('computeRowLock: today applies, a non-granted past day keeps saved value', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 99, tue: 0, wed: 60, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants: [] });
+  assert.equal(rows[0].entries.wed, 60); // today applied
+  assert.equal(rows[0].entries.mon, 30); // locked past day kept
+  assert.deepEqual(consumed, []);
 });
 
-test('editableDaysFor: past week with an approved day', () => {
-  const days = editableDaysFor('2026-06-08', '2026-06-17', ['thu']);
-  assert.deepEqual(days, ['thu']);
+test('computeRowLock: a granted project past day applies and is consumed on change', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const grants = [{ day: 'mon', projectId: 'pA' }];
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  assert.equal(rows[0].entries.mon, 120); // granted day applied
+  assert.deepEqual(consumed, [{ day: 'mon', projectId: 'pA' }]); // consumed
 });
 
-test('applyDayLock: editable-day minutes apply, locked-day minutes keep saved values', () => {
-  const submitted = [{ id: 'r1', name: 'A', taskId: null, entries: { mon: 99, tue: 99, wed: 60, thu: 0, fri: 0 } }];
-  const saved = [{ id: 'r1', name: 'A', entries: { mon: 30, tue: 45, wed: 0, thu: 0, fri: 0 } }];
-  const out = applyDayLock(submitted, saved, ['wed']);
-  assert.equal(out[0].entries.wed, 60);
-  assert.equal(out[0].entries.mon, 30);
-  assert.equal(out[0].entries.tue, 45);
+test('computeRowLock: an unrelated project change does not apply or consume another project grant', () => {
+  const submitted = [{ id: 'r2', name: 'B', taskId: 't2', entries: { mon: 90, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r2', name: 'B', taskId: 't2', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t2', 'pB']]);
+  const grants = [{ day: 'mon', projectId: 'pA' }]; // grant is for pA, row is pB
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  assert.equal(rows[0].entries.mon, 0); // pB mon locked
+  assert.deepEqual(consumed, []); // pA grant untouched
 });
 
-test('applyDayLock: a new row cannot put minutes on a locked day', () => {
-  const submitted = [{ id: 'new', name: 'X', taskId: null, entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }];
-  const out = applyDayLock(submitted, [], ['wed']);
-  assert.equal(out[0].entries.mon, 0);
+test('computeRowLock: an ad-hoc past-day cell is always locked and never consumed', () => {
+  const submitted = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const grants = [{ day: 'mon', projectId: 'pA' }];
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById: new Map(), todayDay: 'wed', grants });
+  assert.equal(rows[0].entries.mon, 0); // ad-hoc past day locked
+  assert.deepEqual(consumed, []);
 });
 
 test('mergeWeekRows: injects startDate and computed endDate', () => {

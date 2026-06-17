@@ -102,26 +102,43 @@ export function todayISO(now = new Date()) {
   return d.toISOString().slice(0, 10);
 }
 
-export function editableDaysFor(weekStart, today, approvedDays = []) {
-  const approved = new Set(approvedDays);
-  const out = [];
-  DAYS.forEach((day, i) => {
-    const date = addDaysISO(weekStart, i);
-    if (date === today) out.push(day);
-    else if (date < today && approved.has(day)) out.push(day);
-  });
-  return out;
+export function todayDayFor(weekStart, today) {
+  for (let i = 0; i < DAYS.length; i += 1) {
+    if (addDaysISO(weekStart, i) === today) return DAYS[i];
+  }
+  return null;
 }
 
-export function applyDayLock(submittedRows, savedRows, editableDays) {
-  const editable = new Set(editableDays);
+export function computeRowLock({
+  submittedRows = [], savedRows = [], taskProjectById = new Map(), todayDay = null, grants = [],
+}) {
+  const grantSet = new Set(grants.map((g) => `${g.day}:${g.projectId}`));
   const savedById = new Map((savedRows || []).map((r) => [String(r.id), r]));
-  return (submittedRows || []).map((r) => {
+  const projectOf = (row) => {
+    if (!row || !row.taskId) return null;
+    const p = taskProjectById.get(String(row.taskId));
+    return p ? String(p) : null;
+  };
+  const editableFor = (projectId, day) =>
+    day === todayDay || (!!projectId && grantSet.has(`${day}:${projectId}`));
+
+  const rows = (submittedRows || []).map((r) => {
     const prev = savedById.get(String(r.id));
+    const projectId = projectOf(r);
     const entries = {};
     for (const d of DAYS) {
-      entries[d] = editable.has(d) ? cleanMinutes(r?.entries?.[d]) : cleanMinutes(prev?.entries?.[d]);
+      entries[d] = editableFor(projectId, d)
+        ? cleanMinutes(r?.entries?.[d])
+        : cleanMinutes(prev?.entries?.[d]);
     }
     return { ...r, entries };
   });
+
+  const consumed = (grants || []).filter((g) => (submittedRows || []).some((r) => {
+    if (projectOf(r) !== String(g.projectId)) return false;
+    const prev = savedById.get(String(r.id));
+    return cleanMinutes(r?.entries?.[g.day]) !== cleanMinutes(prev?.entries?.[g.day]);
+  }));
+
+  return { rows, consumed };
 }
