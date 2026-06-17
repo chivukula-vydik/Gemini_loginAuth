@@ -1,7 +1,63 @@
 import { useEffect, useState } from 'react';
-import { myTasks, proposeEstimate, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
+import { myTasks, proposeEstimate, proposeExtension, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
+import { dueUrgency, dueLabel } from '../timesheet/due';
+import { todayISO } from '../timesheet/time';
 
 const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
+
+function DueLabel({ task }: { task: Task }) {
+  const today = todayISO();
+  const due = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
+  if (!due) return <span className="ts-cell-ro-empty">—</span>;
+  const urgency = dueUrgency(due, today, task.status);
+  return (
+    <span className={`due-chip ${urgency ?? 'ok'}`} title={task.dueDateAuto ? 'Auto (start + estimate)' : 'Set by PM'}>
+      <span className="due-dot" />
+      {due}
+      {(urgency === 'overdue' || urgency === 'soon') && <span className="due-rel">{dueLabel(due, today)}</span>}
+    </span>
+  );
+}
+
+function ExtensionRequest({ task, onRequest }: { task: Task; onRequest: (value: number, unit: EstimateUnit) => void }) {
+  const [value, setValue] = useState(2);
+  const [unit, setUnit] = useState<EstimateUnit>('days');
+  const [open, setOpen] = useState(false);
+
+  if (task.dueProposalStatus === 'proposed') {
+    return (
+      <span className="ext-note ext-pending" title="Waiting for your PM to approve">
+        ⏳ Extension requested{task.dueProposalDate ? ` → ${task.dueProposalDate}` : ''} (pending)
+      </span>
+    );
+  }
+
+  const today = todayISO();
+  const due = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
+  const overdue = dueUrgency(due, today, task.status) === 'overdue';
+  if (!overdue || task.status === 'done') return null;
+
+  if (!open) {
+    return (
+      <button className="link-btn ext-trigger" onClick={() => setOpen(true)}>
+        {task.dueProposalStatus === 'rejected' ? 'Request more time again' : 'Request more time'}
+      </button>
+    );
+  }
+
+  return (
+    <span className="ts-nav-left ext-form">
+      <span className="ext-prefix">finish in</span>
+      <input className="ts-pct" type="number" min={1} value={value}
+        onChange={(e) => setValue(Number(e.target.value))} />
+      <select className="input ts-status" value={unit} onChange={(e) => setUnit(e.target.value as EstimateUnit)}>
+        {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <button className="link-btn" onClick={() => { onRequest(value, unit); setOpen(false); }}>send</button>
+      <button className="link-btn" style={{ color: 'var(--muted)' }} onClick={() => setOpen(false)}>cancel</button>
+    </span>
+  );
+}
 
 function ProposeEstimate({ task, onPropose }: { task: Task; onPropose: (value: number, unit: EstimateUnit) => void }) {
   const [value, setValue] = useState<number>(task.proposedValue ?? 0);
@@ -39,6 +95,12 @@ export function MyTasks() {
   async function propose(id: string, value: number, unit: EstimateUnit) {
     setError('');
     try { await proposeEstimate(id, value, unit); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function requestExtension(id: string, value: number, unit: EstimateUnit) {
+    setError('');
+    try { await proposeExtension(id, value, unit); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -90,7 +152,12 @@ export function MyTasks() {
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
                 <td>{t.status}</td>
-                <td>{t.dueDate ? t.dueDate.slice(0, 10) : '—'}</td>
+                <td>
+                  <div className="due-stack">
+                    <DueLabel task={t} />
+                    <ExtensionRequest task={t} onRequest={(v, u) => requestExtension(t._id, v, u)} />
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

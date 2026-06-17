@@ -18,6 +18,10 @@ const taskSchema = new mongoose.Schema({
   estimateStatus: { type: String, enum: ['none', 'proposed', 'approved', 'rejected'], default: 'none' },
   dependsOn: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
   dueDate: { type: Date, default: null },
+  dueProposalValue: { type: Number, default: 0 },
+  dueProposalUnit: { type: String, enum: ['hours', 'days', 'weeks'], default: 'days' },
+  dueProposalAt: { type: Date, default: null },
+  dueProposalStatus: { type: String, enum: ['none', 'proposed', 'approved', 'rejected'], default: 'none' },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt: { type: Date, default: Date.now },
 });

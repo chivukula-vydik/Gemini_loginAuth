@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toHours, estimateWorkingDays, endDateFrom } from '../src/services/estimate.js';
+import { toHours, estimateWorkingDays, endDateFrom, effectiveDueDate, taskHours, proposedDueDate } from '../src/services/estimate.js';
 
 test('toHours: converts each unit', () => {
   assert.equal(toHours(2, 'hours'), 2);
@@ -34,4 +34,37 @@ test('endDateFrom: spans working days, skipping weekends', () => {
 test('endDateFrom: null start or zero hours', () => {
   assert.equal(endDateFrom(null, 40), null);
   assert.equal(endDateFrom('2026-06-16', 0), '2026-06-16');
+});
+
+test('taskHours: prefers approved estimate, falls back to estimatedHours', () => {
+  assert.equal(taskHours({ estimateValue: 2, estimateUnit: 'days' }), 16);
+  assert.equal(taskHours({ estimatedHours: 12 }), 12);
+  assert.equal(taskHours({}), 0);
+});
+
+test('effectiveDueDate: uses manual dueDate when set', () => {
+  const out = effectiveDueDate({ dueDate: '2026-07-01T00:00:00Z', startDate: '2026-06-16', estimatedHours: 40 });
+  assert.deepEqual(out, { date: '2026-07-01', auto: false });
+});
+
+test('effectiveDueDate: computes start + estimate when no manual date', () => {
+  // 2026-06-16 Tue + 40h (1 week, 5 working days) -> 2026-06-22, flagged auto
+  const out = effectiveDueDate({ dueDate: null, startDate: '2026-06-16', estimateValue: 1, estimateUnit: 'weeks' });
+  assert.deepEqual(out, { date: '2026-06-22', auto: true });
+});
+
+test('effectiveDueDate: null when no manual date and no start date', () => {
+  const out = effectiveDueDate({ dueDate: null, startDate: null, estimatedHours: 40 });
+  assert.deepEqual(out, { date: null, auto: true });
+});
+
+test('proposedDueDate: null unless a proposal is pending', () => {
+  assert.equal(proposedDueDate({ dueProposalStatus: 'none' }), null);
+  assert.equal(proposedDueDate({ dueProposalStatus: 'approved', dueProposalValue: 1, dueProposalUnit: 'weeks', dueProposalAt: '2026-06-16' }), null);
+});
+
+test('proposedDueDate: anchor + duration when proposed', () => {
+  // anchor Tue 2026-06-16 + 1 week (5 working days) -> 2026-06-22
+  const out = proposedDueDate({ dueProposalStatus: 'proposed', dueProposalValue: 1, dueProposalUnit: 'weeks', dueProposalAt: '2026-06-16T10:00:00Z' });
+  assert.equal(out, '2026-06-22');
 });

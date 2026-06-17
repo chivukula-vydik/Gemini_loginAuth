@@ -8,7 +8,7 @@ import { User } from '../models/User.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
 import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
-import { toHours } from '../services/estimate.js';
+import { toHours, effectiveDueDate, proposedDueDate, endDateFrom } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 import { AssignmentOffer } from '../models/AssignmentOffer.js';
 import { hasActiveTask } from '../services/assignment.js';
@@ -22,7 +22,17 @@ export function createTasksRouter() {
       .populate('project', 'name')
       .sort('dueDate');
     const map = await actualMinutesByTask(tasks.map((t) => t._id));
-    res.json(tasks.map((t) => ({ ...t.toObject(), actualMinutes: map.get(String(t._id)) || 0 })));
+    res.json(tasks.map((t) => {
+      const obj = t.toObject();
+      const due = effectiveDueDate(obj);
+      return {
+        ...obj,
+        actualMinutes: map.get(String(t._id)) || 0,
+        effectiveDueDate: due.date,
+        dueDateAuto: due.auto,
+        dueProposalDate: proposedDueDate(obj),
+      };
+    }));
   }));
 
   router.post('/:id/claim', asyncHandler(async (req, res) => {
@@ -89,6 +99,45 @@ export function createTasksRouter() {
       task.estimateStatus = 'approved';
     } else {
       task.estimateStatus = 'rejected';
+    }
+    await task.save();
+    res.json(task);
+  }));
+
+  // Assignee who is behind proposes a new completion date: now + value/unit.
+  router.patch('/:id/extension', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
+    const unit = ['hours', 'days', 'weeks'].includes(req.body?.unit) ? req.body.unit : 'days';
+    const value = Math.max(0, Number(req.body?.value) || 0);
+    if (value <= 0) return res.status(400).json({ error: 'value must be greater than 0' });
+    task.dueProposalValue = value;
+    task.dueProposalUnit = unit;
+    task.dueProposalAt = new Date();
+    task.dueProposalStatus = 'proposed';
+    await task.save();
+    res.json(task);
+  }));
+
+  // PM/owner accepts or rejects the proposed new completion date.
+  router.patch('/:id/extension/decision', asyncHandler(async (req, res) => {
+    const decision = req.body?.decision;
+    if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (task.dueProposalStatus !== 'proposed') return res.status(400).json({ error: 'no pending extension' });
+    const project = await Project.findById(task.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    if (task.assignee && String(task.assignee) === String(req.user.sub)) {
+      return res.status(403).json({ error: 'the proposer cannot approve their own extension' });
+    }
+    if (decision === 'approve') {
+      const anchorISO = (task.dueProposalAt || new Date()).toISOString().slice(0, 10);
+      task.dueDate = endDateFrom(anchorISO, toHours(task.dueProposalValue, task.dueProposalUnit));
+      task.dueProposalStatus = 'approved';
+    } else {
+      task.dueProposalStatus = 'rejected';
     }
     await task.save();
     res.json(task);

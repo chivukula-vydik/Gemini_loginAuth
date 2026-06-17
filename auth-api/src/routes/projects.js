@@ -8,6 +8,7 @@ import { Skill } from '../models/Skill.js';
 import { User } from '../models/User.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
+import { effectiveDueDate, proposedDueDate } from '../services/estimate.js';
 import { AssignmentOffer } from '../models/AssignmentOffer.js';
 import { hasActiveTask } from '../services/assignment.js';
 
@@ -48,7 +49,17 @@ export function createProjectsRouter() {
       .populate('assignee', 'displayName email')
       .sort('createdAt');
     const map = await actualMinutesByTask(tasks.map((t) => t._id));
-    const tasksOut = tasks.map((t) => ({ ...t.toObject(), actualMinutes: map.get(String(t._id)) || 0 }));
+    const tasksOut = tasks.map((t) => {
+      const obj = t.toObject();
+      const due = effectiveDueDate(obj);
+      return {
+        ...obj,
+        actualMinutes: map.get(String(t._id)) || 0,
+        effectiveDueDate: due.date,
+        dueDateAuto: due.auto,
+        dueProposalDate: proposedDueDate(obj),
+      };
+    });
     res.json({ project, tasks: tasksOut });
   }));
 

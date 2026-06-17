@@ -2,9 +2,47 @@ import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
-  decideEstimate,
+  decideEstimate, updateTask, decideExtension,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
+import { ProgressRing } from './ProgressRing';
+import { dueUrgency } from '../timesheet/due';
+import { todayISO } from '../timesheet/time';
+
+function DueCell({ task, onSave, onDecideExt }: {
+  task: TaskDetail;
+  onSave: (dueDate: string | null) => void;
+  onDecideExt: (decision: 'approve' | 'reject') => void;
+}) {
+  const value = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? '');
+  const urgency = dueUrgency(value || null, todayISO(), task.status);
+  return (
+    <div className="due-stack">
+      <span className="due-cell">
+        <input
+          className={`ts-pct due-input${urgency ? ` due-${urgency}` : ''}`}
+          type="date"
+          value={value}
+          onChange={(e) => onSave(e.target.value || null)}
+          title={task.dueDateAuto ? 'Auto: start date + estimate. Pick a date to override.' : 'Due date'}
+        />
+        {task.dueDateAuto && value
+          ? <span className="due-tag">auto</span>
+          : task.dueDate
+            ? <button className="link-btn due-clear" title="Clear (revert to auto)" onClick={() => onSave(null)}>×</button>
+            : null}
+      </span>
+      {task.dueProposalStatus === 'proposed' && (
+        <span className="ext-note ext-pending">
+          Wants {task.dueProposalValue} {task.dueProposalUnit} more
+          {task.dueProposalDate ? ` → ${task.dueProposalDate}` : ''}
+          <button className="link-btn" style={{ marginLeft: 6 }} onClick={() => onDecideExt('approve')}>approve</button>
+          <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => onDecideExt('reject')}>reject</button>
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -126,6 +164,18 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     });
   }
 
+  async function saveDue(taskId: string, dueDate: string | null) {
+    setError('');
+    try { await updateTask(taskId, { dueDate }); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function decideExt(taskId: string, decision: 'approve' | 'reject') {
+    setError('');
+    try { await decideExtension(taskId, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
   async function reassignOwner(ownerId: string) {
     if (!ownerId) return;
     setError('');
@@ -146,14 +196,47 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const nonMembers = directory.filter((d) => !project.members.some((m) => m._id === d._id));
   const ownerCandidates = directory.filter((d) => (d.role === 'pm' || d.role === 'admin') && d._id !== project.ownerPm._id);
 
+  const overall = tasks.length
+    ? Math.round(tasks.reduce((s, t) => s + (t.percentComplete ?? 0), 0) / tasks.length)
+    : 0;
+  const doneCount = tasks.filter((t) => t.status === 'done').length;
+  const estHours = tasks.reduce((s, t) => s + (t.estimatedHours ?? 0), 0);
+  const actualHours = tasks.reduce((s, t) => s + (t.actualMinutes ?? 0), 0) / 60;
+
   return (
     <div className="ts-page">
       <header className="ts-header">
-        <button className="link-btn" onClick={onBack}>← Projects</button>
-        <h1 className="ts-h1">{project.name}</h1>
+        <div>
+          <button className="link-btn" onClick={onBack}>← Projects</button>
+          <h1 className="ts-h1">{project.name}</h1>
+        </div>
       </header>
       {error && <p className="ts-error">{error}</p>}
       {notice && <p className="ts-sub">{notice}</p>}
+
+      <div className="ts-card overview">
+        <div className="overview-ring">
+          <ProgressRing value={overall} />
+        </div>
+        <div className="overview-stats">
+          <div className="stat">
+            <span className="stat-label">Tasks</span>
+            <span className="stat-value">{tasks.length}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Completed</span>
+            <span className="stat-value">{doneCount}<span className="stat-sub">/ {tasks.length}</span></span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Estimated</span>
+            <span className="stat-value">{estHours}<span className="stat-sub">h</span></span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Logged</span>
+            <span className="stat-value">{actualHours.toFixed(1)}<span className="stat-sub">h</span></span>
+          </div>
+        </div>
+      </div>
 
       <div className="ts-card" style={{ padding: 14, marginBottom: 16 }}>
         <strong>Owner</strong>
@@ -211,9 +294,9 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
       <div className="ts-card">
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Task</th><th>Assignee</th><th>Planned</th><th>Actual</th><th>%</th><th>Status</th></tr></thead>
+          <thead><tr><th className="ts-task">Task</th><th>Assignee</th><th>Planned</th><th>Actual</th><th>%</th><th>Status</th><th>Due</th></tr></thead>
           <tbody>
-            {tasks.length === 0 && <tr><td colSpan={6} className="ts-empty">No tasks yet.</td></tr>}
+            {tasks.length === 0 && <tr><td colSpan={7} className="ts-empty">No tasks yet.</td></tr>}
             {tasks.map((t) => (
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
@@ -231,6 +314,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
                 <td>{t.status}</td>
+                <td><DueCell task={t} onSave={(d) => saveDue(t._id, d)} onDecideExt={(dec) => decideExt(t._id, dec)} /></td>
               </tr>
             ))}
           </tbody>

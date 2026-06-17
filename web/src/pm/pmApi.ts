@@ -30,6 +30,12 @@ export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
   description: string; estimatedHours: number; requiredSkills: string[];
   assignee: string | null; status: string; dueDate: string | null;
+  effectiveDueDate?: string | null;
+  dueDateAuto?: boolean;
+  dueProposalStatus?: 'none' | 'proposed' | 'approved' | 'rejected';
+  dueProposalValue?: number;
+  dueProposalUnit?: 'hours' | 'days' | 'weeks';
+  dueProposalDate?: string | null;
   percentComplete?: number;
   actualMinutes?: number;
   proposedHours?: number;
@@ -48,6 +54,13 @@ export type TaskDetail = {
   estimateValue?: number;
   estimateUnit?: 'hours' | 'days' | 'weeks';
   startDate?: string | null;
+  dueDate?: string | null;
+  effectiveDueDate?: string | null;
+  dueDateAuto?: boolean;
+  dueProposalStatus?: 'none' | 'proposed' | 'approved' | 'rejected';
+  dueProposalValue?: number;
+  dueProposalUnit?: 'hours' | 'days' | 'weeks';
+  dueProposalDate?: string | null;
   proposedValue?: number;
   proposedUnit?: 'hours' | 'days' | 'weeks';
 };
@@ -71,6 +84,14 @@ export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task & { offered?: boolean }>;
+
+export const updateTask = (id: string, patch: Partial<Task>) =>
+  authed(`/tasks/${id}`, 'PATCH', patch) as Promise<Task>;
+
+export const proposeExtension = (id: string, value: number, unit: EstimateUnit) =>
+  authed(`/tasks/${id}/extension`, 'PATCH', { value, unit });
+export const decideExtension = (id: string, decision: 'approve' | 'reject') =>
+  authed(`/tasks/${id}/extension/decision`, 'PATCH', { decision });
 
 export const updateProjectMembers = (id: string, members: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { members });

@@ -18,6 +18,32 @@ function isWeekend(d) {
   return dow === 0 || dow === 6;
 }
 
+export function taskHours(task) {
+  if (task.estimateValue && task.estimateUnit) return toHours(task.estimateValue, task.estimateUnit);
+  return Number(task.estimatedHours) || 0;
+}
+
+function toISODate(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+// Due date = manual dueDate if set, else Start Date + estimated duration.
+export function effectiveDueDate(task) {
+  const manual = toISODate(task.dueDate);
+  if (manual) return { date: manual, auto: false };
+  const startISO = toISODate(task.startDate);
+  return { date: endDateFrom(startISO, taskHours(task)), auto: true };
+}
+
+// New completion date a behind-schedule assignee is promising: anchor + duration.
+export function proposedDueDate(task) {
+  if (task.dueProposalStatus !== 'proposed') return null;
+  const anchorISO = toISODate(task.dueProposalAt) || toISODate(new Date());
+  return endDateFrom(anchorISO, toHours(task.dueProposalValue, task.dueProposalUnit));
+}
+
 export function endDateFrom(startISO, hours) {
   if (!startISO) return null;
   const days = estimateWorkingDays(hours);

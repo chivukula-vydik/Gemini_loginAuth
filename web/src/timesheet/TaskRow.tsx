@@ -4,6 +4,7 @@ import type { Day } from './time';
 import type { Task, Entries, Grant } from './timesheetApi';
 import type { BarSegment } from './bar';
 import { isCellEditable } from './cellLock';
+import { dueUrgency, dueLabel } from './due';
 
 type Props = {
   task: Task;
@@ -26,13 +27,18 @@ const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, pendingKeys, bar = null, onRename, onCellChange, onDelete, onRequestEdit, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
+  const urgency = isPm ? dueUrgency(task.endDate, today, task.status) : null;
+  const showDue = urgency === 'overdue' || urgency === 'soon';
   return (
-    <tr>
+    <tr className={showDue ? `ts-row-${urgency}` : undefined}>
       <td className="ts-task">
         {isPm ? (
           <div>
             <span className="ts-name-ro">{task.name || 'Untitled task'}</span>
             <span className="ts-pm-badge">PM</span>
+            {showDue && task.endDate && (
+              <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
+            )}
             <div className="ts-pm-meta">
               Planned {task.estimatedHours ?? 0}h · Actual {((task.actualMinutes ?? 0) / 60).toFixed(1)}h
             </div>
