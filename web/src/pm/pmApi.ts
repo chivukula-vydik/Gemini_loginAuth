@@ -69,7 +69,7 @@ export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm'> & { member
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Partial<Task> & { requiredSkills?: string[] }) =>
-  authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
+  authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task & { offered?: boolean }>;
 
 export const updateProjectMembers = (id: string, members: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { members });

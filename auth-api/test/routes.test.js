@@ -468,3 +468,17 @@ test('declining an offer leaves the task unassigned', async () => {
   const updated = await AssignmentOffer.findById(offer._id);
   assert.equal(updated.status, 'declined');
 });
+
+test('re-assigning a busy employee twice does not stack duplicate pending offers', async () => {
+  const pm = await User.create({ email: 'dd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'dd-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  await Task.create({ project: project._id, title: 'Busy', assignee: emp._id, status: 'in_progress', createdBy: pm._id });
+  const second = await Task.create({ project: project._id, title: 'Second', createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${second._id}`).set('Authorization', bearer(pm)).send({ assignee: String(emp._id) });
+  await request(app).patch(`/tasks/${second._id}`).set('Authorization', bearer(pm)).send({ assignee: String(emp._id) });
+
+  const count = await AssignmentOffer.countDocuments({ taskId: second._id, userId: emp._id, status: 'pending' });
+  assert.equal(count, 1);
+});

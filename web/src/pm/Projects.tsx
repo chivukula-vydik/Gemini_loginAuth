@@ -104,7 +104,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         startDate: startDate || null,
         requiredSkills: [...reqSkills],
       });
-      setNotice((created as { offered?: boolean }).offered
+      setNotice(created.offered
         ? 'That employee already has an active task — sent them an offer to accept.'
         : '');
       setTitle(''); setAssignee(''); setStartDate(''); setReqSkills(new Set());

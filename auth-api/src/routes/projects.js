@@ -104,7 +104,8 @@ export function createProjectsRouter() {
       createdBy: req.user.sub,
     });
     if (assignee && busy) {
-      await AssignmentOffer.create({ taskId: task._id, userId: assignee, offeredBy: req.user.sub });
+      const dup = await AssignmentOffer.exists({ taskId: task._id, userId: assignee, status: 'pending' });
+      if (!dup) await AssignmentOffer.create({ taskId: task._id, userId: assignee, offeredBy: req.user.sub });
       return res.status(201).json({ ...task.toObject(), offered: true });
     }
     res.status(201).json(task);

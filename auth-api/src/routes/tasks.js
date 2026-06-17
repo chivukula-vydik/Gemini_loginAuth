@@ -106,7 +106,8 @@ export function createTasksRouter() {
       }
       const sameAssignee = task.assignee && String(task.assignee) === String(req.body.assignee);
       if (!sameAssignee && (await hasActiveTask(req.body.assignee))) {
-        await AssignmentOffer.create({ taskId: task._id, userId: req.body.assignee, offeredBy: req.user.sub });
+        const dup = await AssignmentOffer.exists({ taskId: task._id, userId: req.body.assignee, status: 'pending' });
+        if (!dup) await AssignmentOffer.create({ taskId: task._id, userId: req.body.assignee, offeredBy: req.user.sub });
         offered = true;
       }
     }
