@@ -75,6 +75,21 @@ export const setTaskProgress = (id: string, patch: { percentComplete?: number; s
 export const listEditRequests = () => authed('/edit-requests?status=pending') as Promise<EditReq[]>;
 export const decideEditRequest = (id: string, decision: 'approved' | 'denied') =>
   authed(`/edit-requests/${id}`, 'PATCH', { decision });
+export type MarketTask = {
+  _id: string; title: string; project: string; requiredSkills: string[];
+  estimatedHours: number; myClaimStatus: 'none' | 'pending';
+};
+export type ClaimReq = {
+  _id: string; user: Person; task: { _id: string; title: string }; project: { name: string };
+  status: string; createdAt: string;
+};
+
+export const listMarketplace = () => authed('/marketplace') as Promise<MarketTask[]>;
+export const claimTask = (id: string) => authed(`/tasks/${id}/claim`, 'POST');
+export const listClaimRequests = () => authed('/claim-requests?status=pending') as Promise<ClaimReq[]>;
+export const decideClaimRequest = (id: string, decision: 'approved' | 'denied') =>
+  authed(`/claim-requests/${id}`, 'PATCH', { decision });
+
 export const proposeEstimate = (id: string, proposedHours: number) =>
   authed(`/tasks/${id}/estimate`, 'PATCH', { proposedHours });
 export const decideEstimate = (id: string, decision: 'approve' | 'reject') =>
