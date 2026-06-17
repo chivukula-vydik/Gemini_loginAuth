@@ -282,10 +282,12 @@ test('PATCH /tasks/:id/estimate: assignee proposes, non-assignee 403; PM approve
   assert.equal(forbidden.status, 403);
 
   const propose = await request(app).patch(`/tasks/${task._id}/estimate`)
-    .set('Authorization', bearer(emp)).send({ proposedHours: 8 });
+    .set('Authorization', bearer(emp)).send({ value: 8, unit: 'hours' });
   assert.equal(propose.status, 200);
   assert.equal(propose.body.estimateStatus, 'proposed');
   assert.equal(propose.body.proposedHours, 8);
+  assert.equal(propose.body.proposedValue, 8);
+  assert.equal(propose.body.proposedUnit, 'hours');
 
   const approve = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
     .set('Authorization', bearer(pm)).send({ decision: 'approve' });
@@ -298,7 +300,7 @@ test('a PM who is also the assignee cannot approve their own proposed estimate',
   const pm = await User.create({ email: 'self-pm@x.com', displayName: 'PM', role: 'pm' });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [pm._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignee: pm._id, createdBy: pm._id });
-  await request(app).patch(`/tasks/${task._id}/estimate`).set('Authorization', bearer(pm)).send({ proposedHours: 6 });
+  await request(app).patch(`/tasks/${task._id}/estimate`).set('Authorization', bearer(pm)).send({ value: 6, unit: 'hours' });
   const res = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
     .set('Authorization', bearer(pm)).send({ decision: 'approve' });
   assert.equal(res.status, 403);

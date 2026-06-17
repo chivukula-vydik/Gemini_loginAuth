@@ -82,7 +82,7 @@ export function createProjectsRouter() {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canCreateTask(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    const { title, description, requiredSkills, assignee, dueDate, dependsOn } = req.body || {};
+    const { title, description, requiredSkills, assignee, dueDate, startDate, dependsOn } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
     if (assignee && !project.members.some((m) => String(m) === String(assignee))) {
       return res.status(400).json({ error: 'assignee must be a project member' });
@@ -96,6 +96,7 @@ export function createProjectsRouter() {
       requiredSkills: validSkills.map((s) => s._id),
       assignee: assignee || null,
       dueDate: dueDate || null,
+      startDate: startDate || null,
       dependsOn: Array.isArray(dependsOn) ? dependsOn : [],
       createdBy: req.user.sub,
     });

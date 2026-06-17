@@ -8,6 +8,7 @@ import { User } from '../models/User.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
 import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
+import { toHours } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 
 export function createTasksRouter() {
@@ -59,7 +60,11 @@ export function createTasksRouter() {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
-    task.proposedHours = Math.max(0, Math.round(Number(req.body?.proposedHours) || 0));
+    const unit = ['hours', 'days', 'weeks'].includes(req.body?.unit) ? req.body.unit : 'hours';
+    const value = Math.max(0, Number(req.body?.value) || 0);
+    task.proposedValue = value;
+    task.proposedUnit = unit;
+    task.proposedHours = Math.round(toHours(value, unit));
     task.estimateStatus = 'proposed';
     await task.save();
     res.json(task);
@@ -76,6 +81,8 @@ export function createTasksRouter() {
       return res.status(403).json({ error: 'the proposer cannot approve their own estimate' });
     }
     if (decision === 'approve') {
+      task.estimateValue = task.proposedValue;
+      task.estimateUnit = task.proposedUnit;
       task.estimatedHours = task.proposedHours;
       task.estimateStatus = 'approved';
     } else {
@@ -95,7 +102,7 @@ export function createTasksRouter() {
         return res.status(400).json({ error: 'assignee must be a project member' });
       }
     }
-    for (const f of ['title', 'description', 'assignee', 'status', 'dueDate']) {
+    for (const f of ['title', 'description', 'assignee', 'status', 'dueDate', 'startDate']) {
       if (f in (req.body || {})) task[f] = req.body[f];
     }
     if (Array.isArray(req.body?.requiredSkills)) {
