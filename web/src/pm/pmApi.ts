@@ -27,13 +27,17 @@ export type Project = {
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
 };
-export type Assignee = { user: Person | string; sharePct: number };
+export type Assignee = { user: Person | string; sharePct: number; estimatedHours?: number | null };
 export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
   description: string; estimatedHours: number; requiredSkills: string[];
   assignees: Assignee[]; status: string; dueDate: string | null;
   mySharePct?: number;
-  myPlannedHours?: number;
+  myEstimatedHours?: number | null;
+  myDue?: string | null;
+  estimatesPending?: boolean;
+  submittedCount?: number;
+  assigneeCount?: number;
   effectiveDueDate?: string | null;
   dueDateAuto?: boolean;
   dueProposalStatus?: 'none' | 'proposed' | 'approved' | 'rejected';
@@ -98,6 +102,9 @@ export const setTaskAssignees = (taskId: string, assignees: { user: string; shar
 
 export const updateTask = (id: string, patch: Partial<Task>) =>
   authed(`/tasks/${id}`, 'PATCH', patch) as Promise<Task>;
+
+export const setMyEstimate = (id: string, value: number, unit: EstimateUnit) =>
+  authed(`/tasks/${id}/my-estimate`, 'PATCH', { value, unit }) as Promise<Task>;
 
 export const proposeExtension = (id: string, value: number, unit: EstimateUnit) =>
   authed(`/tasks/${id}/extension`, 'PATCH', { value, unit });
