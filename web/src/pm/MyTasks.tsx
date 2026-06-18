@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { myTasks, proposeEstimate, proposeExtension, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
+import { myTasks, proposeEstimate, proposeExtension, setMyEstimate, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
 import { dueUrgency, dueLabel } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
 import { StatusBadge } from './StatusBadge';
@@ -76,6 +76,25 @@ function ProposeEstimate({ task, onPropose }: { task: Task; onPropose: (value: n
   );
 }
 
+function MyEstimate({ task, onSubmit }: { task: Task; onSubmit: (value: number, unit: EstimateUnit) => void }) {
+  const hasEstimate = task.myEstimatedHours != null;
+  const [value, setValue] = useState<number>(task.myEstimatedHours ?? 0);
+  const [unit, setUnit] = useState<EstimateUnit>('hours');
+  return (
+    <div>
+      <span className="ts-nav-left">
+        <input className="ts-pct" type="number" min={0} value={value}
+          onChange={(e) => setValue(Number(e.target.value))} />
+        <select className="input ts-status" value={unit} onChange={(e) => setUnit(e.target.value as EstimateUnit)}>
+          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <button className="link-btn" onClick={() => onSubmit(value, unit)}>{hasEstimate ? 'Update' : 'Submit'}</button>
+      </span>
+      {hasEstimate && <div className="ts-sub">Your deadline: {task.myDue ?? '—'}</div>}
+    </div>
+  );
+}
+
 export function MyTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [offers, setOffers] = useState<AssignmentOffer[]>([]);
@@ -102,6 +121,12 @@ export function MyTasks() {
   async function requestExtension(id: string, value: number, unit: EstimateUnit) {
     setError('');
     try { await proposeExtension(id, value, unit); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function submitMyEstimate(id: string, value: number, unit: EstimateUnit) {
+    setError('');
+    try { await setMyEstimate(id, value, unit); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -183,9 +208,10 @@ export function MyTasks() {
                   {t.estimateStatus === 'approved'
                     ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
-                  {(t.mySharePct ?? 0) > 0 && (t.assignees?.length ?? 0) > 1 && (
-                    <div className="ts-sub">Your share {t.mySharePct}% - {t.myPlannedHours}h</div>
-                  )}
+                  {t.estimatesPending
+                    ? <div className="ts-sub">Waiting on {(t.assigneeCount ?? 0) - (t.submittedCount ?? 0)} of {t.assigneeCount ?? 0} teammates — total: —</div>
+                    : <div className="ts-sub">Total: {t.estimatedHours}h</div>}
+                  <MyEstimate task={t} onSubmit={(v, u) => submitMyEstimate(t._id, v, u)} />
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
