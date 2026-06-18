@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { dueUrgency, type DueUrgency } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
 import { assigneeHours } from './workload';
+import { estimateSummary } from './assigneeEstimate';
 import { AssigneesEditor } from './AssigneesEditor';
 import { StatusBadge } from './StatusBadge';
 import { personName } from './personName';
@@ -212,7 +213,7 @@ export function ProjectTasks(props: Props) {
                   {editingAssignees === t._id ? (
                     <AssigneesEditor
                       members={props.members}
-                      value={t.assignees.map((a) => ({ userId: a.user._id, sharePct: a.sharePct }))}
+                      value={t.assignees.map((a) => ({ userId: a.user._id, sharePct: a.sharePct, estimatedHours: a.estimatedHours }))}
                       onSave={async (next) => {
                         await props.onSaveAssignees(t._id, next);
                         setEditingAssignees(null);
@@ -226,7 +227,10 @@ export function ProjectTasks(props: Props) {
                         : t.assignees.map((a) => (
                             <span key={a.user._id} className="assignee-line">
                               <span className="assignee-line-name">{personName(a.user)}</span>
-                              <span className="assignee-line-meta">{a.sharePct}% · {assigneeHours(t.estimatedHours, a.sharePct)}h</span>
+                              <span className="assignee-line-meta">
+                                {a.sharePct}% · {assigneeHours(t.estimatedHours, a.sharePct)}h ·{' '}
+                                {a.estimatedHours != null ? `${a.estimatedHours}h` : 'pending'}
+                              </span>
                             </span>
                           ))}
                     </button>
@@ -241,6 +245,14 @@ export function ProjectTasks(props: Props) {
                     </span>
                   ) : t.estimateStatus === 'approved' ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <span className="ts-sub">{t.estimateStatus === 'rejected' ? 'rejected' : 'no estimate'}</span>}
+                  {t.assignees.length > 0 && (() => {
+                    const { total, submitted, count, allIn } = estimateSummary(t.assignees);
+                    return (
+                      <div className="ts-sub">
+                        {allIn ? `${total}h` : `${submitted} of ${count} submitted`}
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>

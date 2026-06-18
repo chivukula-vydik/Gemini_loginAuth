@@ -56,7 +56,7 @@ export type Task = {
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
-  assignees: { user: Person; sharePct: number }[]; status: string; percentComplete: number; actualMinutes: number;
+  assignees: { user: Person; sharePct: number; estimatedHours?: number | null }[]; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
   estimateValue?: number;

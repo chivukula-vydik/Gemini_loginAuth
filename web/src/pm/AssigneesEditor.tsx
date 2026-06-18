@@ -3,7 +3,7 @@ import type { Person } from './pmApi';
 import { equalShares, normalizeShares } from './workload';
 import { personName } from './personName';
 
-type Row = { userId: string; sharePct: number };
+type Row = { userId: string; sharePct: number; estimatedHours?: number | null };
 type Props = {
   members: Person[];
   value: Row[];
@@ -62,6 +62,9 @@ export function AssigneesEditor({ members, value, onSave, onClose }: Props) {
                     className="ts-pct" type="number" min={0} max={100} value={row.sharePct}
                     onChange={(e) => setShare(m._id, Number(e.target.value))}
                   />%
+                  <span className="assignee-line-meta">
+                    {row.estimatedHours != null ? `${row.estimatedHours}h` : 'pending'}
+                  </span>
                 </span>
               )}
             </div>
