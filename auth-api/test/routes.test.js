@@ -368,41 +368,10 @@ test('POST edit-request requires a projectId the caller has a task on, and dedup
   assert.equal(dup.status, 409); // pending duplicate
 });
 
-test('PATCH /tasks/:id/estimate: assignee proposes, non-assignee 403; PM approves', async () => {
-  const pm = await User.create({ email: 'est-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'est-e@x.com', displayName: 'E', role: 'employee' });
-  const other = await User.create({ email: 'est-o@x.com', displayName: 'O', role: 'employee' });
-  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
-  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
-
-  const forbidden = await request(app).patch(`/tasks/${task._id}/estimate`)
-    .set('Authorization', bearer(other)).send({ proposedHours: 5 });
-  assert.equal(forbidden.status, 403);
-
-  const propose = await request(app).patch(`/tasks/${task._id}/estimate`)
-    .set('Authorization', bearer(emp)).send({ value: 8, unit: 'hours' });
-  assert.equal(propose.status, 200);
-  assert.equal(propose.body.estimateStatus, 'proposed');
-  assert.equal(propose.body.proposedHours, 8);
-  assert.equal(propose.body.proposedValue, 8);
-  assert.equal(propose.body.proposedUnit, 'hours');
-
-  const approve = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
-    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
-  assert.equal(approve.status, 200);
-  assert.equal(approve.body.estimateStatus, 'approved');
-  assert.equal(approve.body.estimatedHours, 8);
-});
-
-test('a PM who is also the assignee cannot approve their own proposed estimate', async () => {
-  const pm = await User.create({ email: 'self-pm@x.com', displayName: 'PM', role: 'pm' });
-  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [pm._id] });
-  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(pm._id), createdBy: pm._id });
-  await request(app).patch(`/tasks/${task._id}/estimate`).set('Authorization', bearer(pm)).send({ value: 6, unit: 'hours' });
-  const res = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
-    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
-  assert.equal(res.status, 403);
-});
+// The legacy task-level estimate-proposal flow (PATCH /tasks/:id/estimate +
+// /estimate/decision) is retired: per-assignee estimates replace it, and the
+// endpoint now returns 409 for any task with assignees (the only tasks its
+// auth gate can reach). The 409 behavior is covered by the test above.
 
 test('GET /marketplace returns only unassigned, member-project, skill-matched tasks', async () => {
   const pm = await User.create({ email: 'mk-pm@x.com', displayName: 'PM', role: 'pm' });
@@ -459,27 +428,6 @@ test('claim-requests: GET 403 for employee; approve assigns task and auto-denies
   assert.equal(String(soleAssigneeId(savedTask)), String(a._id));
   const otherClaim = await ClaimRequest.findById(claimB._id);
   assert.equal(otherClaim.status, 'denied');
-});
-
-test('estimate propose/approve carries unit and derives hours', async () => {
-  const pm = await User.create({ email: 'u-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'u-e@x.com', displayName: 'E', role: 'employee' });
-  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
-  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
-
-  const propose = await request(app).patch(`/tasks/${task._id}/estimate`)
-    .set('Authorization', bearer(emp)).send({ value: 2, unit: 'days' });
-  assert.equal(propose.status, 200);
-  assert.equal(propose.body.proposedValue, 2);
-  assert.equal(propose.body.proposedUnit, 'days');
-  assert.equal(propose.body.proposedHours, 16);
-
-  const approve = await request(app).patch(`/tasks/${task._id}/estimate/decision`)
-    .set('Authorization', bearer(pm)).send({ decision: 'approve' });
-  assert.equal(approve.status, 200);
-  assert.equal(approve.body.estimateValue, 2);
-  assert.equal(approve.body.estimateUnit, 'days');
-  assert.equal(approve.body.estimatedHours, 16);
 });
 
 test('task create + edit accept a startDate', async () => {
@@ -662,4 +610,45 @@ test('my-estimate: assignee submits hours; total + deadline finalize when all in
   assert.equal(savedU2.estimatedHours, 40);
   assert.equal(after.estimatedHours, 48);
   assert.equal(new Date(after.dueDate).toISOString().slice(0, 10), '2026-06-19');
+});
+
+test('estimate proposal is blocked for tasks that have assignees', async () => {
+  const pm = await User.create({ email: 'blk-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'blk-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
+
+  const res = await request(app).patch(`/tasks/${task._id}/estimate`)
+    .set('Authorization', bearer(emp)).send({ value: 8, unit: 'hours' });
+  assert.equal(res.status, 409);
+  assert.equal(res.body.error, 'use per-assignee estimates for assigned tasks');
+});
+
+test('my-tasks row exposes my estimate, my deadline, and pending state', async () => {
+  const pm = await User.create({ email: 'mtr-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'mtr-u1@x.com', displayName: 'U1', role: 'employee' });
+  const u2 = await User.create({ email: 'mtr-u2@x.com', displayName: 'U2', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
+  const task = await Task.create({
+    project: project._id,
+    title: 'T',
+    startDate: '2026-06-15',
+    createdBy: pm._id,
+  });
+
+  await request(app).patch(`/tasks/${task._id}/assignees`)
+    .set('Authorization', bearer(pm))
+    .send({ assignees: [{ user: String(u1._id), sharePct: 50 }, { user: String(u2._id), sharePct: 50 }] });
+
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+
+  const res = await request(app).get('/tasks/mine').set('Authorization', bearer(u1));
+  assert.equal(res.status, 200);
+  const row = res.body.find((t) => t.title === 'T');
+  assert.equal(row.myEstimatedHours, 8);
+  assert.equal(row.myDue, '2026-06-15');
+  assert.equal(row.estimatesPending, true);
+  assert.equal(row.submittedCount, 1);
+  assert.equal(row.assigneeCount, 2);
 });

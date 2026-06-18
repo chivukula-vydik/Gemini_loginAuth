@@ -8,10 +8,10 @@ import { User } from '../models/User.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
 import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
-import { toHours, effectiveDueDate, proposedDueDate, endDateFrom, maxAssigneeDueDate } from '../services/estimate.js';
+import { toHours, effectiveDueDate, proposedDueDate, endDateFrom, maxAssigneeDueDate, assigneeDueDate } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
-import { assigneeHours, equalShares, normalizeShares } from '../services/workload.js';
-import { mergeAssignees, allEstimatesIn, sumEstimatedHours } from '../services/assigneeEstimates.js';
+import { equalShares, normalizeShares } from '../services/workload.js';
+import { mergeAssignees, allEstimatesIn, sumEstimatedHours, submittedCount } from '../services/assigneeEstimates.js';
 
 export function createTasksRouter() {
   const router = express.Router();
@@ -28,15 +28,18 @@ export function createTasksRouter() {
       const obj = t.toObject();
       const due = effectiveDueDate(obj);
       const mine = (obj.assignees || []).find((a) => String(a.user?._id || a.user) === uid);
-      const mySharePct = mine ? mine.sharePct : 0;
       return {
         ...obj,
         actualMinutes: map.get(String(t._id)) || 0,
         effectiveDueDate: due.date,
         dueDateAuto: due.auto,
         dueProposalDate: proposedDueDate(obj),
-        mySharePct,
-        myPlannedHours: assigneeHours(obj.estimatedHours, mySharePct),
+        mySharePct: mine ? mine.sharePct : 0,
+        myEstimatedHours: mine ? mine.estimatedHours ?? null : null,
+        myDue: mine ? assigneeDueDate(obj, mine) : null,
+        estimatesPending: !allEstimatesIn(obj.assignees),
+        submittedCount: submittedCount(obj.assignees),
+        assigneeCount: (obj.assignees || []).length,
       };
     }));
   }));
@@ -78,6 +81,7 @@ export function createTasksRouter() {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
+    if (task.assignees.length > 0) return res.status(409).json({ error: 'use per-assignee estimates for assigned tasks' });
     const unit = ['hours', 'days', 'weeks'].includes(req.body?.unit) ? req.body.unit : 'hours';
     const value = Math.max(0, Number(req.body?.value) || 0);
     task.proposedValue = value;
