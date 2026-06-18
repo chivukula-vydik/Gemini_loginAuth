@@ -61,6 +61,22 @@ export function TimesheetPage() {
     load(weekStart);
   }, [weekStart, load]);
 
+  // Listen for PM task deletions and remove matching timesheet rows (by taskId)
+  useEffect(() => {
+    function handleDeleted(e: Event) {
+      const detail = (e as CustomEvent)?.detail;
+      const deleted: string[] = Array.isArray(detail?.taskIds) ? detail.taskIds : [];
+      if (deleted.length === 0) return;
+      setTasks((prev) => {
+        const next = prev.filter((t) => !(t.taskId && deleted.includes(t.taskId)));
+        if (next.length !== prev.length) dirty.current = true;
+        return next;
+      });
+    }
+    window.addEventListener('pm:tasks-deleted', handleDeleted as EventListener);
+    return () => window.removeEventListener('pm:tasks-deleted', handleDeleted as EventListener);
+  }, []);
+
   useEffect(() => {
     if (!dirty.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);

@@ -120,6 +120,10 @@ export function ProjectTasks(props: Props) {
     try {
       await bulkUpdateTasks(props.projectId, taskIds, op, value);
       setSelectedIds(new Set());
+      // notify other parts of the app when tasks are deleted so they can update (e.g., timesheets)
+      if (op === 'delete') {
+        try { window.dispatchEvent(new CustomEvent('pm:tasks-deleted', { detail: { taskIds } })); } catch {}
+      }
       await props.onReload();
     } catch (e) {
       props.onError((e as Error).message);
