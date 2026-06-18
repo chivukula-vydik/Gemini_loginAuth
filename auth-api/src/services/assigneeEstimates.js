@@ -10,3 +10,11 @@ export function allEstimatesIn(assignees) {
 export function sumEstimatedHours(assignees) {
   return (assignees || []).reduce((sum, a) => sum + (a && a.estimatedHours != null ? Number(a.estimatedHours) : 0), 0);
 }
+
+export function mergeAssignees(prevAssignees, userIds, shares) {
+  const prevByUser = new Map((prevAssignees || []).map((a) => [String(a.user), a]));
+  return userIds.map((user, i) => {
+    const prev = prevByUser.get(String(user));
+    return { user, sharePct: shares[i], estimatedHours: prev ? prev.estimatedHours ?? null : null };
+  });
+}
