@@ -23,7 +23,7 @@ export function taskHours(task) {
   return Number(task.estimatedHours) || 0;
 }
 
-function toISODate(value) {
+export function toISODate(value) {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
@@ -57,4 +57,17 @@ export function endDateFrom(startISO, hours) {
     if (!isWeekend(d)) counted += 1;
   }
   return d.toISOString().slice(0, 10);
+}
+
+export function assigneeDueDate(task, assignee) {
+  const startISO = toISODate(task && task.startDate);
+  if (!startISO || !assignee || assignee.estimatedHours == null) return null;
+  return endDateFrom(startISO, Number(assignee.estimatedHours));
+}
+
+export function maxAssigneeDueDate(task) {
+  const dates = ((task && task.assignees) || [])
+    .map((a) => assigneeDueDate(task, a))
+    .filter(Boolean);
+  return dates.length ? dates.reduce((max, d) => (d > max ? d : max)) : null;
 }

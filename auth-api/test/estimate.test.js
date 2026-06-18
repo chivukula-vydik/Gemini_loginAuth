@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toHours, estimateWorkingDays, endDateFrom, effectiveDueDate, taskHours, proposedDueDate } from '../src/services/estimate.js';
+import { toHours, estimateWorkingDays, endDateFrom, effectiveDueDate, taskHours, proposedDueDate, assigneeDueDate, maxAssigneeDueDate } from '../src/services/estimate.js';
 
 test('toHours: converts each unit', () => {
   assert.equal(toHours(2, 'hours'), 2);
@@ -67,4 +67,20 @@ test('proposedDueDate: anchor + duration when proposed', () => {
   // anchor Tue 2026-06-16 + 1 week (5 working days) -> 2026-06-22
   const out = proposedDueDate({ dueProposalStatus: 'proposed', dueProposalValue: 1, dueProposalUnit: 'weeks', dueProposalAt: '2026-06-16T10:00:00Z' });
   assert.equal(out, '2026-06-22');
+});
+
+test('assigneeDueDate: start date + own hours (skips weekends)', () => {
+  // Mon 2026-06-15, 16h = 2 working days -> Tue 2026-06-16
+  assert.equal(assigneeDueDate({ startDate: '2026-06-15' }, { estimatedHours: 16 }), '2026-06-16');
+});
+
+test('assigneeDueDate: null when no start date or no estimate', () => {
+  assert.equal(assigneeDueDate({ startDate: null }, { estimatedHours: 16 }), null);
+  assert.equal(assigneeDueDate({ startDate: '2026-06-15' }, { estimatedHours: null }), null);
+});
+
+test('maxAssigneeDueDate: latest deadline across assignees', () => {
+  const task = { startDate: '2026-06-15', assignees: [{ estimatedHours: 8 }, { estimatedHours: 40 }] };
+  // 8h -> Mon 06-15; 40h (5 days) -> Fri 06-19; max = 06-19
+  assert.equal(maxAssigneeDueDate(task), '2026-06-19');
 });
