@@ -14,6 +14,7 @@ const taskSchema = new mongoose.Schema({
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         sharePct: { type: Number, default: 0, min: 0, max: 100 },
+        estimatedHours: { type: Number, default: null },
       },
       { _id: false },
     )],
