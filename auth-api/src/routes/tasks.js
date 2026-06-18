@@ -8,7 +8,7 @@ import { User } from '../models/User.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
 import { canEditProject, canLogProgress } from '../services/authz.js';
 import { skillsMatch } from '../services/match.js';
-import { toHours, effectiveDueDate, proposedDueDate, endDateFrom } from '../services/estimate.js';
+import { toHours, effectiveDueDate, proposedDueDate, endDateFrom, maxAssigneeDueDate } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 import { assigneeHours, equalShares, normalizeShares } from '../services/workload.js';
 import { mergeAssignees, allEstimatesIn, sumEstimatedHours } from '../services/assigneeEstimates.js';
@@ -84,6 +84,25 @@ export function createTasksRouter() {
     task.proposedUnit = unit;
     task.proposedHours = Math.round(toHours(value, unit));
     task.estimateStatus = 'proposed';
+    await task.save();
+    res.json(task);
+  }));
+
+  // Assignee submits their own hour estimate; finalizes task totals + due date once all are in.
+  router.patch('/:id/my-estimate', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    const mine = task.assignees.find((a) => String(a.user) === String(req.user.sub));
+    if (!mine) return res.status(403).json({ error: 'not an assignee of this task' });
+    const unit = ['hours', 'days', 'weeks'].includes(req.body?.unit) ? req.body.unit : 'hours';
+    const value = Math.max(0, Number(req.body?.value) || 0);
+    mine.estimatedHours = Math.round(toHours(value, unit));
+    if (allEstimatesIn(task.assignees)) {
+      task.estimatedHours = sumEstimatedHours(task.assignees);
+      if (!task.dueDate) task.dueDate = maxAssigneeDueDate(task);
+    } else {
+      task.estimatedHours = 0;
+    }
     await task.save();
     res.json(task);
   }));

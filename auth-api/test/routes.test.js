@@ -615,3 +615,51 @@ test('re-saving assignees preserves an already-submitted estimate', async () => 
   // Not all assignees have submitted estimates yet, so task.estimatedHours resets to 0.
   assert.equal(after.estimatedHours, 0);
 });
+
+test('my-estimate: assignee submits hours; total + deadline finalize when all in', async () => {
+  const pm = await User.create({ email: 'mye-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'mye-u1@x.com', displayName: 'U1', role: 'employee' });
+  const u2 = await User.create({ email: 'mye-u2@x.com', displayName: 'U2', role: 'employee' });
+  const outsider = await User.create({ email: 'mye-out@x.com', displayName: 'Out', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
+  const task = await Task.create({
+    project: project._id,
+    title: 'T',
+    startDate: '2026-06-15',
+    createdBy: pm._id,
+  });
+
+  const setup = await request(app).patch(`/tasks/${task._id}/assignees`)
+    .set('Authorization', bearer(pm))
+    .send({ assignees: [{ user: String(u1._id), sharePct: 50 }, { user: String(u2._id), sharePct: 50 }] });
+  assert.equal(setup.status, 200);
+
+  // Non-assignee cannot submit an estimate.
+  const forbidden = await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(outsider))
+    .send({ value: 5, unit: 'hours' });
+  assert.equal(forbidden.status, 403);
+
+  // u1 submits 8h; not all assignees have submitted yet, so task.estimatedHours stays 0.
+  const first = await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1))
+    .send({ value: 8, unit: 'hours' });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.estimatedHours, 0);
+
+  // u2 submits 40h; now all assignees have submitted, so totals + dueDate finalize.
+  const second = await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u2))
+    .send({ value: 40, unit: 'hours' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.estimatedHours, 48);
+  assert.equal(new Date(second.body.dueDate).toISOString().slice(0, 10), '2026-06-19');
+
+  const after = await Task.findById(task._id);
+  const savedU1 = after.assignees.find((a) => String(a.user) === String(u1._id));
+  const savedU2 = after.assignees.find((a) => String(a.user) === String(u2._id));
+  assert.equal(savedU1.estimatedHours, 8);
+  assert.equal(savedU2.estimatedHours, 40);
+  assert.equal(after.estimatedHours, 48);
+  assert.equal(new Date(after.dueDate).toISOString().slice(0, 10), '2026-06-19');
+});
