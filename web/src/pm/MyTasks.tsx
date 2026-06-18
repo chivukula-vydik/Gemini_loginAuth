@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { myTasks, proposeEstimate, proposeExtension, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
 import { dueUrgency, dueLabel } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
+import { StatusBadge } from './StatusBadge';
 
 const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
 
@@ -104,24 +105,57 @@ export function MyTasks() {
     catch (e) { setError((e as Error).message); }
   }
 
+  const today = todayISO();
+  const inProgress = tasks.filter((t) => t.status === 'in_progress').length;
+  const doneCount = tasks.filter((t) => t.status === 'done').length;
+  const overdue = tasks.filter((t) =>
+    dueUrgency(t.dueDate ? t.dueDate.slice(0, 10) : (t.effectiveDueDate ?? null), today, t.status) === 'overdue'
+  ).length;
+
   return (
     <div className="ts-page">
-      <header className="ts-header"><h1 className="ts-h1">My Tasks</h1></header>
+      <header className="ts-header">
+        <div>
+          <h1 className="ts-h1">My Tasks</h1>
+          <p className="ts-sub">{tasks.length} task{tasks.length === 1 ? '' : 's'} assigned to you</p>
+        </div>
+      </header>
+
+      <div className="ts-tiles">
+        <div className="ts-tile ts-tile-accent">
+          <span className="ts-tile-label">Assigned</span>
+          <span className="ts-tile-value">{tasks.length}</span>
+        </div>
+        <div className="ts-tile stat-logged">
+          <span className="ts-tile-label">In progress</span>
+          <span className="ts-tile-value">{inProgress}</span>
+        </div>
+        <div className="ts-tile stat-done">
+          <span className="ts-tile-label">Done</span>
+          <span className="ts-tile-value">{doneCount}</span>
+        </div>
+        <div className="ts-tile stat-est">
+          <span className="ts-tile-label">Overdue</span>
+          <span className="ts-tile-value">{overdue}</span>
+        </div>
+      </div>
+
       {error && <p className="ts-error">{error}</p>}
       {offers.length > 0 && (
-        <div className="ts-card" style={{ marginBottom: 16 }}>
-          <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '4px 0 10px' }}>Task offers</h2>
+        <>
+        <h2 className="section-title">Task offers</h2>
+        <div className="ts-card" style={{ marginBottom: 22 }}>
           <table className="ts-table">
-            <thead><tr><th className="ts-task">Task</th><th>Project</th><th></th></tr></thead>
+            <thead><tr><th className="ts-task">Task</th><th className="col-left">Project</th><th className="col-left">Actions</th></tr></thead>
             <tbody>
               {offers.map((o) => (
                 <tr key={o._id}>
                   <td className="ts-task">{o.task.title}</td>
-                  <td>{o.project.name}</td>
-                  <td>
-                    <div className="ts-nav-left">
-                      <button className="link-btn" onClick={() => decide(o._id, 'accept')}>Accept</button>
-                      <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decide(o._id, 'decline')}>Decline</button>
+                  <td className="col-left">{o.project.name}</td>
+                  <td className="col-left">
+                    <div className="row-actions">
+                      <button className="table-action approve" onClick={() => decide(o._id, 'accept')}>Accept</button>
+                      <button className="table-action danger" onClick={() => decide(o._id, 'decline')}>Decline</button>
                     </div>
                   </td>
                 </tr>
@@ -129,13 +163,14 @@ export function MyTasks() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       <div className="ts-card">
         <table className="ts-table">
           <thead>
             <tr>
-              <th className="ts-task">Task</th><th>Project</th><th>Estimate</th>
-              <th>Actual</th><th>%</th><th>Status</th><th>Due</th>
+              <th className="ts-task">Task</th><th className="col-left">Project</th><th className="col-left">Estimate</th>
+              <th>Actual</th><th>%</th><th className="col-left">Status</th><th className="col-left">Due</th>
             </tr>
           </thead>
           <tbody>
@@ -143,8 +178,8 @@ export function MyTasks() {
             {tasks.map((t) => (
               <tr key={t._id}>
                 <td className="ts-task">{t.title}</td>
-                <td>{typeof t.project === 'object' ? t.project.name : '—'}</td>
-                <td>
+                <td className="col-left">{typeof t.project === 'object' ? t.project.name : '—'}</td>
+                <td className="col-left">
                   {t.estimateStatus === 'approved'
                     ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
                     : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
@@ -154,8 +189,8 @@ export function MyTasks() {
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
-                <td>{t.status}</td>
-                <td>
+                <td className="col-left"><StatusBadge status={t.status} /></td>
+                <td className="col-left">
                   <div className="due-stack">
                     <DueLabel task={t} />
                     <ExtensionRequest task={t} onRequest={(v, u) => requestExtension(t._id, v, u)} />

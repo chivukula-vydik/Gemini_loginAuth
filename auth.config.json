@@ -1,4 +1,7 @@
 {
+  "features": {
+    "pmTaskBulk": true
+  },
   "providers": {
     "local": { "enabled": true, "displayName": "Email & Password" },
     "google": {

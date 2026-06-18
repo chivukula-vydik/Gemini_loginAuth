@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listUsers, setUserRole, setUserActive, deleteUser, UserRow } from './pmApi';
 import { useAuth } from '../authContext';
+import { personName, initials } from './personName';
 import type { Role } from './nav';
 
 const ROLES: Role[] = ['admin', 'pm', 'employee'];
@@ -43,34 +44,89 @@ export function AdminUsers() {
     }
   }
 
+  const total = users.length;
+  const activeCount = users.filter((u) => u.active !== false).length;
+  const admins = users.filter((u) => u.role === 'admin').length;
+  const pms = users.filter((u) => u.role === 'pm').length;
+  const employees = users.filter((u) => u.role === 'employee').length;
+
   return (
     <div className="ts-page">
-      <header className="ts-header"><h1 className="ts-h1">Users</h1></header>
+      <header className="ts-header">
+        <div>
+          <h1 className="ts-h1">Users</h1>
+          <p className="ts-sub">{users.length} {users.length === 1 ? 'member' : 'members'}</p>
+        </div>
+      </header>
+
+      <div className="ts-tiles">
+        <div className="ts-tile ts-tile-accent">
+          <span className="ts-tile-label">Total members</span>
+          <span className="ts-tile-value">{total}</span>
+          <span className="ts-tile-foot">{activeCount} active · {total - activeCount} inactive</span>
+        </div>
+        <div className="ts-tile stat-tasks">
+          <span className="ts-tile-label">Admins</span>
+          <span className="ts-tile-value">{admins}</span>
+        </div>
+        <div className="ts-tile stat-done">
+          <span className="ts-tile-label">Project managers</span>
+          <span className="ts-tile-value">{pms}</span>
+        </div>
+        <div className="ts-tile stat-logged">
+          <span className="ts-tile-label">Employees</span>
+          <span className="ts-tile-value">{employees}</span>
+        </div>
+      </div>
+
       {error && <p className="ts-error">{error}</p>}
       <div className="ts-card">
         <table className="ts-table">
-          <thead><tr><th className="ts-task">User</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th className="ts-task">User</th>
+              <th className="col-left">Role</th>
+              <th className="col-left">Status</th>
+              <th className="col-left">Actions</th>
+            </tr>
+          </thead>
           <tbody>
+            {users.length === 0 && <tr><td colSpan={4} className="ts-empty">No users found.</td></tr>}
             {users.map((u) => {
               const inactive = u.active === false;
               const isSelf = u.email === me?.email;
               return (
-                <tr key={u._id} style={inactive ? { opacity: 0.55 } : undefined}>
-                  <td className="ts-task">{u.displayName || '—'}</td>
-                  <td>{u.email}</td>
-                  <td>
-                    <select className="input" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
+                <tr key={u._id} className={inactive ? 'row-inactive' : undefined}>
+                  <td className="ts-task">
+                    <span className="person-pill">
+                      <span className="person-avatar">{initials(u)}</span>
+                      <span className="user-id">
+                        <span className="user-id-name">
+                          {personName(u)}
+                          {isSelf && <span className="self-tag">You</span>}
+                        </span>
+                        <span className="user-id-email">{u.email}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td className="col-left">
+                    <select className="input pm-select" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </td>
-                  <td>{inactive ? 'Inactive' : 'Active'}</td>
-                  <td>
+                  <td className="col-left">
+                    <span className={`status-badge ${inactive ? 'status-archived' : 'status-done'}`}>
+                      <span className="status-dot" aria-hidden="true" />
+                      {inactive ? 'Inactive' : 'Active'}
+                    </span>
+                  </td>
+                  <td className="col-left">
                     {!isSelf && (
-                      <div className="ts-nav-left">
-                        <button className="link-btn" onClick={() => toggleActive(u)}>
+                      <div className="row-actions">
+                        <button className="table-action" onClick={() => toggleActive(u)}>
                           {inactive ? 'Activate' : 'Deactivate'}
                         </button>
-                        <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => remove(u)}>
+                        <button className="table-action danger" onClick={() => remove(u)}>
                           Delete
                         </button>
                       </div>

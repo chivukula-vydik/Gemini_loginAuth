@@ -71,6 +71,27 @@ Copy `.env.example` to `.env`. Key variables:
 | `SAML_IDP_CERT` | IdP signing certificate (PEM or base64). |
 | `SMTP_*`, `MAIL_FROM` | Password-reset email. Leave `SMTP_HOST` empty in dev to log reset links to the console instead of sending. |
 
+### Feature flags
+
+Feature flags are split by runtime:
+
+- Backend flags are loaded from `auth.config.json` under `features`, with optional env overrides.
+- Frontend flags are read from Vite env vars (`VITE_FF_*`) at build/start time.
+
+Current flags:
+
+| Flag | Runtime | Default | Effect |
+|---|---|---|---|
+| `pmTaskBulk` | backend | `true` | Enables `PATCH /projects/:id/tasks/bulk` |
+| `FEATURE_PM_TASK_BULK` | backend env override | unset | Overrides `pmTaskBulk` when present |
+| `VITE_FF_PM_TASK_TOOLS` | frontend | `true` | Enables project task toolbar filters + pagination |
+| `VITE_FF_PM_TASK_BULK` | frontend | `true` | Enables checkbox selection + bulk bar actions |
+
+Examples:
+
+- Disable backend bulk endpoint: set `"features": { "pmTaskBulk": false }` in `auth.config.json` (or `FEATURE_PM_TASK_BULK=false`).
+- Disable frontend bulk UI: start web with `VITE_FF_PM_TASK_BULK=false`.
+
 ## Provider setup
 
 ### Google OAuth

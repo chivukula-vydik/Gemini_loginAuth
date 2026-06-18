@@ -1,4 +1,5 @@
 import { User } from '../models/User.js';
+import { nameFromEmail } from './displayName.js';
 
 export async function findOrCreateByProvider({ email, displayName, provider, providerUserId }) {
   const normalized = String(email).toLowerCase().trim();
@@ -6,7 +7,7 @@ export async function findOrCreateByProvider({ email, displayName, provider, pro
   if (!user) {
     user = await User.create({
       email: normalized,
-      displayName: displayName || normalized,
+      displayName: displayName || nameFromEmail(normalized),
       providers: [{ provider, providerUserId }],
     });
     return user;

@@ -4,6 +4,7 @@ import {
   listClaimRequests, decideClaimRequest, ClaimReq,
   listSubmittedTimesheets, decideTimesheet, SubmittedTimesheet,
 } from './pmApi';
+import { personName } from './personName';
 
 const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' };
 
@@ -38,27 +39,50 @@ export function Requests() {
     catch (e) { setError((e as Error).message); }
   }
 
+  const totalPending = sheets.length + reqs.length + claims.length;
+
   return (
     <div className="ts-page">
-      <header className="ts-header"><h1 className="ts-h1">Requests</h1></header>
+      <header className="ts-header">
+        <div>
+          <h1 className="ts-h1">Requests</h1>
+          <p className="ts-sub">{totalPending} item{totalPending === 1 ? '' : 's'} awaiting your review</p>
+        </div>
+      </header>
+
+      <div className="ts-tiles">
+        <div className="ts-tile ts-tile-accent">
+          <span className="ts-tile-label">Timesheets</span>
+          <span className="ts-tile-value">{sheets.length}</span>
+        </div>
+        <div className="ts-tile stat-est">
+          <span className="ts-tile-label">Edit requests</span>
+          <span className="ts-tile-value">{reqs.length}</span>
+        </div>
+        <div className="ts-tile stat-logged">
+          <span className="ts-tile-label">Task claims</span>
+          <span className="ts-tile-value">{claims.length}</span>
+        </div>
+      </div>
+
       {error && <p className="ts-error">{error}</p>}
 
-      <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Submitted timesheets</h2>
+      <h2 className="section-title">Submitted timesheets</h2>
       <div className="ts-card" style={{ marginBottom: 22 }}>
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Employee</th><th>Week</th><th>Total hours</th><th>Submitted</th><th></th></tr></thead>
+          <thead><tr><th className="ts-task">Employee</th><th className="col-left">Week</th><th>Total hours</th><th className="col-left">Submitted</th><th className="col-left">Actions</th></tr></thead>
           <tbody>
             {sheets.length === 0 && <tr><td colSpan={5} className="ts-empty">No submitted timesheets.</td></tr>}
             {sheets.map((s) => (
               <tr key={s._id}>
-                <td className="ts-task">{s.user?.displayName || s.user?.email || '—'}</td>
-                <td>{s.weekStart}</td>
+                <td className="ts-task">{personName(s.user)}</td>
+                <td className="col-left">{s.weekStart}</td>
                 <td>{(s.totalMinutes / 60).toFixed(1)}h</td>
-                <td>{s.submittedAt ? s.submittedAt.slice(0, 10) : '—'}</td>
-                <td>
-                  <div className="ts-nav-left">
-                    <button className="link-btn" onClick={() => decideSheet(s._id, 'approve')}>Approve</button>
-                    <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decideSheet(s._id, 'return')}>Return</button>
+                <td className="col-left">{s.submittedAt ? s.submittedAt.slice(0, 10) : '—'}</td>
+                <td className="col-left">
+                  <div className="row-actions">
+                    <button className="table-action approve" onClick={() => decideSheet(s._id, 'approve')}>Approve</button>
+                    <button className="table-action danger" onClick={() => decideSheet(s._id, 'return')}>Return</button>
                   </div>
                 </td>
               </tr>
@@ -67,23 +91,23 @@ export function Requests() {
         </table>
       </div>
 
-      <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Timesheet edit requests</h2>
+      <h2 className="section-title">Timesheet edit requests</h2>
       <div className="ts-card" style={{ marginBottom: 22 }}>
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Employee</th><th>Week</th><th>Day</th><th>Project</th><th>Reason</th><th></th></tr></thead>
+          <thead><tr><th className="ts-task">Employee</th><th className="col-left">Week</th><th className="col-left">Day</th><th className="col-left">Project</th><th className="col-left">Reason</th><th className="col-left">Actions</th></tr></thead>
           <tbody>
             {reqs.length === 0 && <tr><td colSpan={6} className="ts-empty">No pending edit requests.</td></tr>}
             {reqs.map((r) => (
               <tr key={r._id}>
-                <td className="ts-task">{r.userId?.displayName || r.userId?.email || '—'}</td>
-                <td>{r.weekStart}</td>
-                <td>{DAY_LABEL[r.day] || r.day}</td>
-                <td>{r.projectId?.name || '—'}</td>
-                <td>{r.reason || '—'}</td>
-                <td>
-                  <div className="ts-nav-left">
-                    <button className="link-btn" onClick={() => decideEdit(r._id, 'approved')}>Approve</button>
-                    <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decideEdit(r._id, 'denied')}>Deny</button>
+                <td className="ts-task">{personName(r.userId)}</td>
+                <td className="col-left">{r.weekStart}</td>
+                <td className="col-left">{DAY_LABEL[r.day] || r.day}</td>
+                <td className="col-left">{r.projectId?.name || '—'}</td>
+                <td className="col-left">{r.reason || '—'}</td>
+                <td className="col-left">
+                  <div className="row-actions">
+                    <button className="table-action approve" onClick={() => decideEdit(r._id, 'approved')}>Approve</button>
+                    <button className="table-action danger" onClick={() => decideEdit(r._id, 'denied')}>Deny</button>
                   </div>
                 </td>
               </tr>
@@ -92,21 +116,21 @@ export function Requests() {
         </table>
       </div>
 
-      <h2 className="ts-sub" style={{ fontWeight: 700, fontSize: 15, margin: '8px 0' }}>Task claims</h2>
+      <h2 className="section-title">Task claims</h2>
       <div className="ts-card">
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Employee</th><th>Task</th><th>Project</th><th></th></tr></thead>
+          <thead><tr><th className="ts-task">Employee</th><th className="col-left">Task</th><th className="col-left">Project</th><th className="col-left">Actions</th></tr></thead>
           <tbody>
             {claims.length === 0 && <tr><td colSpan={4} className="ts-empty">No pending claims.</td></tr>}
             {claims.map((c) => (
               <tr key={c._id}>
-                <td className="ts-task">{c.user?.displayName || c.user?.email || '—'}</td>
-                <td>{c.task?.title}</td>
-                <td>{c.project?.name}</td>
-                <td>
-                  <div className="ts-nav-left">
-                    <button className="link-btn" onClick={() => decideClaim(c._id, 'approved')}>Approve</button>
-                    <button className="link-btn" style={{ color: 'var(--danger)' }} onClick={() => decideClaim(c._id, 'denied')}>Deny</button>
+                <td className="ts-task">{personName(c.user)}</td>
+                <td className="col-left">{c.task?.title}</td>
+                <td className="col-left">{c.project?.name}</td>
+                <td className="col-left">
+                  <div className="row-actions">
+                    <button className="table-action approve" onClick={() => decideClaim(c._id, 'approved')}>Approve</button>
+                    <button className="table-action danger" onClick={() => decideClaim(c._id, 'denied')}>Deny</button>
                   </div>
                 </td>
               </tr>

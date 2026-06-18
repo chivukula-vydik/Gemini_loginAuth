@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Person } from './pmApi';
 import { equalShares, normalizeShares } from './workload';
+import { personName } from './personName';
 
 type Row = { userId: string; sharePct: number };
 type Props = {
@@ -53,7 +54,7 @@ export function AssigneesEditor({ members, value, onSave, onClose }: Props) {
             <div key={m._id} className="assignees-row">
               <label className="assignees-pick">
                 <input type="checkbox" checked={selected.has(m._id)} onChange={() => toggle(m._id)} />
-                {m.displayName || m.email}
+                {personName(m)}
               </label>
               {row && (
                 <span className="assignees-share">

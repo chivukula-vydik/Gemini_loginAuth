@@ -66,6 +66,21 @@ export function MySkills() {
         <span className="ts-badge">{selected.size} selected</span>
       </header>
 
+      <div className="ts-tiles">
+        <div className="ts-tile ts-tile-accent">
+          <span className="ts-tile-label">On your profile</span>
+          <span className="ts-tile-value">{selected.size}</span>
+        </div>
+        <div className="ts-tile stat-logged">
+          <span className="ts-tile-label">Available</span>
+          <span className="ts-tile-value">{skills.filter((s) => s.active).length}</span>
+        </div>
+        <div className="ts-tile stat-est">
+          <span className="ts-tile-label">Unsaved changes</span>
+          <span className="ts-tile-value">{dirty ? '•' : '0'}</span>
+        </div>
+      </div>
+
       {error && <p className="ts-error">{error}</p>}
 
       <div className="skill-toolbar">

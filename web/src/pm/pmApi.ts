@@ -25,6 +25,7 @@ export type EditReq = {
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
+  progress?: number; taskCount?: number; doneCount?: number;
 };
 export type Assignee = { user: Person | string; sharePct: number };
 export type Task = {
@@ -87,6 +88,10 @@ export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
+
+export type BulkTaskOp = 'status' | 'assignee' | 'delete';
+export const bulkUpdateTasks = (projectId: string, taskIds: string[], op: BulkTaskOp, value?: string) =>
+  authed(`/projects/${projectId}/tasks/bulk`, 'PATCH', { taskIds, op, value });
 
 export const setTaskAssignees = (taskId: string, assignees: { user: string; sharePct: number }[]) =>
   authed(`/tasks/${taskId}/assignees`, 'PATCH', { assignees }) as Promise<Task>;

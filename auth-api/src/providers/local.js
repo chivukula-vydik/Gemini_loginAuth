@@ -7,6 +7,7 @@ import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import { sendPasswordReset } from '../services/mailer.js';
 import { revokeAllForUser } from '../services/tokens.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { nameFromEmail } from '../services/displayName.js';
 
 function sha256(v) {
   return crypto.createHash('sha256').update(v).digest('hex');
@@ -39,7 +40,7 @@ export default {
       const passwordHash = await bcrypt.hash(password, 12);
       const user = await User.create({
         email: normalized,
-        displayName: displayName || normalized,
+        displayName: displayName || nameFromEmail(normalized),
         passwordHash,
         providers: [{ provider: 'local', providerUserId: normalized }],
       });

@@ -25,7 +25,7 @@ export default {
             const email = profile.email || profile.nameID;
             const user = await findOrCreateByProvider({
               email,
-              displayName: profile.displayName || email,
+              displayName: profile.displayName, // falls back to a name derived from email
               provider: 'saml',
               providerUserId: profile.nameID,
             });

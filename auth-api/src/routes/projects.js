@@ -6,6 +6,7 @@ import { Project } from '../models/Project.js';
 import { Task } from '../models/Task.js';
 import { Skill } from '../models/Skill.js';
 import { User } from '../models/User.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 import { effectiveDueDate, proposedDueDate } from '../services/estimate.js';
@@ -35,7 +36,30 @@ export function createProjectsRouter() {
     else if (req.user.role === 'pm') query = { ownerPm: req.user.sub };
     else query = { members: req.user.sub };
     const projects = await Project.find(query).sort('-createdAt');
-    res.json(projects);
+
+    // Aggregate task progress per project so the list can show state at a glance.
+    const ids = projects.map((p) => p._id);
+    const agg = ids.length ? await Task.aggregate([
+      { $match: { project: { $in: ids } } },
+      { $group: {
+        _id: '$project',
+        taskCount: { $sum: 1 },
+        doneCount: { $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] } },
+        avgPct: { $avg: { $ifNull: ['$percentComplete', 0] } },
+      } },
+    ]) : [];
+    const stats = new Map(agg.map((a) => [String(a._id), a]));
+
+    const out = projects.map((p) => {
+      const a = stats.get(String(p._id));
+      return {
+        ...p.toObject(),
+        taskCount: a ? a.taskCount : 0,
+        doneCount: a ? a.doneCount : 0,
+        progress: a ? Math.round(a.avgPct) : 0,
+      };
+    });
+    res.json(out);
   }));
 
   router.get('/:id', asyncHandler(async (req, res) => {
@@ -120,6 +144,53 @@ export function createProjectsRouter() {
       createdBy: req.user.sub,
     });
     res.status(201).json(task);
+  }));
+
+  router.patch('/:id/tasks/bulk', requireFeature('pmTaskBulk'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+
+    const taskIds = Array.isArray(req.body?.taskIds) ? req.body.taskIds.map(String) : [];
+    if (taskIds.length === 0) return res.status(400).json({ error: 'taskIds required' });
+
+    const tasks = await Task.find({ _id: { $in: taskIds }, project: project._id }).select('_id');
+    if (tasks.length !== taskIds.length) {
+      return res.status(400).json({ error: 'every taskId must belong to this project' });
+    }
+
+    const op = req.body?.op;
+    if (!['status', 'assignee', 'delete'].includes(op)) {
+      return res.status(400).json({ error: 'invalid op' });
+    }
+
+    if (op === 'delete') {
+      await Task.deleteMany({ _id: { $in: taskIds }, project: project._id });
+      return res.json({ ok: true, count: taskIds.length });
+    }
+
+    if (op === 'status') {
+      const value = req.body?.value;
+      if (!['todo', 'in_progress', 'blocked', 'done'].includes(value)) {
+        return res.status(400).json({ error: 'invalid status value' });
+      }
+      await Task.updateMany(
+        { _id: { $in: taskIds }, project: project._id },
+        { $set: { status: value } },
+      );
+      return res.json({ ok: true, count: taskIds.length });
+    }
+
+    const assigneeId = String(req.body?.value || '');
+    const memberSet = new Set(project.members.map((m) => String(m)));
+    if (!assigneeId || !memberSet.has(assigneeId)) {
+      return res.status(400).json({ error: 'assignee must be a project member' });
+    }
+    await Task.updateMany(
+      { _id: { $in: taskIds }, project: project._id },
+      { $set: { assignees: [{ user: assigneeId, sharePct: 100 }] } },
+    );
+    return res.json({ ok: true, count: taskIds.length });
   }));
 
   return router;

@@ -18,7 +18,40 @@ import { createAssignmentOffersRouter } from './routes/assignmentOffers.js';
 
 export function createApp(config) {
   const app = express();
-  app.use(cors({ origin: process.env.WEB_URL, credentials: true }));
+  const featureFlags = { pmTaskBulk: true, ...(config?.featureFlags || {}) };
+  const configuredOrigins = String(process.env.WEB_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const isLocalDevOrigin = (origin) => {
+    try {
+      const parsed = new URL(origin);
+      if (!['localhost', '127.0.0.1'].includes(parsed.hostname)) return false;
+      return ['http:', 'https:'].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  };
+
+  const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    if (configuredOrigins.includes(origin)) return true;
+    return isLocalDevOrigin(origin);
+  };
+
+  app.locals.featureFlags = featureFlags;
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (isOriginAllowed(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error('CORS origin blocked'));
+      },
+      credentials: true,
+    }),
+  );
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
   app.use(cookieParser());

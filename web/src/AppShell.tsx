@@ -10,6 +10,7 @@ import { MySkills } from './pm/MySkills';
 import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
 import { ThemeToggle } from './ThemeToggle';
+import { personName } from './pm/personName';
 
 function viewFor(key: NavKey) {
   switch (key) {
@@ -48,7 +49,8 @@ export function AppShell() {
   const { user, signOut } = useAuth();
   const items = navForRole(user?.role ?? 'employee');
   const [active, setActive] = useState<NavKey>(items[0].key);
-  const initial = (user?.email?.[0] ?? '?').toUpperCase();
+  const name = personName(user);
+  const initial = (name[0] ?? '?').toUpperCase();
 
   return (
     <div className="shell">
@@ -68,7 +70,7 @@ export function AppShell() {
           <div className="shell-user">
             <div className="shell-avatar">{initial}</div>
             <div className="shell-user-meta">
-              <div className="shell-user-email">{user?.email}</div>
+              <div className="shell-user-email">{name}</div>
               {user?.role && <div className="shell-user-role">{user.role}</div>}
             </div>
             <button className="shell-signout" onClick={signOut} title="Sign out" aria-label="Sign out">
