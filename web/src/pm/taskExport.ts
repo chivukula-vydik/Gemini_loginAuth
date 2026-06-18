@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { TaskDetail } from './pmApi';
-import { personName } from './personName';
+import { personName } from './personName.ts';
 
 export type ExportRow = {
   taskId: string;

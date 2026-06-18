@@ -58,12 +58,13 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
         const inBar = bar && i >= bar.startCol && i <= bar.endCol;
         const capL = inBar && i === bar!.startCol && !bar!.continuesLeft;
         const capR = inBar && i === bar!.endCol && !bar!.continuesRight;
+        const isToday = todayDay === d;
         const editable = isCellEditable(d, task.projectId, todayDay, grants, dates[d], task.startDate);
         const isPast = dates[d] < today;
         const canRequest = !editable && isPast && !!task.taskId && !!task.projectId;
         const pending = canRequest && pendingKeys.has(`${d}:${task.projectId}`);
         return (
-          <td key={d} className="ts-cell">
+          <td key={d} className={`ts-cell${isToday ? ' ts-cell-today' : ''}`}>
             {inBar && (
               <div
                 className={`ts-bar ts-bar-${task.status ?? 'todo'}${capL ? ' ts-bar-l' : ''}${capR ? ' ts-bar-r' : ''}`}
@@ -71,6 +72,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
               />
             )}
             <TimeCell
+              className={isToday ? 'ts-cell-today' : ''}
               minutes={task.entries[d] || 0}
               readOnly={!editable}
               onChange={(m) => onCellChange(d, m)}

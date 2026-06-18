@@ -38,7 +38,8 @@ export function TimesheetGrid({
             <th className="ts-task">Task</th>
             {DAYS.map((d) => {
               const isFuture = dates[d] > today;
-              return <th key={d} className={isFuture ? 'ts-day-future' : undefined}>{cols[d]}</th>;
+              const isToday = todayDay === d;
+              return <th key={d} className={`${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}`.trim() || undefined}>{cols[d]}</th>;
             })}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>
@@ -74,7 +75,7 @@ export function TimesheetGrid({
         <tfoot>
           <tr>
             <td className="ts-task">Daily total</td>
-            {DAYS.map((d) => <td key={d} className="ts-coltotal">{formatMinutes(dayTotal(d))}</td>)}
+            {DAYS.map((d) => <td key={d} className={`ts-coltotal${todayDay === d ? ' ts-coltoday' : ''}`}>{formatMinutes(dayTotal(d))}</td>)}
             <td></td><td></td>
           </tr>
         </tfoot>

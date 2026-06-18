@@ -508,14 +508,17 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-name:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--ring); background: var(--card); }
 .ts-name-ro { font-size: 14px; font-weight: 500; color: var(--text); }
 .ts-cell { width: 74px; text-align: center; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 7px 4px; font-size: 13px; background: var(--card); color: var(--text); transition: border-color 0.12s, box-shadow 0.12s; }
+.ts-cell.ts-cell-today { background: var(--card); border-color: #bbf7d0; box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.12); }
 .ts-cell:hover { border-color: var(--faint); }
 .ts-cell:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--ring); }
 .ts-cell::placeholder { color: var(--faint); }
 .ts-cell-ro { font-size: 13px; color: var(--text); }
 .ts-cell-ro-empty { color: var(--faint); }
 .ts-table th.ts-day-future { color: var(--faint); font-weight: 500; }
+.ts-table thead th.ts-day-today { color: var(--faint); background: var(--surface-2); border-bottom-color: #bbf7d0; }
 .ts-rowtotal { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .ts-coltotal { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ts-coltoday { background: var(--surface); border-color: #bbf7d0; }
 .ts-actions { width: 40px; }
 .ts-table tfoot td { background: var(--surface); font-weight: 600; border-bottom: none; }
 .ts-del { border: none; background: transparent; color: var(--faint); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 6px; border-radius: 6px; transition: color 0.12s; }
@@ -641,6 +644,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-bar-in_progress { background: #3b82f6; }
 .ts-bar-blocked { background: #ef4444; }
 .ts-bar-done { background: #10b981; }
+.ts-bar-today { background: #10b981; }
 
 /* ---- Timesheet submission ---- */
 .ts-submit-badge {

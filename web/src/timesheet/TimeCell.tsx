@@ -5,9 +5,10 @@ type Props = {
   minutes: number;
   onChange: (minutes: number) => void;
   readOnly?: boolean;
+  className?: string;
 };
 
-export function TimeCell({ minutes, onChange, readOnly = false }: Props) {
+export function TimeCell({ minutes, onChange, readOnly = false, className = '' }: Props) {
   const display = minutes > 0 ? formatMinutes(minutes) : '';
   const [text, setText] = useState(display);
   const [editing, setEditing] = useState(false);
@@ -29,7 +30,7 @@ export function TimeCell({ minutes, onChange, readOnly = false }: Props) {
 
   return (
     <input
-      className="ts-cell"
+      className={`ts-cell${className ? ` ${className}` : ''}`}
       inputMode="text"
       placeholder="—"
       value={text}
