@@ -112,7 +112,8 @@ export function todayDayFor(weekStart, today) {
 }
 
 export function computeRowLock({
-  submittedRows = [], savedRows = [], taskProjectById = new Map(), todayDay = null, grants = [],
+  submittedRows = [], savedRows = [], taskProjectById = new Map(),
+  taskStartById = new Map(), weekStart = null, todayDay = null, grants = [],
 }) {
   const grantSet = new Set(grants.map((g) => `${g.day}:${String(g.projectId)}`));
   const savedById = new Map((savedRows || []).map((r) => [String(r.id), r]));
@@ -121,15 +122,30 @@ export function computeRowLock({
     const p = taskProjectById.get(String(row.taskId));
     return p ? String(p) : null;
   };
-  const editableFor = (projectId, day) =>
-    day === todayDay || (!!projectId && grantSet.has(`${day}:${projectId}`));
+  const startOf = (row) => {
+    if (!row || !row.taskId) return null;
+    return taskStartById.get(String(row.taskId)) || null;
+  };
+  const dayDate = (day) => (weekStart ? addDaysISO(weekStart, DAYS.indexOf(day)) : null);
+  // A task is only editable on/after the day it was assigned (its start date).
+  // Current week (todayDay set): today and any earlier weekday are freely
+  // editable — no grant needed. Otherwise a matching approved grant unlocks it.
+  const editableFor = (projectId, day, startDate) => {
+    if (startDate) {
+      const cd = dayDate(day);
+      if (cd && cd < startDate) return false;
+    }
+    return (!!todayDay && DAYS.indexOf(day) <= DAYS.indexOf(todayDay))
+      || (!!projectId && grantSet.has(`${day}:${projectId}`));
+  };
 
   const rows = (submittedRows || []).map((r) => {
     const prev = savedById.get(String(r.id));
     const projectId = projectOf(r);
+    const startDate = startOf(r);
     const entries = {};
     for (const d of DAYS) {
-      entries[d] = editableFor(projectId, d)
+      entries[d] = editableFor(projectId, d, startDate)
         ? cleanMinutes(r?.entries?.[d])
         : cleanMinutes(prev?.entries?.[d]);
     }

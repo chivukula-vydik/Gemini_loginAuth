@@ -63,22 +63,30 @@ test('todayDayFor: returns the weekday matching today, else null', () => {
   assert.equal(todayDayFor('2026-06-08', '2026-06-17'), null); // past week
 });
 
-test('computeRowLock: today applies, a non-granted past day keeps saved value', () => {
+test('computeRowLock: in the current week, today and earlier days apply freely', () => {
   const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 99, tue: 0, wed: 60, thu: 0, fri: 0 } }];
   const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const taskProjectById = new Map([['t1', 'pA']]);
   const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants: [] });
   assert.equal(rows[0].entries.wed, 60); // today applied
-  assert.equal(rows[0].entries.mon, 30); // locked past day kept
+  assert.equal(rows[0].entries.mon, 99); // earlier day of the same week applied — no grant needed
   assert.deepEqual(consumed, []);
 });
 
-test('computeRowLock: a granted project past day applies and is consumed on change', () => {
+test('computeRowLock: in the current week, a future day stays locked without a grant', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 120 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const { rows } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants: [] });
+  assert.equal(rows[0].entries.fri, 0); // future day not editable
+});
+
+test('computeRowLock: a granted project day in a past week applies and is consumed on change', () => {
   const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const taskProjectById = new Map([['t1', 'pA']]);
   const grants = [{ day: 'mon', projectId: 'pA' }];
-  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: null, grants });
   assert.equal(rows[0].entries.mon, 120); // granted day applied
   assert.deepEqual(consumed, [{ day: 'mon', projectId: 'pA' }]); // consumed
 });
@@ -88,7 +96,7 @@ test('computeRowLock: a no-op save does not consume an existing grant', () => {
   const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 45, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const taskProjectById = new Map([['t1', 'pA']]);
   const grants = [{ day: 'mon', projectId: 'pA' }];
-  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: null, grants });
   assert.equal(rows[0].entries.mon, 45); // granted day, unchanged value stays
   assert.deepEqual(consumed, []); // no change → not consumed
 });
@@ -98,17 +106,31 @@ test('computeRowLock: an unrelated project change does not apply or consume anot
   const saved = [{ id: 'r2', name: 'B', taskId: 't2', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const taskProjectById = new Map([['t2', 'pB']]);
   const grants = [{ day: 'mon', projectId: 'pA' }]; // grant is for pA, row is pB
-  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: null, grants });
   assert.equal(rows[0].entries.mon, 0); // pB mon locked
   assert.deepEqual(consumed, []); // pA grant untouched
 });
 
-test('computeRowLock: an ad-hoc past-day cell is always locked and never consumed', () => {
+test('computeRowLock: a day before the task start date is locked even in the current week', () => {
+  // week of Mon 2026-06-15; task t1 assigned from Wed 2026-06-17
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 99, tue: 0, wed: 60, thu: 0, fri: 0 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const taskStartById = new Map([['t1', '2026-06-17']]);
+  const { rows } = computeRowLock({
+    submittedRows: submitted, savedRows: saved, taskProjectById, taskStartById,
+    weekStart: '2026-06-15', todayDay: 'wed', grants: [],
+  });
+  assert.equal(rows[0].entries.mon, 0); // before start date → locked
+  assert.equal(rows[0].entries.wed, 60); // start day → editable
+});
+
+test('computeRowLock: an ad-hoc cell in a past week is always locked and never consumed', () => {
   const submitted = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const saved = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const grants = [{ day: 'mon', projectId: 'pA' }];
-  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById: new Map(), todayDay: 'wed', grants });
-  assert.equal(rows[0].entries.mon, 0); // ad-hoc past day locked
+  const { rows, consumed } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById: new Map(), todayDay: null, grants });
+  assert.equal(rows[0].entries.mon, 0); // ad-hoc, no grant possible → locked
   assert.deepEqual(consumed, []);
 });
 

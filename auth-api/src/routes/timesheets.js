@@ -126,9 +126,12 @@ export function createTimesheetRouter() {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     const userId = req.user.sub;
-    const assigned = await Task.find({ 'assignees.user': userId }).select('_id project');
+    const assigned = await Task.find({ 'assignees.user': userId }).select('_id project startDate');
     const allowed = assigned.map((t) => String(t._id));
     const taskProjectById = new Map(assigned.map((t) => [String(t._id), String(t.project)]));
+    const taskStartById = new Map(assigned.map((t) => [
+      String(t._id), t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
+    ]));
     const sanitized = sanitizeRows(req.body?.tasks, allowed);
 
     const doc = await Timesheet.findOne({ userId, weekStart });
@@ -138,7 +141,7 @@ export function createTimesheetRouter() {
     // Once submitted/approved, "today" is no longer auto-editable; only approved
     // grants punch through. Passing todayDay=null achieves exactly that.
     const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
-    const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, todayDay, grants });
+    const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, taskStartById, weekStart, todayDay, grants });
 
     const updatedAt = new Date();
     await Timesheet.updateOne(

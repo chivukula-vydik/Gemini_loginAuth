@@ -58,7 +58,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
         const inBar = bar && i >= bar.startCol && i <= bar.endCol;
         const capL = inBar && i === bar!.startCol && !bar!.continuesLeft;
         const capR = inBar && i === bar!.endCol && !bar!.continuesRight;
-        const editable = isCellEditable(d, task.projectId, todayDay, grants);
+        const editable = isCellEditable(d, task.projectId, todayDay, grants, dates[d], task.startDate);
         const isPast = dates[d] < today;
         const canRequest = !editable && isPast && !!task.taskId && !!task.projectId;
         const pending = canRequest && pendingKeys.has(`${d}:${task.projectId}`);
