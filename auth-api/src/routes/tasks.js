@@ -11,6 +11,7 @@ import { skillsMatch } from '../services/match.js';
 import { toHours, effectiveDueDate, proposedDueDate, endDateFrom } from '../services/estimate.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 import { assigneeHours, equalShares, normalizeShares } from '../services/workload.js';
+import { mergeAssignees, allEstimatesIn, sumEstimatedHours } from '../services/assigneeEstimates.js';
 
 export function createTasksRouter() {
   const router = express.Router();
@@ -181,7 +182,9 @@ export function createTasksRouter() {
     const givenShares = input.map((a) => (typeof a === 'object' && a ? Number(a.sharePct) : NaN));
     const hasShares = givenShares.length > 0 && givenShares.every((s) => Number.isFinite(s));
     const shares = hasShares ? normalizeShares(givenShares) : equalShares(userIds.length);
-    task.assignees = userIds.map((user, i) => ({ user, sharePct: shares[i] }));
+    task.assignees = mergeAssignees(task.assignees, userIds, shares);
+    if (allEstimatesIn(task.assignees)) task.estimatedHours = sumEstimatedHours(task.assignees);
+    else task.estimatedHours = 0;
     await task.save();
     res.json(task);
   }));
