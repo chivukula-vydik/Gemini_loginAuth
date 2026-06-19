@@ -594,6 +594,47 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ext-form { gap: 5px; }
 .ext-prefix { font-size: 11px; color: var(--muted); }
 
+/* My Tasks estimate cell */
+.est-cell { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.est-approved { font-size: 14px; }
+.est-pending {
+  font-size: 12px; font-weight: 600; color: var(--soon);
+  max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.est-trigger { font-size: 12px; }
+
+/* Personal completion estimate (My Tasks) */
+.eta-block { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.eta-row { gap: 5px; flex-wrap: wrap; }
+.eta-prefix { font-size: 11px; color: var(--muted); }
+.eta-input { font-size: 12px; padding: 3px 6px; }
+.eta-ok { font-size: 11px; color: var(--muted); }
+.eta-late { font-size: 11px; font-weight: 600; color: var(--overdue); max-width: 240px; }
+
+/* Per-assignee ETA on the PM task table */
+.eta-meta { color: var(--muted); }
+.eta-meta-late { color: var(--overdue); font-weight: 600; }
+.eta-badge-late {
+  display: inline-block; margin-top: 6px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; padding: 1px 7px; border-radius: 999px;
+  color: var(--overdue); background: var(--overdue-soft);
+  border: 1px solid color-mix(in srgb, var(--overdue) 35%, transparent);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: color-mix(in srgb, #000 45%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-card { width: 100%; max-width: 380px; padding: 20px; cursor: default; }
+.modal-title { margin: 0 0 2px; font-size: 16px; }
+.modal-task { margin: 0 0 14px; }
+.modal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.modal-label { font-size: 13px; font-weight: 600; }
+.modal-reason { resize: vertical; min-height: 60px; font-family: inherit; }
+.modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 4px; }
+
 .due-pill { display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 1px 7px; border-radius: 999px; vertical-align: middle; }
 .due-pill.overdue { color: var(--overdue); background: var(--overdue-soft); border: 1px solid color-mix(in srgb, var(--overdue) 35%, transparent); }
 .due-pill.soon { color: var(--soon); background: var(--soon-soft); border: 1px solid color-mix(in srgb, var(--soon) 35%, transparent); }

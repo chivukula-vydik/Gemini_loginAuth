@@ -27,13 +27,19 @@ export type Project = {
   members: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
 };
-export type Assignee = { user: Person | string; sharePct: number; estimatedHours?: number | null };
+export type Assignee = { user: Person | string; sharePct: number; estimatedHours?: number | null; etaAt?: string | null };
 export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
   description: string; estimatedHours: number; requiredSkills: string[];
   assignees: Assignee[]; status: string; dueDate: string | null;
   mySharePct?: number;
   myEstimatedHours?: number | null;
+  myPendingHours?: number | null;
+  myPendingValue?: number;
+  myPendingUnit?: EstimateUnit;
+  myPendingReason?: string;
+  myEstimateStatus?: 'none' | 'pending';
+  myEtaAt?: string | null;
   myDue?: string | null;
   estimatesPending?: boolean;
   submittedCount?: number;
@@ -56,7 +62,7 @@ export type Task = {
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
-  assignees: { user: Person; sharePct: number; estimatedHours?: number | null }[]; status: string; percentComplete: number; actualMinutes: number;
+  assignees: { user: Person; sharePct: number; estimatedHours?: number | null; etaAt?: string | null }[]; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
   estimateValue?: number;
@@ -103,8 +109,12 @@ export const setTaskAssignees = (taskId: string, assignees: { user: string; shar
 export const updateTask = (id: string, patch: Partial<Task>) =>
   authed(`/tasks/${id}`, 'PATCH', patch) as Promise<Task>;
 
-export const setMyEstimate = (id: string, value: number, unit: EstimateUnit) =>
-  authed(`/tasks/${id}/my-estimate`, 'PATCH', { value, unit }) as Promise<Task>;
+export const setMyEstimate = (id: string, value: number, unit: EstimateUnit, reason?: string) =>
+  authed(`/tasks/${id}/my-estimate`, 'PATCH', { value, unit, reason }) as Promise<Task>;
+export const setMyEta = (id: string, etaAt: string | null) =>
+  authed(`/tasks/${id}/my-eta`, 'PATCH', { etaAt }) as Promise<Task>;
+export const decideMyEstimate = (id: string, userId: string, decision: 'approve' | 'reject') =>
+  authed(`/tasks/${id}/my-estimate/decision`, 'PATCH', { userId, decision }) as Promise<Task>;
 
 export const proposeExtension = (id: string, value: number, unit: EstimateUnit) =>
   authed(`/tasks/${id}/extension`, 'PATCH', { value, unit });

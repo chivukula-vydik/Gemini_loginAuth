@@ -564,52 +564,169 @@ test('re-saving assignees preserves an already-submitted estimate', async () => 
   assert.equal(after.estimatedHours, 0);
 });
 
-test('my-estimate: assignee submits hours; total + deadline finalize when all in', async () => {
+test('my-estimate: submitting records a pending request without changing the approved estimate', async () => {
   const pm = await User.create({ email: 'mye-pm@x.com', displayName: 'PM', role: 'pm' });
   const u1 = await User.create({ email: 'mye-u1@x.com', displayName: 'U1', role: 'employee' });
   const u2 = await User.create({ email: 'mye-u2@x.com', displayName: 'U2', role: 'employee' });
   const outsider = await User.create({ email: 'mye-out@x.com', displayName: 'Out', role: 'employee' });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
-  const task = await Task.create({
-    project: project._id,
-    title: 'T',
-    startDate: '2026-06-15',
-    createdBy: pm._id,
-  });
+  const task = await Task.create({ project: project._id, title: 'T', startDate: '2026-06-15', createdBy: pm._id });
 
-  const setup = await request(app).patch(`/tasks/${task._id}/assignees`)
+  await request(app).patch(`/tasks/${task._id}/assignees`)
     .set('Authorization', bearer(pm))
     .send({ assignees: [{ user: String(u1._id), sharePct: 50 }, { user: String(u2._id), sharePct: 50 }] });
-  assert.equal(setup.status, 200);
 
-  // Non-assignee cannot submit an estimate.
+  // Non-assignee cannot request an estimate change.
   const forbidden = await request(app).patch(`/tasks/${task._id}/my-estimate`)
     .set('Authorization', bearer(outsider))
     .send({ value: 5, unit: 'hours' });
   assert.equal(forbidden.status, 403);
 
-  // u1 submits 8h; not all assignees have submitted yet, so task.estimatedHours stays 0.
-  const first = await request(app).patch(`/tasks/${task._id}/my-estimate`)
+  // u1 requests 1 day (8h) with a reason; this is pending, not applied.
+  const res = await request(app).patch(`/tasks/${task._id}/my-estimate`)
     .set('Authorization', bearer(u1))
-    .send({ value: 8, unit: 'hours' });
-  assert.equal(first.status, 200);
-  assert.equal(first.body.estimatedHours, 0);
-
-  // u2 submits 40h; now all assignees have submitted, so totals + dueDate finalize.
-  const second = await request(app).patch(`/tasks/${task._id}/my-estimate`)
-    .set('Authorization', bearer(u2))
-    .send({ value: 40, unit: 'hours' });
-  assert.equal(second.status, 200);
-  assert.equal(second.body.estimatedHours, 48);
-  assert.equal(new Date(second.body.dueDate).toISOString().slice(0, 10), '2026-06-19');
+    .send({ value: 1, unit: 'days', reason: 'scope grew' });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.estimatedHours, 0);
 
   const after = await Task.findById(task._id);
   const savedU1 = after.assignees.find((a) => String(a.user) === String(u1._id));
-  const savedU2 = after.assignees.find((a) => String(a.user) === String(u2._id));
-  assert.equal(savedU1.estimatedHours, 8);
-  assert.equal(savedU2.estimatedHours, 40);
-  assert.equal(after.estimatedHours, 48);
-  assert.equal(new Date(after.dueDate).toISOString().slice(0, 10), '2026-06-19');
+  assert.equal(savedU1.estimatedHours, null);
+  assert.equal(savedU1.pendingHours, 8);
+  assert.equal(savedU1.pendingValue, 1);
+  assert.equal(savedU1.pendingUnit, 'days');
+  assert.equal(savedU1.pendingReason, 'scope grew');
+  assert.equal(after.estimatedHours, 0);
+});
+
+test('my-estimate decision: approve applies the estimate; totals + deadline finalize once all approved', async () => {
+  const pm = await User.create({ email: 'myd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'myd-u1@x.com', displayName: 'U1', role: 'employee' });
+  const u2 = await User.create({ email: 'myd-u2@x.com', displayName: 'U2', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
+  const task = await Task.create({ project: project._id, title: 'T', startDate: '2026-06-15', createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${task._id}/assignees`)
+    .set('Authorization', bearer(pm))
+    .send({ assignees: [{ user: String(u1._id), sharePct: 50 }, { user: String(u2._id), sharePct: 50 }] });
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u2)).send({ value: 40, unit: 'hours' });
+
+  // Approve u1: their estimate applies, but the task total stays pending (u2 not approved yet).
+  const a1 = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'approve' });
+  assert.equal(a1.status, 200);
+  assert.equal(a1.body.estimatedHours, 0);
+  const mid = await Task.findById(task._id);
+  const midU1 = mid.assignees.find((a) => String(a.user) === String(u1._id));
+  assert.equal(midU1.estimatedHours, 8);
+  assert.equal(midU1.pendingHours, null);
+
+  // Approve u2: now all assignees are approved, so totals + dueDate finalize.
+  const a2 = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u2._id), decision: 'approve' });
+  assert.equal(a2.status, 200);
+  assert.equal(a2.body.estimatedHours, 48);
+  assert.equal(new Date(a2.body.dueDate).toISOString().slice(0, 10), '2026-06-19');
+});
+
+test('my-estimate decision: reject clears the request and leaves the approved estimate unchanged', async () => {
+  const pm = await User.create({ email: 'myr-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'myr-u1@x.com', displayName: 'U1', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+  const rej = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'reject' });
+  assert.equal(rej.status, 200);
+  const after = await Task.findById(task._id);
+  const savedU1 = after.assignees.find((a) => String(a.user) === String(u1._id));
+  assert.equal(savedU1.estimatedHours, null);
+  assert.equal(savedU1.pendingHours, null);
+
+  // No pending request left to decide.
+  const again = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'reject' });
+  assert.equal(again.status, 400);
+});
+
+test('my-estimate decision: only a PM/owner who is not the requester can decide', async () => {
+  const pm = await User.create({ email: 'mya-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'mya-u1@x.com', displayName: 'U1', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [pm._id, u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  await request(app).patch(`/tasks/${task._id}/assignees`)
+    .set('Authorization', bearer(pm))
+    .send({ assignees: [{ user: String(pm._id), sharePct: 50 }, { user: String(u1._id), sharePct: 50 }] });
+
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(pm)).send({ value: 8, unit: 'hours' });
+
+  // A teammate employee cannot decide.
+  const byEmp = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(u1)).send({ userId: String(u1._id), decision: 'approve' });
+  assert.equal(byEmp.status, 403);
+
+  // A PM cannot approve their own request.
+  const ownReq = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(pm._id), decision: 'approve' });
+  assert.equal(ownReq.status, 403);
+});
+
+test('my-eta: assignee sets, updates, and clears their personal completion estimate', async () => {
+  const pm = await User.create({ email: 'eta-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'eta-u1@x.com', displayName: 'U1', role: 'employee' });
+  const outsider = await User.create({ email: 'eta-out@x.com', displayName: 'Out', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  // Non-assignee cannot set an estimate.
+  const forbidden = await request(app).patch(`/tasks/${task._id}/my-eta`)
+    .set('Authorization', bearer(outsider)).send({ etaAt: '2026-06-25T17:30:00.000Z' });
+  assert.equal(forbidden.status, 403);
+
+  // Invalid datetime is rejected.
+  const bad = await request(app).patch(`/tasks/${task._id}/my-eta`)
+    .set('Authorization', bearer(u1)).send({ etaAt: 'not-a-date' });
+  assert.equal(bad.status, 400);
+
+  // Set.
+  const set = await request(app).patch(`/tasks/${task._id}/my-eta`)
+    .set('Authorization', bearer(u1)).send({ etaAt: '2026-06-25T17:30:00.000Z' });
+  assert.equal(set.status, 200);
+  const afterSet = await Task.findById(task._id);
+  assert.equal(afterSet.assignees[0].etaAt.toISOString(), '2026-06-25T17:30:00.000Z');
+
+  // Clear.
+  const cleared = await request(app).patch(`/tasks/${task._id}/my-eta`)
+    .set('Authorization', bearer(u1)).send({ etaAt: null });
+  assert.equal(cleared.status, 200);
+  const afterClear = await Task.findById(task._id);
+  assert.equal(afterClear.assignees[0].etaAt, null);
+});
+
+test('my-eta is exposed on /tasks/mine and on the project detail assignee', async () => {
+  const pm = await User.create({ email: 'eta2-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'eta2-u1@x.com', displayName: 'U1', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T-eta', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${task._id}/my-eta`)
+    .set('Authorization', bearer(u1)).send({ etaAt: '2026-06-25T17:30:00.000Z' });
+
+  const mine = await request(app).get('/tasks/mine').set('Authorization', bearer(u1));
+  const row = mine.body.find((t) => t.title === 'T-eta');
+  assert.equal(row.myEtaAt, '2026-06-25T17:30:00.000Z');
+
+  const detail = await request(app).get(`/projects/${project._id}`).set('Authorization', bearer(pm));
+  const dtask = detail.body.tasks.find((t) => t.title === 'T-eta');
+  assert.equal(dtask.assignees[0].etaAt, '2026-06-25T17:30:00.000Z');
 });
 
 test('estimate proposal is blocked for tasks that have assignees', async () => {
@@ -641,14 +758,27 @@ test('my-tasks row exposes my estimate, my deadline, and pending state', async (
     .send({ assignees: [{ user: String(u1._id), sharePct: 50 }, { user: String(u2._id), sharePct: 50 }] });
 
   await request(app).patch(`/tasks/${task._id}/my-estimate`)
-    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours', reason: 'too tight' });
 
-  const res = await request(app).get('/tasks/mine').set('Authorization', bearer(u1));
-  assert.equal(res.status, 200);
-  const row = res.body.find((t) => t.title === 'T');
-  assert.equal(row.myEstimatedHours, 8);
-  assert.equal(row.myDue, '2026-06-15');
-  assert.equal(row.estimatesPending, true);
-  assert.equal(row.submittedCount, 1);
-  assert.equal(row.assigneeCount, 2);
+  // While pending: no approved estimate yet, request is exposed as pending.
+  const pending = await request(app).get('/tasks/mine').set('Authorization', bearer(u1));
+  assert.equal(pending.status, 200);
+  const prow = pending.body.find((t) => t.title === 'T');
+  assert.equal(prow.myEstimatedHours, null);
+  assert.equal(prow.myEstimateStatus, 'pending');
+  assert.equal(prow.myPendingHours, 8);
+  assert.equal(prow.myPendingValue, 8);
+  assert.equal(prow.myPendingUnit, 'hours');
+  assert.equal(prow.myPendingReason, 'too tight');
+  assert.equal(prow.submittedCount, 0);
+  assert.equal(prow.assigneeCount, 2);
+
+  // After approval: estimate is applied and no longer pending.
+  await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'approve' });
+  const approved = await request(app).get('/tasks/mine').set('Authorization', bearer(u1));
+  const arow = approved.body.find((t) => t.title === 'T');
+  assert.equal(arow.myEstimatedHours, 8);
+  assert.equal(arow.myEstimateStatus, 'none');
+  assert.equal(arow.myDue, '2026-06-15');
 });

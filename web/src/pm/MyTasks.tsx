@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
-import { myTasks, proposeEstimate, proposeExtension, setMyEstimate, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
+import { myTasks, proposeExtension, setMyEstimate, setMyEta, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
 import { dueUrgency, dueLabel } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
 import { StatusBadge } from './StatusBadge';
+import { estimateCellState } from './estimateRequest';
+import { EstimateRequestModal } from './EstimateRequestModal';
+import { etaStatus } from './eta';
+
+function deadlineOf(task: Task): string | null {
+  return task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
+}
+
+// ISO (UTC) -> value for a datetime-local input (local wall-clock, no zone).
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
 
 const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
 
@@ -20,7 +33,7 @@ function DueLabel({ task }: { task: Task }) {
   );
 }
 
-function ExtensionRequest({ task, onRequest }: { task: Task; onRequest: (value: number, unit: EstimateUnit) => void }) {
+function ExtensionRequest({ task, forceOffer, onRequest }: { task: Task; forceOffer?: boolean; onRequest: (value: number, unit: EstimateUnit) => void }) {
   const [value, setValue] = useState(2);
   const [unit, setUnit] = useState<EstimateUnit>('days');
   const [open, setOpen] = useState(false);
@@ -36,7 +49,7 @@ function ExtensionRequest({ task, onRequest }: { task: Task; onRequest: (value: 
   const today = todayISO();
   const due = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
   const overdue = dueUrgency(due, today, task.status) === 'overdue';
-  if (!overdue || task.status === 'done') return null;
+  if ((!overdue && !forceOffer) || task.status === 'done') return null;
 
   if (!open) {
     return (
@@ -60,37 +73,63 @@ function ExtensionRequest({ task, onRequest }: { task: Task; onRequest: (value: 
   );
 }
 
-function ProposeEstimate({ task, onPropose }: { task: Task; onPropose: (value: number, unit: EstimateUnit) => void }) {
-  const [value, setValue] = useState<number>(task.proposedValue ?? 0);
-  const [unit, setUnit] = useState<EstimateUnit>(task.proposedUnit ?? 'hours');
+function EstimateCell({ task, onRequest }: { task: Task; onRequest: (value: number, unit: EstimateUnit, reason: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const { approvedHours, pending, buttonLabel } = estimateCellState(task);
+
   return (
-    <span className="ts-nav-left">
-      <input className="ts-pct" type="number" min={0} value={value}
-        onChange={(e) => setValue(Number(e.target.value))} />
-      <select className="input ts-status" value={unit} onChange={(e) => setUnit(e.target.value as EstimateUnit)}>
-        {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-      </select>
-      <button className="link-btn" onClick={() => onPropose(value, unit)}>propose</button>
-      <span className="ts-sub">{task.estimateStatus === 'proposed' ? 'proposed' : task.estimateStatus === 'rejected' ? 'rejected' : ''}</span>
-    </span>
+    <div className="est-cell">
+      <div className="est-approved">
+        {approvedHours != null ? <strong>{approvedHours}h</strong> : <span className="ts-sub">No approved estimate yet</span>}
+        {approvedHours != null && task.myDue && <span className="ts-sub"> · due {task.myDue}</span>}
+      </div>
+
+      {pending && (
+        <div className="est-pending" title={pending.reason || undefined}>
+          ⏳ Pending: {pending.value} {pending.unit} ({pending.hours}h){pending.reason ? ' — ' + pending.reason : ''}
+        </div>
+      )}
+
+      {task.estimatesPending
+        ? <div className="ts-sub">Waiting on {(task.assigneeCount ?? 0) - (task.submittedCount ?? 0)} of {task.assigneeCount ?? 0} teammates</div>
+        : <div className="ts-sub">Total: {task.estimatedHours}h</div>}
+
+      <button className="link-btn est-trigger" onClick={() => setOpen(true)}>{buttonLabel}</button>
+
+      {open && (
+        <EstimateRequestModal
+          taskTitle={task.title}
+          initialValue={pending ? pending.value : (approvedHours ?? 0)}
+          initialUnit={pending ? pending.unit : 'hours'}
+          initialReason={pending ? pending.reason : ''}
+          onClose={() => setOpen(false)}
+          onSubmit={(value, unit, reason) => { onRequest(value, unit, reason); setOpen(false); }}
+        />
+      )}
+    </div>
   );
 }
 
-function MyEstimate({ task, onSubmit }: { task: Task; onSubmit: (value: number, unit: EstimateUnit) => void }) {
-  const hasEstimate = task.myEstimatedHours != null;
-  const [value, setValue] = useState<number>(task.myEstimatedHours ?? 0);
-  const [unit, setUnit] = useState<EstimateUnit>('hours');
+function PersonalEta({ task, onSave }: { task: Task; onSave: (etaAt: string | null) => void }) {
+  const [value, setValue] = useState<string>(task.myEtaAt ? toLocalInput(task.myEtaAt) : '');
+  const status = etaStatus(task.myEtaAt, deadlineOf(task));
+
   return (
-    <div>
-      <span className="ts-nav-left">
-        <input className="ts-pct" type="number" min={0} value={value}
-          onChange={(e) => setValue(Number(e.target.value))} />
-        <select className="input ts-status" value={unit} onChange={(e) => setUnit(e.target.value as EstimateUnit)}>
-          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-        </select>
-        <button className="link-btn" onClick={() => onSubmit(value, unit)}>{hasEstimate ? 'Update' : 'Submit'}</button>
+    <div className="eta-block">
+      <span className="ts-nav-left eta-row">
+        <span className="eta-prefix">I'll finish by</span>
+        <input className="input eta-input" type="datetime-local" value={value}
+          onChange={(e) => setValue(e.target.value)} />
+        <button className="link-btn" onClick={() => onSave(value ? new Date(value).toISOString() : null)}>Save</button>
+        {task.myEtaAt && (
+          <button className="link-btn" style={{ color: 'var(--muted)' }}
+            onClick={() => { setValue(''); onSave(null); }}>Clear</button>
+        )}
       </span>
-      {hasEstimate && <div className="ts-sub">Your deadline: {task.myDue ?? '—'}</div>}
+      {status === 'ontrack' && <div className="eta-ok">✓ On track for the deadline</div>}
+      {status === 'late' && task.status !== 'done' && (
+        <div className="eta-late">⚠ Your estimate is later than the deadline — discuss the timeline with your PM.</div>
+      )}
     </div>
   );
 }
@@ -112,21 +151,21 @@ export function MyTasks() {
   }
   useEffect(() => { reload(); }, []);
 
-  async function propose(id: string, value: number, unit: EstimateUnit) {
-    setError('');
-    try { await proposeEstimate(id, value, unit); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
   async function requestExtension(id: string, value: number, unit: EstimateUnit) {
     setError('');
     try { await proposeExtension(id, value, unit); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
-  async function submitMyEstimate(id: string, value: number, unit: EstimateUnit) {
+  async function requestMyEstimate(id: string, value: number, unit: EstimateUnit, reason: string) {
     setError('');
-    try { await setMyEstimate(id, value, unit); reload(); }
+    try { await setMyEstimate(id, value, unit, reason); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveMyEta(id: string, etaAt: string | null) {
+    setError('');
+    try { await setMyEta(id, etaAt); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -205,13 +244,7 @@ export function MyTasks() {
                 <td className="ts-task">{t.title}</td>
                 <td className="col-left">{typeof t.project === 'object' ? t.project.name : '—'}</td>
                 <td className="col-left">
-                  {t.estimateStatus === 'approved'
-                    ? `${t.estimateValue || t.estimatedHours} ${t.estimateUnit ?? 'hours'}`
-                    : <ProposeEstimate task={t} onPropose={(v, u) => propose(t._id, v, u)} />}
-                  {t.estimatesPending
-                    ? <div className="ts-sub">Waiting on {(t.assigneeCount ?? 0) - (t.submittedCount ?? 0)} of {t.assigneeCount ?? 0} teammates — total: —</div>
-                    : <div className="ts-sub">Total: {t.estimatedHours}h</div>}
-                  <MyEstimate task={t} onSubmit={(v, u) => submitMyEstimate(t._id, v, u)} />
+                  <EstimateCell task={t} onRequest={(v, u, r) => requestMyEstimate(t._id, v, u, r)} />
                 </td>
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
@@ -219,7 +252,9 @@ export function MyTasks() {
                 <td className="col-left">
                   <div className="due-stack">
                     <DueLabel task={t} />
-                    <ExtensionRequest task={t} onRequest={(v, u) => requestExtension(t._id, v, u)} />
+                    <PersonalEta task={t} onSave={(eta) => saveMyEta(t._id, eta)} />
+                    <ExtensionRequest task={t} forceOffer={etaStatus(t.myEtaAt, deadlineOf(t)) === 'late'}
+                      onRequest={(v, u) => requestExtension(t._id, v, u)} />
                   </div>
                 </td>
               </tr>

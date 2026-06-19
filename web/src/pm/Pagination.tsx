@@ -9,7 +9,7 @@ export function Pagination({ page, totalPages, onChange }: Props) {
   return (
     <div className="pm-pagination" aria-label="Pagination">
       <button className="btn btn-ghost" onClick={() => onChange(page - 1)} disabled={page <= 1}>Prev</button>
-      <span className="ts-sub">Page {page} of {totalPages}</span>
+      <span className="ts-sub">Page  {page}/{totalPages}</span>
       <button className="btn btn-ghost" onClick={() => onChange(page + 1)} disabled={page >= totalPages}>Next</button>
     </div>
   );

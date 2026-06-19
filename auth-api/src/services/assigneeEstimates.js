@@ -15,6 +15,14 @@ export function mergeAssignees(prevAssignees, userIds, shares) {
   const prevByUser = new Map((prevAssignees || []).map((a) => [String(a.user), a]));
   return userIds.map((user, i) => {
     const prev = prevByUser.get(String(user));
-    return { user, sharePct: shares[i], estimatedHours: prev ? prev.estimatedHours ?? null : null };
+    return {
+      user,
+      sharePct: shares[i],
+      estimatedHours: prev ? prev.estimatedHours ?? null : null,
+      pendingValue: prev ? prev.pendingValue ?? 0 : 0,
+      pendingUnit: prev ? prev.pendingUnit ?? 'hours' : 'hours',
+      pendingHours: prev ? prev.pendingHours ?? null : null,
+      pendingReason: prev ? prev.pendingReason ?? '' : '',
+    };
   });
 }

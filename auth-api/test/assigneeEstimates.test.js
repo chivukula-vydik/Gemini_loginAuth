@@ -20,7 +20,15 @@ test('mergeAssignees: keeps existing hours by user id, new users get null', () =
   const prev = [{ user: 'u1', sharePct: 50, estimatedHours: 12 }, { user: 'u2', sharePct: 50, estimatedHours: 8 }];
   const next = mergeAssignees(prev, ['u1', 'u3'], [60, 40]);
   assert.deepEqual(next, [
-    { user: 'u1', sharePct: 60, estimatedHours: 12 },
-    { user: 'u3', sharePct: 40, estimatedHours: null },
+    { user: 'u1', sharePct: 60, estimatedHours: 12, pendingValue: 0, pendingUnit: 'hours', pendingHours: null, pendingReason: '' },
+    { user: 'u3', sharePct: 40, estimatedHours: null, pendingValue: 0, pendingUnit: 'hours', pendingHours: null, pendingReason: '' },
+  ]);
+});
+
+test('mergeAssignees: preserves an existing pending estimate request by user id', () => {
+  const prev = [{ user: 'u1', sharePct: 100, estimatedHours: null, pendingValue: 2, pendingUnit: 'days', pendingHours: 16, pendingReason: 'scope grew' }];
+  const next = mergeAssignees(prev, ['u1'], [100]);
+  assert.deepEqual(next, [
+    { user: 'u1', sharePct: 100, estimatedHours: null, pendingValue: 2, pendingUnit: 'days', pendingHours: 16, pendingReason: 'scope grew' },
   ]);
 });

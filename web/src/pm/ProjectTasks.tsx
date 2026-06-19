@@ -3,6 +3,7 @@ import { dueUrgency, type DueUrgency } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
 import { assigneeHours } from './workload';
 import { estimateSummary } from './assigneeEstimate';
+import { etaStatus } from './eta';
 import { AssigneesEditor } from './AssigneesEditor';
 import { StatusBadge } from './StatusBadge';
 import { personName } from './personName';
@@ -200,6 +201,8 @@ export function ProjectTasks(props: Props) {
           {pageTasks.map((t) => {
             const urgency = dueUrgency(t.dueDate ?? t.effectiveDueDate ?? null, todayISO(), t.status);
             const rowClass = urgency === 'overdue' ? 'ts-row-overdue' : urgency === 'soon' ? 'ts-row-soon' : '';
+            const taskDeadline = t.dueDate ? t.dueDate.slice(0, 10) : (t.effectiveDueDate ?? null);
+            const anyEtaLate = t.status !== 'done' && t.assignees.some((a) => etaStatus(a.etaAt, taskDeadline) === 'late');
             return (
               <tr key={t._id} className={rowClass}>
                 {toolsEnabled && bulkEnabled && (
@@ -228,15 +231,23 @@ export function ProjectTasks(props: Props) {
                     <button className="assignees-cell" type="button" onClick={() => setEditingAssignees(t._id)}>
                       {t.assignees.length === 0
                         ? <span className="ts-sub">Unassigned</span>
-                        : t.assignees.map((a) => (
+                        : t.assignees.map((a) => {
+                            const aStatus = etaStatus(a.etaAt, taskDeadline);
+                            return (
                             <span key={a.user._id} className="assignee-line">
                               <span className="assignee-line-name">{personName(a.user)}</span>
                               <span className="assignee-line-meta">
                                 {a.sharePct}% · {assigneeHours(t.estimatedHours, a.sharePct)}h ·{' '}
                                 {a.estimatedHours != null ? `${a.estimatedHours}h` : 'pending'}
+                                {a.etaAt && (
+                                  <span className={aStatus === 'late' ? 'eta-meta-late' : 'eta-meta'}>
+                                    {' '}· ETA {a.etaAt.slice(0, 10)}{aStatus === 'late' ? ' ⚠' : ''}
+                                  </span>
+                                )}
                               </span>
                             </span>
-                          ))}
+                            );
+                          })}
                     </button>
                   )}
                 </td>
@@ -261,7 +272,10 @@ export function ProjectTasks(props: Props) {
                 <td>{((t.actualMinutes ?? 0) / 60).toFixed(1)}h</td>
                 <td>{t.percentComplete ?? 0}%</td>
                 <td><StatusBadge status={t.status} /></td>
-                <td className="col-left"><DueCell task={t} onSave={(d) => props.onSaveDue(t._id, d)} onDecideExt={(dec) => props.onDecideExt(t._id, dec)} /></td>
+                <td className="col-left">
+                  <DueCell task={t} onSave={(d) => props.onSaveDue(t._id, d)} onDecideExt={(dec) => props.onDecideExt(t._id, dec)} />
+                  {anyEtaLate && <span className="eta-badge-late" title="An assignee expects to finish after the deadline">⚠ ETA past deadline</span>}
+                </td>
               </tr>
             );
           })}

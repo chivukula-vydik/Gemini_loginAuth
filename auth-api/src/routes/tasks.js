@@ -36,6 +36,12 @@ export function createTasksRouter() {
         dueProposalDate: proposedDueDate(obj),
         mySharePct: mine ? mine.sharePct : 0,
         myEstimatedHours: mine ? mine.estimatedHours ?? null : null,
+        myPendingHours: mine ? mine.pendingHours ?? null : null,
+        myPendingValue: mine ? mine.pendingValue ?? 0 : 0,
+        myPendingUnit: mine ? mine.pendingUnit ?? 'hours' : 'hours',
+        myPendingReason: mine ? mine.pendingReason ?? '' : '',
+        myEstimateStatus: mine && mine.pendingHours != null ? 'pending' : 'none',
+        myEtaAt: mine && mine.etaAt ? new Date(mine.etaAt).toISOString() : null,
         myDue: mine ? assigneeDueDate(obj, mine) : null,
         estimatesPending: !allEstimatesIn(obj.assignees),
         submittedCount: submittedCount(obj.assignees),
@@ -92,7 +98,7 @@ export function createTasksRouter() {
     res.json(task);
   }));
 
-  // Assignee submits their own hour estimate; finalizes task totals + due date once all are in.
+  // Assignee requests an estimate (or a change to it); recorded as pending until a PM decides.
   router.patch('/:id/my-estimate', asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
@@ -100,7 +106,50 @@ export function createTasksRouter() {
     if (!mine) return res.status(403).json({ error: 'not an assignee of this task' });
     const unit = ['hours', 'days', 'weeks'].includes(req.body?.unit) ? req.body.unit : 'hours';
     const value = Math.max(0, Number(req.body?.value) || 0);
-    mine.estimatedHours = Math.round(toHours(value, unit));
+    mine.pendingValue = value;
+    mine.pendingUnit = unit;
+    mine.pendingHours = Math.round(toHours(value, unit));
+    mine.pendingReason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    await task.save();
+    res.json(task);
+  }));
+
+  // Assignee sets/updates/clears their own personal estimated completion datetime (advisory, no approval).
+  router.patch('/:id/my-eta', asyncHandler(async (req, res) => {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    const mine = task.assignees.find((a) => String(a.user) === String(req.user.sub));
+    if (!mine) return res.status(403).json({ error: 'not an assignee of this task' });
+    const raw = req.body?.etaAt;
+    if (raw == null) {
+      mine.etaAt = null;
+    } else {
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return res.status(400).json({ error: 'invalid etaAt' });
+      mine.etaAt = d;
+    }
+    await task.save();
+    res.json(task);
+  }));
+
+  // PM/owner approves or rejects an assignee's pending estimate request.
+  router.patch('/:id/my-estimate/decision', asyncHandler(async (req, res) => {
+    const decision = req.body?.decision;
+    if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
+    const userId = String(req.body?.userId || '');
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    const project = await Project.findById(task.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    if (userId === String(req.user.sub)) {
+      return res.status(403).json({ error: 'you cannot decide your own estimate request' });
+    }
+    const target = task.assignees.find((a) => String(a.user) === userId);
+    if (!target || target.pendingHours == null) return res.status(400).json({ error: 'no pending estimate request' });
+    if (decision === 'approve') target.estimatedHours = target.pendingHours;
+    target.pendingHours = null;
+    target.pendingValue = 0;
+    target.pendingReason = '';
     if (allEstimatesIn(task.assignees)) {
       task.estimatedHours = sumEstimatedHours(task.assignees);
       if (!task.dueDate) task.dueDate = maxAssigneeDueDate(task);
