@@ -11,6 +11,7 @@ const { createApp } = await import('../src/app.js');
 const { User } = await import('../src/models/User.js');
 const { Project } = await import('../src/models/Project.js');
 const { Task } = await import('../src/models/Task.js');
+const { Skill } = await import('../src/models/Skill.js');
 const { Timesheet } = await import('../src/models/Timesheet.js');
 const { EditRequest } = await import('../src/models/EditRequest.js');
 const { ClaimRequest } = await import('../src/models/ClaimRequest.js');
@@ -691,6 +692,77 @@ test('my-estimate decision: only a PM/owner who is not the requester can decide'
   const ownReq = await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
     .set('Authorization', bearer(pm)).send({ userId: String(pm._id), decision: 'approve' });
   assert.equal(ownReq.status, 403);
+});
+
+test('project requiredSkills: keeps active skills on create/patch and returns them populated', async () => {
+  const pm = await User.create({ email: 'rs-pm@x.com', displayName: 'PM', role: 'pm' });
+  const active = await Skill.create({ name: 'React', active: true });
+  const inactive = await Skill.create({ name: 'COBOL', active: false });
+
+  // Create: only the active skill is kept.
+  const created = await request(app).post('/projects')
+    .set('Authorization', bearer(pm))
+    .send({ name: 'P', requiredSkills: [String(active._id), String(inactive._id)] });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.body.requiredSkills.map(String), [String(active._id)]);
+
+  const id = created.body._id;
+
+  // GET returns the skill populated (so the UI can render names).
+  const got = await request(app).get(`/projects/${id}`).set('Authorization', bearer(pm));
+  assert.equal(got.status, 200);
+  assert.equal(got.body.project.requiredSkills[0].name, 'React');
+
+  // PATCH replaces the set.
+  const node = await Skill.create({ name: 'Node', active: true });
+  const patched = await request(app).patch(`/projects/${id}`)
+    .set('Authorization', bearer(pm))
+    .send({ requiredSkills: [String(node._id)] });
+  assert.equal(patched.status, 200);
+  assert.deepEqual(patched.body.requiredSkills.map(String), [String(node._id)]);
+});
+
+test('GET /projects/:id/candidates: workload + skill match, sorted, PM-only', async () => {
+  const pm = await User.create({ email: 'cand-pm@x.com', displayName: 'PM', role: 'pm' });
+  const vue = await Skill.create({ name: 'Vue', active: true });
+  const free = await User.create({ email: 'cand-free@x.com', displayName: 'Free', role: 'employee', skills: [vue._id] });
+  const busy = await User.create({ email: 'cand-busy@x.com', displayName: 'Busy', role: 'employee', skills: [] });
+  const member = await User.create({ email: 'cand-mem@x.com', displayName: 'Mem', role: 'employee', skills: [vue._id] });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [member._id], requiredSkills: [vue._id] });
+
+  // 'busy' carries 36h of active work; 'free' carries none.
+  await Task.create({ project: project._id, title: 'T', status: 'in_progress', createdBy: pm._id,
+    estimatedHours: 36, assignees: [{ user: busy._id, sharePct: 100, estimatedHours: 36 }] });
+  // A done task must never count against capacity.
+  await Task.create({ project: project._id, title: 'D', status: 'done', createdBy: pm._id,
+    estimatedHours: 40, assignees: [{ user: free._id, sharePct: 100, estimatedHours: 40 }] });
+
+  const res = await request(app).get(`/projects/${project._id}/candidates`).set('Authorization', bearer(pm));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.capacity, 40);
+
+  const byId = Object.fromEntries(res.body.candidates.map((c) => [c._id, c]));
+  const f = byId[String(free._id)];
+  assert.equal(f.status, 'available');
+  assert.equal(f.hours, 0); // done task excluded
+  assert.equal(f.skillsOk, true);
+  assert.deepEqual(f.matchedSkills, ['Vue']);
+
+  const b = byId[String(busy._id)];
+  assert.equal(b.status, 'busy');
+  assert.equal(b.hours, 36);
+  assert.equal(b.skillsOk, false);
+  assert.deepEqual(b.missingSkills, ['Vue']);
+
+  assert.equal(byId[String(member._id)].isMember, true);
+
+  // Skilled-and-available sorts before busy/unskilled.
+  const order = res.body.candidates.map((c) => c._id);
+  assert.ok(order.indexOf(String(free._id)) < order.indexOf(String(busy._id)));
+
+  // Employees cannot see org-wide workload.
+  const forbidden = await request(app).get(`/projects/${project._id}/candidates`).set('Authorization', bearer(busy));
+  assert.equal(forbidden.status, 403);
 });
 
 test('my-eta: assignee sets, updates, and clears their personal completion estimate', async () => {

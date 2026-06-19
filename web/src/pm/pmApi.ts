@@ -24,8 +24,17 @@ export type EditReq = {
 };
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
-  members: string[]; status: string; startDate: string | null; targetDate: string | null;
+  members: string[]; requiredSkills?: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
+};
+export type Availability = 'available' | 'standby' | 'busy';
+export type Candidate = {
+  _id: string; displayName: string; email: string; role: Role;
+  status: Availability; loadPct: number; hours: number; capacity: number;
+  skillsOk: boolean; matchedSkills: string[]; missingSkills: string[]; isMember: boolean;
+};
+export type CandidatesResponse = {
+  capacity: number; requiredSkills: { _id: string; name: string }[]; candidates: Candidate[];
 };
 export type Assignee = { user: Person | string; sharePct: number; estimatedHours?: number | null; etaAt?: string | null };
 export type Task = {
@@ -93,7 +102,9 @@ export const setMySkills = (skillIds: string[]) => authed('/me/skills', 'PATCH',
 
 export const listProjects = () => authed('/projects') as Promise<Project[]>;
 export const createProject = (body: Partial<Project>) => authed('/projects', 'POST', body) as Promise<Project>;
-export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm'> & { members: Person[]; ownerPm: Person };
+export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm' | 'requiredSkills'> & {
+  members: Person[]; ownerPm: Person; requiredSkills: { _id: string; name: string }[];
+};
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
 export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[] }) =>
@@ -123,6 +134,10 @@ export const decideExtension = (id: string, decision: 'approve' | 'reject') =>
 
 export const updateProjectMembers = (id: string, members: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { members });
+export const updateProjectRequiredSkills = (id: string, requiredSkills: string[]) =>
+  authed(`/projects/${id}`, 'PATCH', { requiredSkills });
+export const listCandidates = (projectId: string) =>
+  authed(`/projects/${projectId}/candidates`) as Promise<CandidatesResponse>;
 export const setProjectOwner = (id: string, ownerPm: string) =>
   authed(`/projects/${id}`, 'PATCH', { ownerPm });
 export const deleteProject = (id: string) => authed(`/projects/${id}`, 'DELETE');

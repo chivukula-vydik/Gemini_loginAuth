@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
-  decideEstimate, updateTask, decideExtension,
+  decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
+import { CandidatePicker } from './CandidatePicker';
 import { ProgressRing } from './ProgressRing';
 import { StatusBadge } from './StatusBadge';
 import { personName, initials } from './personName';
@@ -139,7 +140,6 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [assignees, setAssignees] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
-  const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -153,14 +153,20 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     listDirectory().then(setDirectory).catch(() => {});
   }, [id]);
 
-  async function addMember() {
-    if (!newMember || !project) return;
+
+  async function addMemberById(uid: string) {
+    if (!project) return;
+    await updateProjectMembers(id, [...project.members.map((m) => m._id), uid]);
+    reload();
+  }
+
+  async function toggleRequiredSkill(sid: string) {
+    if (!project) return;
+    const cur = project.requiredSkills.map((s) => s._id);
+    const next = cur.includes(sid) ? cur.filter((x) => x !== sid) : [...cur, sid];
     setError('');
-    try {
-      await updateProjectMembers(id, [...project.members.map((m) => m._id), newMember]);
-      setNewMember('');
-      reload();
-    } catch (e) { setError((e as Error).message); }
+    try { await updateProjectRequiredSkills(id, next); reload(); }
+    catch (e) { setError((e as Error).message); }
   }
 
   async function removeMember(mid: string) {
@@ -248,7 +254,6 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     </div>
   );
 
-  const nonMembers = directory.filter((d) => !project.members.some((m) => m._id === d._id));
   const ownerCandidates = directory.filter((d) => (d.role === 'pm' || d.role === 'admin') && d._id !== project.ownerPm._id);
 
   const overall = tasks.length
@@ -340,14 +345,26 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
               </span>
             ))}
           </div>
-          <div className="pm-row-actions">
-            <select className="input pm-select" value={newMember} onChange={(e) => setNewMember(e.target.value)}>
-              <option value="">Add member…</option>
-              {nonMembers.map((d) => <option key={d._id} value={d._id}>{personName(d)}</option>)}
-            </select>
-            <button className="btn btn-auto btn-primary" onClick={addMember}>Add</button>
-          </div>
+          <span className="field-hint">Add member — sorted by availability &amp; skill fit</span>
+          <CandidatePicker projectId={id} onAdd={addMemberById} />
         </div>
+      </div>
+
+      <div className="ts-card card-section">
+        <div className="card-title">Required skills</div>
+        <div className="toggle-group">
+          {skills.filter((s) => s.active).length === 0 && <span className="ts-sub">No skills defined</span>}
+          {skills.filter((s) => s.active).map((s) => {
+            const on = project.requiredSkills.some((r) => r._id === s._id);
+            return (
+              <button key={s._id} type="button"
+                className={`toggle-chip${on ? ' on' : ''}`}
+                aria-pressed={on}
+                onClick={() => toggleRequiredSkill(s._id)}>{s.name}</button>
+            );
+          })}
+        </div>
+        <span className="field-hint">Used to flag skill fit when staffing.</span>
       </div>
 
       <div className="ts-card card-section">

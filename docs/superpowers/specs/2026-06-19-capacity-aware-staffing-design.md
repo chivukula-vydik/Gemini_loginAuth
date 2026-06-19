@@ -103,14 +103,22 @@ The PM sees commitment *before* clicking **Add** — staffing decisions become i
 
 ## Phased build (once approved)
 
-1. **`staffing.js` + test** — pure helper, no DB. (TDD)
-2. **`Project.requiredSkills`** — model field + accept/validate/return in routes. (back-compat)
-3. **`GET /:id/candidates`** — the enriched endpoint (workload + skills + sort).
-4. **UI** — `CandidatePicker.tsx`, required-skills editor, `pmApi` additions, CSS.
+The work splits into **the input** (let the PM say what skills a project needs) and **the
+picker** (read those skills + show hours/Standby/Busy against the 40h cap). Both are in scope —
+the input is built first, the picker follows. They are committed phases, not deferred work.
+
+1. **`staffing.js` + test** — pure helper, no DB (40h cap, committed-hours math, availability). (TDD) — *picker*
+2. **`Project.requiredSkills`** — model field + accept/validate/return in routes, plus the
+   toggle-chip editor in `ProjectDetail`. (back-compat) — **the input (build first)**
+3. **`GET /:id/candidates`** — the enriched endpoint (workload + skills + sort). — *picker*
+4. **UI** — `CandidatePicker.tsx`, `pmApi` additions, CSS. — *picker*
 
 Net: ~2 new files, ~4 edits, fully additive — no behavior change to existing flows.
 
 ## Out of scope (for now)
+
+These are genuinely future, not-yet-designed items. The capacity math, the Available/Standby/Busy
+model, and the candidate picker are **in scope** (see Phased build above) — only the following are out:
 
 - Date-spread / true per-week capacity (needs every task to have start+due dates).
 - Per-user custom capacity, PTO/leave awareness, partial-week proration.
