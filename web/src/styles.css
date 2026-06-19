@@ -623,11 +623,11 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 /* Personal completion estimate picker (My Tasks) */
 .eta-picker { position: relative; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
 .eta-trigger { font-size: 12px; }
-.eta-pop-backdrop { position: fixed; inset: 0; z-index: 40; }
+.eta-pop-backdrop { position: fixed; inset: 0; z-index: 1000; }
 .eta-pop {
-  position: absolute; top: 100%; left: 0; z-index: 41; margin-top: 4px;
+  position: fixed; z-index: 1001;
   background: var(--card); border: 1px solid var(--border-strong); border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.14); padding: 8px; width: 200px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.14); padding: 8px;
 }
 .eta-pop-presets { display: flex; flex-direction: column; gap: 2px; }
 .eta-opt {

@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { todayISO } from '../timesheet/time';
 import { etaStatus } from './eta';
 import { presetDates, etaIsoAt } from './etaPresets';
+import { popoverPosition, type Placement } from './popoverPosition';
+
+const POPOVER_WIDTH = 200;
+const POPOVER_HEIGHT = 260;
 
 type Props = {
   etaAt: string | null;
@@ -21,6 +26,18 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
   const [custom, setCustom] = useState('');
   const [showTime, setShowTime] = useState(false);
   const [time, setTime] = useState('18:00');
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [place, setPlace] = useState<Placement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPlace(popoverPosition(
+      { left: r.left, top: r.top, bottom: r.bottom, width: r.width },
+      { width: window.innerWidth, height: window.innerHeight },
+      POPOVER_HEIGHT, POPOVER_WIDTH,
+    ));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -40,14 +57,24 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
 
   return (
     <div className="eta-picker">
-      <button className="link-btn eta-trigger" type="button" onClick={() => setOpen((o) => !o)}>
+      <button ref={triggerRef} className="link-btn eta-trigger" type="button" onClick={() => setOpen((o) => !o)}>
         {triggerLabel(etaAt)}
       </button>
 
-      {open && (
+      {open && place && createPortal(
         <>
           <div className="eta-pop-backdrop" onClick={() => setOpen(false)} />
-          <div className="eta-pop" role="dialog" aria-label="Set expected completion date">
+          <div
+            className="eta-pop"
+            role="dialog"
+            aria-label="Set expected completion date"
+            style={{
+              left: place.left,
+              top: place.top ?? undefined,
+              bottom: place.bottom ?? undefined,
+              width: POPOVER_WIDTH,
+            }}
+          >
             <div className="eta-pop-presets">
               {presets.map((p) => (
                 <button key={p.key} className="eta-opt" type="button" onClick={() => commit(p.dateISO)}>{p.label}</button>
@@ -69,7 +96,8 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
 
       {status === 'ontrack' && <div className="eta-ok">✓ On track for the deadline</div>}
