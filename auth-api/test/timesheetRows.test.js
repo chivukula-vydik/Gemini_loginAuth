@@ -81,6 +81,15 @@ test('computeRowLock: in the current week, a future day stays locked without a g
   assert.equal(rows[0].entries.fri, 0); // future day not editable
 });
 
+test('computeRowLock: a future day in the current week stays locked even with a matching grant', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 120 } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const grants = [{ day: 'fri', projectId: 'pA' }];
+  const { rows } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants });
+  assert.equal(rows[0].entries.fri, 0); // grants do not apply in the current week
+});
+
 test('computeRowLock: a granted project day in a past week applies and is consumed on change', () => {
   const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 120, tue: 0, wed: 0, thu: 0, fri: 0 } }];
   const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } }];

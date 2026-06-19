@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { EstimateUnit } from './pmApi';
 
 const UNITS: EstimateUnit[] = ['hours', 'days', 'weeks'];
@@ -23,7 +24,9 @@ export function EstimateRequestModal({ taskTitle, initialValue, initialUnit, ini
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  // Render through a portal to <body> so the fixed overlay is not trapped inside
+  // a transformed/overflow-hidden ancestor (the task table's .ts-card).
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="ts-card modal-card" role="dialog" aria-modal="true" aria-label="Request estimate change" onClick={(e) => e.stopPropagation()}>
         <h3 className="modal-title">Request estimate change</h3>
@@ -54,6 +57,7 @@ export function EstimateRequestModal({ taskTitle, initialValue, initialUnit, ini
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

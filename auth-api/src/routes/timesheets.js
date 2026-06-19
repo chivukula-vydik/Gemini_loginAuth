@@ -179,6 +179,8 @@ export function createTimesheetRouter() {
   router.post('/:weekStart/edit-requests', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
+    // Requests are a previous-week concept only; the current/future week has no request process.
+    if (weekStart >= currentMonday()) return res.status(400).json({ error: 'requests are only for previous weeks' });
     const day = req.body?.day;
     if (!DAYS.includes(day)) return res.status(400).json({ error: 'invalid day' });
     const projectId = req.body?.projectId;

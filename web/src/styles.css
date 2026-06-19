@@ -596,18 +596,51 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 
 /* My Tasks estimate cell */
 .est-cell { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
-.est-approved { font-size: 14px; }
-.est-pending {
-  font-size: 12px; font-weight: 600; color: var(--soon);
-  max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+.est-main { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+.est-pending-tag { font-size: 11px; font-weight: 600; color: var(--soon); }
+.est-approved-sub { margin: 0; }
 .est-trigger { font-size: 12px; }
 
-/* Personal completion estimate (My Tasks) */
-.eta-block { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
-.eta-row { gap: 5px; flex-wrap: wrap; }
-.eta-prefix { font-size: 11px; color: var(--muted); }
-.eta-input { font-size: 12px; padding: 3px 6px; }
+/* Estimate ⋮ actions menu */
+.est-menu { position: relative; display: inline-flex; }
+.est-menu-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px;
+}
+.est-cell:hover .est-menu-btn, .est-menu-btn:focus { color: var(--text); }
+.est-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.est-menu-pop {
+  position: absolute; top: 100%; right: 0; z-index: 41; margin-top: 4px;
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12); padding: 4px; min-width: 140px;
+}
+.est-menu-item {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font-size: 13px; padding: 6px 8px; border-radius: 5px; color: var(--text);
+}
+.est-menu-item:hover { background: var(--surface); }
+
+/* Personal completion estimate picker (My Tasks) */
+.eta-picker { position: relative; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.eta-trigger { font-size: 12px; }
+.eta-pop-backdrop { position: fixed; inset: 0; z-index: 40; }
+.eta-pop {
+  position: absolute; top: 100%; left: 0; z-index: 41; margin-top: 4px;
+  background: var(--card); border: 1px solid var(--border-strong); border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.14); padding: 8px; width: 200px;
+}
+.eta-pop-presets { display: flex; flex-direction: column; gap: 2px; }
+.eta-opt {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font-size: 13px; padding: 6px 8px; border-radius: 6px; color: var(--text);
+}
+.eta-opt:hover { background: var(--surface); }
+.eta-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+.eta-pop-custom { display: flex; gap: 4px; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.eta-date { font-size: 12px; padding: 3px 6px; flex: 1; }
+.eta-time { font-size: 12px; padding: 3px 6px; }
+.eta-pop-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.eta-clear { color: var(--muted); margin-left: auto; }
 .eta-ok { font-size: 11px; color: var(--muted); }
 .eta-late { font-size: 11px; font-weight: 600; color: var(--overdue); max-width: 240px; }
 
@@ -623,7 +656,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 
 /* Modal */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 50;
+  position: fixed; inset: 0; z-index: 1000;
   background: color-mix(in srgb, #000 45%, transparent);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }

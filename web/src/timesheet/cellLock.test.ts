@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isCellEditable } from './cellLock.ts';
+import { isCellEditable, canRequestEdit } from './cellLock.ts';
 
 const grants = [{ day: 'fri', projectId: 'pA' }] as const;
+const pmTask = { taskId: 't1', projectId: 'pA' } as never;
 
 test('today is always editable', () => {
   assert.equal(isCellEditable('wed', 'pA', 'wed', []), true);
@@ -17,9 +18,25 @@ test('a previous day with no project is still editable', () => {
   assert.equal(isCellEditable('mon', null, 'wed', []), true);
 });
 
-test('a future day of the current week needs a grant', () => {
+test('a future day of the current week is always locked (grants do not apply in the current week)', () => {
   assert.equal(isCellEditable('fri', 'pA', 'wed', []), false);
-  assert.equal(isCellEditable('fri', 'pA', 'wed', grants as never), true);
+  assert.equal(isCellEditable('fri', 'pA', 'wed', grants as never), false);
+});
+
+test('canRequestEdit: a locked past day in a previous week can be requested', () => {
+  assert.equal(canRequestEdit(true, false, true, pmTask), true);
+});
+
+test('canRequestEdit: never available in the current week', () => {
+  assert.equal(canRequestEdit(false, false, true, pmTask), false);
+});
+
+test('canRequestEdit: not offered for an editable day', () => {
+  assert.equal(canRequestEdit(true, true, true, pmTask), false);
+});
+
+test('canRequestEdit: not offered for an ad-hoc row without a PM task/project', () => {
+  assert.equal(canRequestEdit(true, false, true, { taskId: null, projectId: null } as never), false);
 });
 
 test('past weeks (no todayDay) are only editable via a grant', () => {

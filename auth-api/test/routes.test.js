@@ -368,6 +368,20 @@ test('POST edit-request requires a projectId the caller has a task on, and dedup
   assert.equal(dup.status, 409); // pending duplicate
 });
 
+test('edit-request is rejected for the current week (requests are previous-weeks only)', async () => {
+  const { currentMonday } = await import('../src/services/timesheetRows.js');
+  const pm = await User.create({ email: 'reqcw-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'reqcw-e@x.com', displayName: 'E', role: 'employee' });
+  const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
+  await Task.create({ project: projA._id, title: 'TA', assignees: assignedTo(emp._id), createdBy: pm._id });
+  const wk = currentMonday();
+
+  const res = await request(app).post(`/timesheets/${wk}/edit-requests`)
+    .set('Authorization', bearer(emp)).send({ day: 'mon', projectId: String(projA._id) });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error, 'requests are only for previous weeks');
+});
+
 // The legacy task-level estimate-proposal flow (PATCH /tasks/:id/estimate +
 // /estimate/decision) is retired: per-assignee estimates replace it, and the
 // endpoint now returns 409 for any task with assignees (the only tasks its

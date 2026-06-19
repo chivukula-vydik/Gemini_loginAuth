@@ -129,14 +129,15 @@ export function computeRowLock({
   const dayDate = (day) => (weekStart ? addDaysISO(weekStart, DAYS.indexOf(day)) : null);
   // A task is only editable on/after the day it was assigned (its start date).
   // Current week (todayDay set): today and any earlier weekday are freely
-  // editable — no grant needed. Otherwise a matching approved grant unlocks it.
+  // editable; future days are always locked and grants do not apply. In previous
+  // weeks (todayDay null) a matching approved grant unlocks the day.
   const editableFor = (projectId, day, startDate) => {
     if (startDate) {
       const cd = dayDate(day);
       if (cd && cd < startDate) return false;
     }
-    return (!!todayDay && DAYS.indexOf(day) <= DAYS.indexOf(todayDay))
-      || (!!projectId && grantSet.has(`${day}:${projectId}`));
+    if (todayDay) return DAYS.indexOf(day) <= DAYS.indexOf(todayDay);
+    return !!projectId && grantSet.has(`${day}:${projectId}`);
   };
 
   const rows = (submittedRows || []).map((r) => {

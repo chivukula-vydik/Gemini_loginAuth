@@ -1,6 +1,6 @@
 import { TaskRow } from './TaskRow';
 import { weekBarSegment } from './bar';
-import { DAYS, formatMinutes, columnDates, dayDates, todayISO } from './time';
+import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
 import type { Task, Entries, Grant } from './timesheetApi';
 
@@ -26,6 +26,7 @@ export function TimesheetGrid({
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
   const today = todayISO();
+  const weekIsPast = weekStart < mondayOf();
 
   const dayTotal = (day: keyof Entries) =>
     tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
@@ -62,6 +63,7 @@ export function TimesheetGrid({
               grants={grants}
               dates={dates}
               today={today}
+              weekIsPast={weekIsPast}
               pendingKeys={pendingKeys}
               bar={weekBarSegment(weekStart, t.startDate, t.endDate)}
               onRename={(name) => onRename(t.id, name)}

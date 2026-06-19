@@ -1,31 +1,40 @@
-import type { EstimateUnit } from './pmApi';
-
 type EstimateLike = {
   myEstimatedHours?: number | null;
   myPendingHours?: number | null;
-  myPendingValue?: number;
-  myPendingUnit?: EstimateUnit;
-  myPendingReason?: string;
+  assigneeCount?: number;
+  submittedCount?: number;
+  estimatesPending?: boolean;
+  estimatedHours?: number;
 };
 
-export type PendingRequest = { value: number; unit: EstimateUnit; hours: number; reason: string };
+export type EstimateState = 'empty' | 'pending-new' | 'approved' | 'pending-change';
 
-export type EstimateCellState = {
+export type TeamEstimate = { total: number | null; submitted: number; count: number; allIn: boolean };
+
+export type EstimateView = {
+  state: EstimateState;
   approvedHours: number | null;
-  pending: PendingRequest | null;
-  buttonLabel: 'Submit estimate' | 'Request estimate change';
+  pendingHours: number | null;
+  team: TeamEstimate | null;
 };
 
-export function estimateCellState(task: EstimateLike): EstimateCellState {
+export function estimateCellState(task: EstimateLike): EstimateView {
   const approvedHours = task.myEstimatedHours ?? null;
-  const pending = task.myPendingHours != null
+  const pendingHours = task.myPendingHours ?? null;
+
+  let state: EstimateState;
+  if (pendingHours != null) state = approvedHours != null ? 'pending-change' : 'pending-new';
+  else state = approvedHours != null ? 'approved' : 'empty';
+
+  const count = task.assigneeCount ?? 0;
+  const team: TeamEstimate | null = count > 1
     ? {
-        value: task.myPendingValue ?? 0,
-        unit: task.myPendingUnit ?? 'hours',
-        hours: task.myPendingHours,
-        reason: task.myPendingReason ?? '',
+        total: task.estimatesPending ? null : (task.estimatedHours ?? 0),
+        submitted: task.submittedCount ?? 0,
+        count,
+        allIn: !task.estimatesPending,
       }
     : null;
-  const buttonLabel = approvedHours == null && pending == null ? 'Submit estimate' : 'Request estimate change';
-  return { approvedHours, pending, buttonLabel };
+
+  return { state, approvedHours, pendingHours, team };
 }

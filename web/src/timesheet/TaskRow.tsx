@@ -3,7 +3,7 @@ import { DAYS, formatMinutes } from './time';
 import type { Day } from './time';
 import type { Task, Entries, Grant } from './timesheetApi';
 import type { BarSegment } from './bar';
-import { isCellEditable } from './cellLock';
+import { isCellEditable, canRequestEdit } from './cellLock';
 import { dueUrgency, dueLabel } from './due';
 
 type Props = {
@@ -13,6 +13,7 @@ type Props = {
   grants: Grant[];
   dates: Record<Day, string>;
   today: string;
+  weekIsPast: boolean;
   pendingKeys: Set<string>;
   bar?: BarSegment | null;
   onRename: (name: string) => void;
@@ -24,7 +25,7 @@ type Props = {
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, pendingKeys, bar = null, onRename, onCellChange, onDelete, onRequestEdit, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, onRename, onCellChange, onDelete, onRequestEdit, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   const urgency = isPm ? dueUrgency(task.endDate, today, task.status) : null;
@@ -61,7 +62,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
         const isToday = todayDay === d;
         const editable = isCellEditable(d, task.projectId, todayDay, grants, dates[d], task.startDate);
         const isPast = dates[d] < today;
-        const canRequest = !editable && isPast && !!task.taskId && !!task.projectId;
+        const canRequest = canRequestEdit(weekIsPast, editable, isPast, task);
         const pending = canRequest && pendingKeys.has(`${d}:${task.projectId}`);
         return (
           <td key={d} className={`ts-cell${isToday ? ' ts-cell-today' : ''}`}>
