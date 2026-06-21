@@ -16,7 +16,7 @@ async function authed(path: string, method = 'GET', body?: unknown) {
 }
 
 export type Skill = { _id: string; name: string; active: boolean };
-export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean };
+export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean; reestimationCount?: number };
 export type Person = { _id: string; displayName: string; email: string; role?: Role };
 export type EditReq = {
   _id: string; userId: Person; weekStart: string; day: string; reason: string; status: string; createdAt: string;
@@ -28,10 +28,12 @@ export type Project = {
   progress?: number; taskCount?: number; doneCount?: number;
 };
 export type Availability = 'available' | 'standby' | 'busy';
+export type PastRecord = { total: number; approved: number; rejected: number; pending: number };
 export type Candidate = {
   _id: string; displayName: string; email: string; role: Role;
   status: Availability; loadPct: number; hours: number; capacity: number;
-  skillsOk: boolean; matchedSkills: string[]; missingSkills: string[]; isMember: boolean;
+  skillsOk: boolean; matchedSkills: string[]; missingSkills: string[];
+  pastRecord: PastRecord; isMember: boolean;
 };
 export type CandidatesResponse = {
   capacity: number; requiredSkills: { _id: string; name: string }[]; candidates: Candidate[];
@@ -93,6 +95,17 @@ export const setUserRole = (id: string, role: Role) => authed(`/admin/users/${id
 export const setUserActive = (id: string, active: boolean) =>
   authed(`/admin/users/${id}/active`, 'PATCH', { active }) as Promise<UserRow>;
 export const deleteUser = (id: string) => authed(`/admin/users/${id}`, 'DELETE');
+
+export type ReestimationEntry = {
+  taskId: string; taskTitle: string; projectId: string | null; projectName: string;
+  fromHours: number; value: number; unit: 'hours' | 'days' | 'weeks'; toHours: number;
+  reason: string; status: 'pending' | 'approved' | 'rejected'; requestedAt: string; decidedAt: string | null;
+};
+export type ReestimationHistory = { summary: PastRecord; entries: ReestimationEntry[] };
+export const getUserReestimations = (id: string) =>
+  authed(`/users/${id}/reestimations`) as Promise<ReestimationHistory>;
+export const getReestimationSummary = () =>
+  authed('/users/reestimations/summary') as Promise<{ requesters: number }>;
 
 export const listSkills = () => authed('/skills') as Promise<Skill[]>;
 export const addSkill = (name: string) => authed('/admin/skills', 'POST', { name }) as Promise<Skill>;

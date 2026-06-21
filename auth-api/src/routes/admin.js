@@ -21,7 +21,7 @@ export function createAdminRouter() {
   router.use(requireAuth, requireRole('admin'));
 
   router.get('/users', asyncHandler(async (req, res) => {
-    const users = await User.find().select('email displayName role active').sort('email');
+    const users = await User.find().select('email displayName role active reestimationCount').sort('email');
     res.json(users);
   }));
 

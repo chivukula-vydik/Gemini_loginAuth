@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
-import { getWeek, saveWeek, submitWeek, createEditRequest, Task, Entries, Grant } from './timesheetApi';
+import { getWeek, saveWeek, submitWeek, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
+import { blankRow, rowFromAssignable } from './addRow';
 import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
 import { setTaskProgress } from '../pm/pmApi';
@@ -17,6 +18,7 @@ function newTask(name = ''): Task {
 export function TimesheetPage() {
   const [weekStart, setWeekStart] = useState(() => mondayOf());
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [assignable, setAssignable] = useState<Assignable[]>([]);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [loadError, setLoadError] = useState('');
   const [todayDay, setTodayDay] = useState<Day | null>(null);
@@ -39,6 +41,7 @@ export function TimesheetPage() {
       const loaded = await getWeek(week);
       if (weekStartRef.current !== week) return;
       setTasks(loaded.tasks);
+      setAssignable(loaded.assignable);
       setTodayDay(loaded.todayDay);
       setGrants(loaded.grants);
       setPendingKeys(loaded.pending.map((g) => `${g.day}:${g.projectId}`));
@@ -109,7 +112,8 @@ export function TimesheetPage() {
 
   const onDelete = (id: string) => update(tasks.filter((t) => t.id !== id));
 
-  const onAddTask = () => update([...tasks, newTask()]);
+  const onAddAssigned = (a: Assignable) => update([...tasks, rowFromAssignable(a)]);
+  const onAddBlank = () => update([...tasks, blankRow()]);
 
   function onProgress(id: string, patch: { percentComplete?: number; status?: string }) {
     const row = tasks.find((t) => t.id === id);
@@ -217,6 +221,7 @@ export function TimesheetPage() {
       <TimesheetGrid
         weekStart={weekStart}
         tasks={tasks}
+        assignable={assignable}
         readOnly={readOnly}
         todayDay={todayDay}
         grants={grants}
@@ -225,7 +230,8 @@ export function TimesheetPage() {
         onRename={onRename}
         onCellChange={onCellChange}
         onDelete={onDelete}
-        onAddTask={onAddTask}
+        onAddAssigned={onAddAssigned}
+        onAddBlank={onAddBlank}
         onProgress={onProgress}
       />
     </div>

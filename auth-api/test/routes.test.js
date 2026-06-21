@@ -113,21 +113,28 @@ test('PATCH /tasks/:id/progress: assignee can set, non-assignee gets 403, value 
   assert.equal(ok.body.status, 'in_progress');
 });
 
-test('GET /timesheets injects assigned tasks for current week but not a past week', async () => {
+test('GET /timesheets offers assigned tasks to add (current week only), never auto-injecting them', async () => {
   const pm = await User.create({ email: 'tpm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'temp@x.com', displayName: 'E', role: 'employee' });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
-  await Task.create({ project: project._id, title: 'Assigned work', assignees: assignedTo(emp._id), createdBy: pm._id });
+  const task = await Task.create({ project: project._id, title: 'Assigned work', assignees: assignedTo(emp._id), createdBy: pm._id });
 
   const { currentMonday } = await import('../src/services/timesheetRows.js');
   const thisMon = currentMonday();
   const cur = await request(app).get(`/timesheets/${thisMon}`).set('Authorization', bearer(emp));
   assert.equal(cur.status, 200);
-  assert.equal(cur.body.tasks.some((t) => t.name === 'Assigned work' && t.locked === true), true);
+  // Not auto-added to the week...
+  assert.equal(cur.body.tasks.length, 0);
+  // ...but offered in the picker, labeled by project.
+  assert.deepEqual(cur.body.assignable, [{
+    taskId: String(task._id), title: 'Assigned work', projectName: 'P', status: 'todo', estimatedHours: 0,
+  }]);
 
+  // Past weeks are read-only: nothing to add, nothing offered.
   const past = await request(app).get('/timesheets/2020-01-06').set('Authorization', bearer(emp));
   assert.equal(past.status, 200);
   assert.equal(past.body.tasks.length, 0);
+  assert.deepEqual(past.body.assignable, []);
 });
 
 test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine reports actualMinutes', async () => {
@@ -329,6 +336,10 @@ test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and row
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
   const wk = currentMonday();
   await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'mon', projectId: project._id, status: 'approved' });
+  // The employee has added this task to their week (fork A: rows are deliberate).
+  await Timesheet.create({ userId: emp._id, weekStart: wk, tasks: [
+    { id: String(task._id), name: 'T', taskId: task._id, entries: { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ] });
 
   const res = await request(app).get(`/timesheets/${wk}`).set('Authorization', bearer(emp));
   assert.equal(res.status, 200);
@@ -336,7 +347,7 @@ test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and row
   assert.equal(res.body.readOnly, false); // current week
   assert.deepEqual(res.body.grants, [{ day: 'mon', projectId: String(project._id) }]);
   const row = res.body.tasks.find((t) => t.taskId === String(task._id));
-  assert.equal(row.projectId, String(project._id)); // injected row carries projectId
+  assert.equal(row.projectId, String(project._id)); // linked row carries projectId
 
   await EditRequest.create({ userId: emp._id, weekStart: wk, day: 'tue', projectId: project._id, status: 'pending' });
   // re-fetch so the pending request is included
@@ -867,4 +878,94 @@ test('my-tasks row exposes my estimate, my deadline, and pending state', async (
   assert.equal(arow.myEstimatedHours, 8);
   assert.equal(arow.myEstimateStatus, 'none');
   assert.equal(arow.myDue, '2026-06-15');
+});
+
+test('re-estimation history: an ask is recorded pending and stamped on decision (Part 4)', async () => {
+  const pm = await User.create({ email: 'reh-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'reh-u1@x.com', displayName: 'U1', role: 'employee' });
+  const project = await Project.create({ name: 'Apollo', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'Build API', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  // u1 asks for a re-estimate.
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 3, unit: 'days', reason: 'scope grew' });
+
+  let after = await User.findById(u1._id);
+  assert.equal(after.reestimationCount, 1);
+  assert.equal(after.reestimations.length, 1);
+  const e = after.reestimations[0];
+  assert.equal(String(e.taskId), String(task._id));
+  assert.equal(e.taskTitle, 'Build API');
+  assert.equal(e.projectName, 'Apollo');
+  assert.equal(e.toHours, 24);
+  assert.equal(e.unit, 'days');
+  assert.equal(e.reason, 'scope grew');
+  assert.equal(e.status, 'pending');
+  assert.equal(e.decidedAt, null);
+
+  // PM rejects → the same entry is stamped, count unchanged, no duplicate.
+  await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'reject' });
+  after = await User.findById(u1._id);
+  assert.equal(after.reestimations.length, 1);
+  assert.equal(after.reestimations[0].status, 'rejected');
+  assert.ok(after.reestimations[0].decidedAt);
+  assert.equal(after.reestimationCount, 1);
+
+  // A second ask after a decision is a separate entry (full history).
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 5, unit: 'hours' });
+  after = await User.findById(u1._id);
+  assert.equal(after.reestimationCount, 2);
+  assert.deepEqual(after.reestimations.map((r) => r.status), ['rejected', 'pending']);
+});
+
+test('GET /users/:id/reestimations: self/PM allowed, others forbidden; aggregate counts requesters', async () => {
+  const pm = await User.create({ email: 'rhist-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'rhist-u1@x.com', displayName: 'U1', role: 'employee' });
+  const other = await User.create({ email: 'rhist-o@x.com', displayName: 'O', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours', reason: 'r' });
+  await request(app).patch(`/tasks/${task._id}/my-estimate/decision`)
+    .set('Authorization', bearer(pm)).send({ userId: String(u1._id), decision: 'approve' });
+
+  // Self can see own history.
+  const own = await request(app).get(`/users/${u1._id}/reestimations`).set('Authorization', bearer(u1));
+  assert.equal(own.status, 200);
+  assert.deepEqual(own.body.summary, { total: 1, approved: 1, rejected: 0, pending: 0 });
+  assert.equal(own.body.entries[0].status, 'approved');
+
+  // A peer cannot see someone else's.
+  const peer = await request(app).get(`/users/${u1._id}/reestimations`).set('Authorization', bearer(other));
+  assert.equal(peer.status, 403);
+
+  // PM can see anyone's.
+  const byPm = await request(app).get(`/users/${u1._id}/reestimations`).set('Authorization', bearer(pm));
+  assert.equal(byPm.status, 200);
+  assert.equal(byPm.body.summary.total, 1);
+
+  // Aggregate: one person has asked. Employees cannot see it.
+  const agg = await request(app).get('/users/reestimations/summary').set('Authorization', bearer(pm));
+  assert.equal(agg.status, 200);
+  assert.ok(agg.body.requesters >= 1);
+  const aggForbidden = await request(app).get('/users/reestimations/summary').set('Authorization', bearer(other));
+  assert.equal(aggForbidden.status, 403);
+});
+
+test('candidates carry pastRecord re-estimation summary (Part 2 × Part 4)', async () => {
+  const pm = await User.create({ email: 'pr-pm@x.com', displayName: 'PM', role: 'pm' });
+  const u1 = await User.create({ email: 'pr-u1@x.com', displayName: 'U1', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
+
+  await request(app).patch(`/tasks/${task._id}/my-estimate`)
+    .set('Authorization', bearer(u1)).send({ value: 8, unit: 'hours' });
+
+  const res = await request(app).get(`/projects/${project._id}/candidates`).set('Authorization', bearer(pm));
+  assert.equal(res.status, 200);
+  const c = res.body.candidates.find((x) => x._id === String(u1._id));
+  assert.deepEqual(c.pastRecord, { total: 1, approved: 0, rejected: 0, pending: 1 });
 });

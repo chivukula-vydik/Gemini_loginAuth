@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listCandidates, type Candidate, type CandidatesResponse } from './pmApi';
+import { pastRecordLabel, isScopingRisk } from './pastRecord';
 import { initials } from './personName';
 
 const STATUS_LABEL: Record<Candidate['status'], string> = {
@@ -9,6 +10,7 @@ const STATUS_LABEL: Record<Candidate['status'], string> = {
 };
 
 function CandidateRow({ c, busy, onAdd }: { c: Candidate; busy: boolean; onAdd: () => void }) {
+  const record = pastRecordLabel(c.pastRecord);
   return (
     <div className="cand-row">
       <span className="person-avatar cand-avatar">{initials({ displayName: c.displayName, email: c.email })}</span>
@@ -22,6 +24,11 @@ function CandidateRow({ c, busy, onAdd }: { c: Candidate; busy: boolean; onAdd: 
           <div className="cand-skills">
             {c.matchedSkills.map((s) => <span key={`m${s}`} className="cand-skill ok">✓ {s}</span>)}
             {c.missingSkills.map((s) => <span key={`x${s}`} className="cand-skill missing">⚠ {s}</span>)}
+          </div>
+        )}
+        {record && (
+          <div className={`cand-record${isScopingRisk(c.pastRecord) ? ' risk' : ''}`} title="Re-estimation history">
+            {record}
           </div>
         )}
       </div>

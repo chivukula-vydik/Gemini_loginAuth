@@ -14,10 +14,6 @@ function entriesOf(row) {
   return out;
 }
 
-function zeroEntries() {
-  return { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
-}
-
 export function currentMonday() {
   const now = new Date();
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -26,34 +22,12 @@ export function currentMonday() {
   return d.toISOString().slice(0, 10);
 }
 
-export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById = new Map(), editable }) {
+// The week is built only from rows the employee deliberately added (fork A,
+// "clean week"). Assigned tasks never auto-appear; a saved row linked to a task
+// is hydrated from taskInfoById so its name/metadata stay in sync with the task.
+export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
   const out = [];
   const used = new Set();
-  const savedByTaskId = new Map(
-    savedRows.filter((r) => r.taskId).map((r) => [String(r.taskId), r]),
-  );
-
-  if (editable) {
-    for (const task of assignedTasks) {
-      const tid = String(task._id);
-      const sr = savedByTaskId.get(tid);
-      out.push({
-        id: sr ? sr.id : tid,
-        taskId: tid,
-        name: task.title,
-        locked: true,
-        percentComplete: task.percentComplete || 0,
-        estimatedHours: task.estimatedHours || 0,
-        actualMinutes: task.actualMinutes || 0,
-        status: task.status || 'todo',
-        startDate: task.startDate || null,
-        endDate: endDateFrom(task.startDate || null, task.estimatedHours || 0),
-        projectId: task.projectId || null,
-        entries: sr ? entriesOf(sr) : zeroEntries(),
-      });
-      used.add(tid);
-    }
-  }
 
   for (const r of savedRows) {
     if (r.taskId) {
@@ -80,6 +54,23 @@ export function mergeWeekRows({ savedRows = [], assignedTasks = [], taskInfoById
     }
   }
   return out;
+}
+
+// Tasks the employee may add to the week via the "Add a task" picker: their
+// assigned, non-done tasks minus any already present as a saved row this week.
+export function assignableTasks(assignedTasks = [], savedRows = []) {
+  const inWeek = new Set(
+    savedRows.filter((r) => r.taskId).map((r) => String(r.taskId)),
+  );
+  return assignedTasks
+    .filter((t) => t.status !== 'done' && !inWeek.has(String(t._id)))
+    .map((t) => ({
+      taskId: String(t._id),
+      title: t.title,
+      projectName: t.projectName,
+      status: t.status,
+      estimatedHours: t.estimatedHours,
+    }));
 }
 
 export function sanitizeRows(rows, allowedTaskIds) {

@@ -26,8 +26,13 @@ export function authHeaders(): Record<string, string> {
 
 export type Grant = { day: Day; projectId: string };
 
+// A task the employee may add to the week via the "Add a task" picker.
+export type Assignable = {
+  taskId: string; title: string; projectName: string | null; status: string; estimatedHours: number;
+};
+
 export type WeekData = {
-  weekStart: string; tasks: Task[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
+  weekStart: string; tasks: Task[]; assignable: Assignable[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
   readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
 };
 
@@ -38,6 +43,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
   return {
     weekStart: data.weekStart,
     tasks: data.tasks as Task[],
+    assignable: (data.assignable ?? []) as Assignable[],
     todayDay: (data.todayDay ?? null) as Day | null,
     grants: (data.grants ?? []) as Grant[],
     pending: (data.pending ?? []) as Grant[],

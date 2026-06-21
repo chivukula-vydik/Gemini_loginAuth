@@ -1,12 +1,15 @@
+import { useEffect, useRef, useState } from 'react';
 import { TaskRow } from './TaskRow';
 import { weekBarSegment } from './bar';
+import { addableTasks } from './addRow';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
-import type { Task, Entries, Grant } from './timesheetApi';
+import type { Task, Entries, Grant, Assignable } from './timesheetApi';
 
 type Props = {
   weekStart: string;
   tasks: Task[];
+  assignable: Assignable[];
   readOnly?: boolean;
   todayDay: Day | null;
   grants: Grant[];
@@ -15,18 +18,32 @@ type Props = {
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
   onDelete: (taskId: string) => void;
-  onAddTask: () => void;
+  onAddAssigned: (a: Assignable) => void;
+  onAddBlank: () => void;
   onProgress: (taskId: string, patch: { percentComplete?: number; status?: string }) => void;
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, readOnly = false, todayDay, grants, pendingKeys, onRequestEdit,
-  onRename, onCellChange, onDelete, onAddTask, onProgress,
+  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, onRequestEdit,
+  onRename, onCellChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
   const today = todayISO();
   const weekIsPast = weekStart < mondayOf();
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const addable = addableTasks(assignable, tasks);
+
+  useEffect(() => {
+    if (!pickerOpen) return undefined;
+    function onDocClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [pickerOpen]);
 
   const dayTotal = (day: keyof Entries) =>
     tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
@@ -84,7 +101,52 @@ export function TimesheetGrid({
       </table>
       {!readOnly && (
         <div className="ts-card-foot">
-          <button className="ts-add" type="button" onClick={onAddTask}>+ Add task</button>
+          <div className="ts-add-wrap" ref={pickerRef}>
+            <button
+              className="ts-add"
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen((o) => !o)}
+            >
+              + Add a task
+            </button>
+            {pickerOpen && (
+              <div className="ts-add-menu" role="menu">
+                {addable.length > 0 && (
+                  <div className="ts-add-group">
+                    <div className="ts-add-group-label">My assigned tasks</div>
+                    {addable.map((a) => (
+                      <button
+                        key={a.taskId}
+                        className="ts-add-item"
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
+                      >
+                        <span className="ts-add-item-title">{a.title}</span>
+                        {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {addable.length === 0 && (
+                  <div className="ts-add-empty">No assigned tasks left to add.</div>
+                )}
+                <div className="ts-add-group">
+                  <button
+                    className="ts-add-item"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { onAddBlank(); setPickerOpen(false); }}
+                  >
+                    <span className="ts-add-item-title">No task assigned</span>
+                    <span className="ts-add-item-meta">Meetings, admin, training…</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

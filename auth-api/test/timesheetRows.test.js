@@ -1,38 +1,58 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeWeekRows, sanitizeRows, currentMonday, todayDayFor, computeRowLock, canSubmit, weekLocked } from '../src/services/timesheetRows.js';
+import { mergeWeekRows, assignableTasks, sanitizeRows, currentMonday, todayDayFor, computeRowLock, canSubmit, weekLocked } from '../src/services/timesheetRows.js';
 
 const z = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
 
-test('mergeWeekRows: editable week injects assigned tasks as locked rows', () => {
-  const assigned = [{ _id: 't1', title: 'Build API', percentComplete: 25, estimatedHours: 8, actualMinutes: 120, status: 'in_progress' }];
-  const rows = mergeWeekRows({ savedRows: [], assignedTasks: assigned, taskInfoById: new Map(), editable: true });
+test('mergeWeekRows: does not auto-inject assigned tasks — only saved rows appear', () => {
+  // A task the user is assigned to but has not added/saved must NOT show up.
+  const rows = mergeWeekRows({ savedRows: [], taskInfoById: new Map([['t1', { title: 'Build API' }]]) });
+  assert.deepEqual(rows, []);
+});
+
+test('mergeWeekRows: a saved linked row renders locked with task metadata', () => {
+  const saved = [{ id: 't1', name: 'old', taskId: 't1', entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } }];
+  const info = new Map([['t1', { title: 'Build API', percentComplete: 25, estimatedHours: 8, actualMinutes: 120, status: 'in_progress' }]]);
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: info });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].taskId, 't1');
-  assert.equal(rows[0].name, 'Build API');
+  assert.equal(rows[0].name, 'Build API'); // name comes from the task, not the saved 'old'
   assert.equal(rows[0].locked, true);
   assert.equal(rows[0].percentComplete, 25);
   assert.equal(rows[0].actualMinutes, 120);
   assert.equal(rows[0].status, 'in_progress');
-  assert.deepEqual(rows[0].entries, z);
-});
-
-test('mergeWeekRows: merges saved minutes into the assigned row', () => {
-  const saved = [{ id: 't1', name: 'old', taskId: 't1', entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } }];
-  const assigned = [{ _id: 't1', title: 'Build API', percentComplete: 0, estimatedHours: 8, actualMinutes: 60, status: 'todo' }];
-  const rows = mergeWeekRows({ savedRows: saved, assignedTasks: assigned, taskInfoById: new Map(), editable: true });
-  assert.equal(rows.length, 1);
   assert.equal(rows[0].entries.mon, 60);
-  assert.equal(rows[0].name, 'Build API');
 });
 
-test('mergeWeekRows: keeps ad-hoc rows and does not inject when not editable', () => {
+test('mergeWeekRows: keeps an ad-hoc (unlinked) row', () => {
   const saved = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } }];
-  const rows = mergeWeekRows({ savedRows: saved, assignedTasks: [], taskInfoById: new Map(), editable: false });
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: new Map() });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].taskId, null);
   assert.equal(rows[0].locked, false);
   assert.equal(rows[0].entries.mon, 30);
+});
+
+test('assignableTasks: excludes tasks already saved in the week, keeps the rest', () => {
+  const assigned = [
+    { _id: 't1', title: 'A', projectName: 'P1', status: 'todo', estimatedHours: 8 },
+    { _id: 't2', title: 'B', projectName: 'P2', status: 'in_progress', estimatedHours: 4 },
+  ];
+  const saved = [{ id: 'r1', taskId: 't1', entries: z }];
+  assert.deepEqual(assignableTasks(assigned, saved), [
+    { taskId: 't2', title: 'B', projectName: 'P2', status: 'in_progress', estimatedHours: 4 },
+  ]);
+});
+
+test('assignableTasks: empty when every assigned task is already in the week', () => {
+  const assigned = [{ _id: 't1', title: 'A', projectName: 'P1', status: 'todo', estimatedHours: 8 }];
+  const saved = [{ id: 'r1', taskId: 't1', entries: z }];
+  assert.deepEqual(assignableTasks(assigned, saved), []);
+});
+
+test('assignableTasks: never offers a done task', () => {
+  const assigned = [{ _id: 't1', title: 'A', projectName: 'P', status: 'done', estimatedHours: 8 }];
+  assert.deepEqual(assignableTasks(assigned, []), []);
 });
 
 test('sanitizeRows: keeps taskId only when assigned, cleans minutes', () => {
@@ -143,21 +163,23 @@ test('computeRowLock: an ad-hoc cell in a past week is always locked and never c
   assert.deepEqual(consumed, []);
 });
 
-test('mergeWeekRows: injects startDate and computed endDate', () => {
-  const assigned = [{ _id: 't1', title: 'Build', percentComplete: 0, estimatedHours: 40, actualMinutes: 0, status: 'todo', startDate: '2026-06-16' }];
-  const rows = mergeWeekRows({ savedRows: [], assignedTasks: assigned, taskInfoById: new Map(), editable: true });
+test('mergeWeekRows: a saved linked row carries startDate + computed endDate', () => {
+  const saved = [{ id: 't1', name: '', taskId: 't1', entries: z }];
+  const info = new Map([['t1', { title: 'Build', estimatedHours: 40, startDate: '2026-06-16' }]]);
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: info });
   assert.equal(rows[0].startDate, '2026-06-16');
   assert.equal(rows[0].endDate, '2026-06-22'); // 40h = 5 working days from Tue
 });
 
-test('mergeWeekRows: rows carry projectId (null for ad-hoc)', () => {
-  const assigned = [{ _id: 't1', title: 'Build', percentComplete: 0, estimatedHours: 8, actualMinutes: 0, status: 'todo', projectId: 'pA' }];
-  const saved = [{ id: 'a', name: 'Email', taskId: null, entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } }];
-  const rows = mergeWeekRows({ savedRows: saved, assignedTasks: assigned, taskInfoById: new Map(), editable: true });
-  const taskRow = rows.find((r) => r.taskId === 't1');
-  const adhoc = rows.find((r) => r.taskId === null);
-  assert.equal(taskRow.projectId, 'pA');
-  assert.equal(adhoc.projectId, null);
+test('mergeWeekRows: a saved linked row carries projectId; ad-hoc is null', () => {
+  const saved = [
+    { id: 't1', name: '', taskId: 't1', entries: z },
+    { id: 'a', name: 'Email', taskId: null, entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 } },
+  ];
+  const info = new Map([['t1', { title: 'Build', projectId: 'pA' }]]);
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: info });
+  assert.equal(rows.find((r) => r.taskId === 't1').projectId, 'pA');
+  assert.equal(rows.find((r) => r.taskId === null).projectId, null);
 });
 
 test('canSubmit: draft/returned for a started week are submittable', () => {

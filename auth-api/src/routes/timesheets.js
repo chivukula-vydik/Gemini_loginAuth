@@ -7,7 +7,7 @@ import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
 import {
-  mergeWeekRows, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
+  mergeWeekRows, assignableTasks, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
   canSubmit, weekLocked,
 } from '../services/timesheetRows.js';
 import { actualMinutesByTask } from '../services/actuals.js';
@@ -75,20 +75,21 @@ export function createTimesheetRouter() {
     const savedRows = doc
       ? doc.tasks.map((t) => ({ id: t.id, name: t.name, entries: t.entries, taskId: t.taskId ? String(t.taskId) : null }))
       : [];
-    const injectable = weekStart >= currentMonday();
 
+    // The picker offers the employee's assigned, non-done tasks (across all
+    // projects) only for the current/future week. Past weeks are read-only.
+    const pickable = weekStart >= currentMonday();
     let assignedTasks = [];
-    if (injectable) {
+    if (pickable) {
       assignedTasks = await Task.find({ 'assignees.user': userId, status: { $ne: 'done' } })
-        .select('title percentComplete estimatedHours status startDate project');
+        .select('title status estimatedHours project')
+        .populate('project', 'name');
     }
 
-    const ids = new Set();
-    for (const t of assignedTasks) ids.add(String(t._id));
-    for (const r of savedRows) if (r.taskId) ids.add(r.taskId);
-    const idList = [...ids];
+    // Saved linked rows are hydrated from live task metadata so names/actuals
+    // stay current. Assigned tasks are no longer auto-injected (fork A).
+    const idList = savedRows.filter((r) => r.taskId).map((r) => r.taskId);
     const actualMap = await actualMinutesByTask(idList);
-
     const infoTasks = idList.length
       ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status startDate project')
       : [];
@@ -98,14 +99,15 @@ export function createTimesheetRouter() {
       startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
       projectId: t.project ? String(t.project) : null,
     }]));
-    const assignedForMerge = assignedTasks.map((t) => ({
-      _id: String(t._id), title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
-      status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
-      startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
-      projectId: t.project ? String(t.project) : null,
-    }));
 
-    const tasks = mergeWeekRows({ savedRows, assignedTasks: assignedForMerge, taskInfoById, editable: injectable });
+    const tasks = mergeWeekRows({ savedRows, taskInfoById });
+    const assignable = assignableTasks(
+      assignedTasks.map((t) => ({
+        _id: String(t._id), title: t.title, status: t.status,
+        estimatedHours: t.estimatedHours, projectName: t.project ? t.project.name : null,
+      })),
+      savedRows,
+    );
 
     const grants = await approvedGrantsFor(userId, weekStart);
     const pending = await pendingGrantsFor(userId, weekStart);
@@ -115,7 +117,7 @@ export function createTimesheetRouter() {
     const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
     const readOnly = (weekStart < currentMonday() && grants.length === 0) || weekLocked(status);
     res.json({
-      weekStart, tasks, todayDay, grants, pending, readOnly,
+      weekStart, tasks, assignable, todayDay, grants, pending, readOnly,
       status,
       submittedAt: doc?.submittedAt || null,
       reviewedAt: doc?.reviewedAt || null,

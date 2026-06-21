@@ -12,6 +12,7 @@ import { toHours, effectiveDueDate, proposedDueDate, endDateFrom, maxAssigneeDue
 import { actualMinutesByTask } from '../services/actuals.js';
 import { equalShares, normalizeShares } from '../services/workload.js';
 import { mergeAssignees, allEstimatesIn, sumEstimatedHours, submittedCount } from '../services/assigneeEstimates.js';
+import { buildEntry, upsertPending, stampOutcome, summarize } from '../services/reestimations.js';
 
 export function createTasksRouter() {
   const router = express.Router();
@@ -111,6 +112,21 @@ export function createTasksRouter() {
     mine.pendingHours = Math.round(toHours(value, unit));
     mine.pendingReason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
     await task.save();
+
+    // Part 4: record the ask permanently against the asking user.
+    const project = await Project.findById(task.project).select('name');
+    const user = await User.findById(req.user.sub);
+    if (user) {
+      const entry = buildEntry({
+        taskId: task._id, taskTitle: task.title,
+        projectId: task.project, projectName: project ? project.name : '',
+        fromHours: mine.estimatedHours ?? 0, value, unit, toHours: mine.pendingHours,
+        reason: mine.pendingReason, at: new Date(),
+      });
+      user.reestimations = upsertPending(user.reestimations || [], entry);
+      user.reestimationCount = summarize(user.reestimations).total;
+      await user.save();
+    }
     res.json(task);
   }));
 
@@ -157,6 +173,13 @@ export function createTasksRouter() {
       task.estimatedHours = 0;
     }
     await task.save();
+
+    // Part 4: stamp the matching pending entry on the assignee's history.
+    const assignee = await User.findById(userId);
+    if (assignee) {
+      assignee.reestimations = stampOutcome(assignee.reestimations || [], task._id, decision, new Date());
+      await assignee.save();
+    }
     res.json(task);
   }));
 
