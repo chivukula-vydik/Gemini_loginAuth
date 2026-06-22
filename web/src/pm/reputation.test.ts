@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { companyFit, RELIABILITY_LABEL, type Reputation } from './companyFit.ts';
+import { companyFit, RELIABILITY_LABEL, type Reputation } from './reputation.ts';
 
 function rep(over: Partial<Reputation> = {}): Reputation {
   return {

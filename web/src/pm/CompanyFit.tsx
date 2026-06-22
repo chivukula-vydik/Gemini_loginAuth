@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listReputation } from './pmApi';
-import { companyFit, RELIABILITY_LABEL, type Reputation } from './companyFit';
+import { companyFit, RELIABILITY_LABEL, type Reputation } from './reputation';
 import { initials, personName } from './personName';
 
 function pct(n: number | null): string {

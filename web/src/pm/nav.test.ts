@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { navForRole } from './nav.ts';
 
 test('admin nav', () => {
-  assert.deepEqual(navForRole('admin').map((n) => n.key), ['users', 'skills', 'projects', 'requests', 'timesheet']);
+  assert.deepEqual(navForRole('admin').map((n) => n.key), ['users', 'skills', 'company-fit', 'projects', 'requests', 'timesheet']);
 });
 
 test('pm nav', () => {

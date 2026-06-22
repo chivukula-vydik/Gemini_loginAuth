@@ -1,6 +1,6 @@
 import { getAccessToken } from '../api';
 import type { Role } from './nav';
-import type { Reputation } from './companyFit';
+import type { Reputation } from './reputation';
 
 const API = 'http://localhost:4000';
 

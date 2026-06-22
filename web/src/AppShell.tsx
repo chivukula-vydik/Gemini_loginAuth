@@ -4,6 +4,7 @@ import { TimesheetPage } from './timesheet/TimesheetPage';
 import { navForRole, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
+import { CompanyFit } from './pm/CompanyFit';
 import { Projects } from './pm/Projects';
 import { MyTasks } from './pm/MyTasks';
 import { MySkills } from './pm/MySkills';
@@ -16,6 +17,7 @@ function viewFor(key: NavKey) {
   switch (key) {
     case 'users': return <AdminUsers />;
     case 'skills': return <AdminSkills />;
+    case 'company-fit': return <CompanyFit />;
     case 'projects': return <Projects />;
     case 'requests': return <Requests />;
     case 'my-tasks': return <MyTasks />;
@@ -28,6 +30,7 @@ function viewFor(key: NavKey) {
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
   skills: <path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1L12 16.6 5.7 21l2.3-7.1-6-4.5h7.6z" />,
+  'company-fit': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3M9 11l3 3L22 4" />,
   projects: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
   requests: <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" />,
   marketplace: <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />,
