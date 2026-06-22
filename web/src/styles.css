@@ -972,6 +972,9 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 }
 .pm-bulk-count { font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 4px; }
 .pm-bulk-select { width: auto; min-width: 135px; }
+/* Compact buttons: the base .btn is width:100%, which would make each bulk
+   action stretch full-width and wrap onto its own line. */
+.pm-bulkbar .btn { width: auto; min-height: 30px; padding: 5px 12px; font-size: var(--fs-sm); }
 
 .pm-pagination {
   display: flex;
@@ -980,6 +983,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
   gap: 8px;
   padding: 12px 14px;
 }
+.pm-pagination .btn { width: auto; min-height: 30px; padding: 5px 12px; font-size: var(--fs-sm); }
 
 @media (max-width: 820px) {
   .pm-toolbar { align-items: flex-start; flex-direction: column; }
