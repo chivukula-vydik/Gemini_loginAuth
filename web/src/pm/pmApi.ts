@@ -1,5 +1,6 @@
 import { getAccessToken } from '../api';
 import type { Role } from './nav';
+import type { Reputation } from './companyFit';
 
 const API = 'http://localhost:4000';
 
@@ -151,6 +152,8 @@ export const updateProjectRequiredSkills = (id: string, requiredSkills: string[]
   authed(`/projects/${id}`, 'PATCH', { requiredSkills });
 export const listCandidates = (projectId: string) =>
   authed(`/projects/${projectId}/candidates`) as Promise<CandidatesResponse>;
+export const listReputation = () =>
+  authed('/users/reputation') as Promise<{ people: Reputation[] }>;
 export const setProjectOwner = (id: string, ownerPm: string) =>
   authed(`/projects/${id}`, 'PATCH', { ownerPm });
 export const deleteProject = (id: string) => authed(`/projects/${id}`, 'DELETE');
