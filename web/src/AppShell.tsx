@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react';
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
+import { AttendancePage } from './attendance/AttendancePage';
 import { navForRole, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
@@ -24,6 +25,7 @@ function viewFor(key: NavKey) {
     case 'my-skills': return <MySkills />;
     case 'marketplace': return <Marketplace />;
     case 'timesheet': return <TimesheetPage />;
+    case 'attendance': return <AttendancePage />;
   }
 }
 
@@ -37,6 +39,7 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'my-tasks': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   'my-skills': <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />,
   timesheet: <path d="M12 8v4l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
+  attendance: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11l-4 4-2-2" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {

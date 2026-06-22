@@ -113,7 +113,7 @@ export function TimesheetPage() {
   const onDelete = (id: string) => update(tasks.filter((t) => t.id !== id));
 
   const onAddAssigned = (a: Assignable) => update([...tasks, rowFromAssignable(a)]);
-  const onAddBlank = () => update([...tasks, blankRow()]);
+  const onAddBlank = () => update([...tasks, blankRow('No task assigned')]);
 
   function onProgress(id: string, patch: { percentComplete?: number; status?: string }) {
     const row = tasks.find((t) => t.id === id);
