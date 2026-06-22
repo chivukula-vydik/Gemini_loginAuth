@@ -1235,3 +1235,6 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .fit-tasks { font-size: 12px; color: var(--muted, #64748b); margin-left: auto; }
 .fit-note { font-size: 12px; color: #92400e; }
 .fit-add { align-self: flex-start; }
+
+/* Company-fit footnote: normal-case explanatory caveat (not an uppercase label) */
+.fit-caveat { display: block; margin-top: 10px; }

@@ -57,7 +57,7 @@ export function CompanyFit() {
           </table>
         )}
       </div>
-      <span className="field-hint">On-time and delay only count tasks completed after this feature shipped.</span>
+      <span className="ts-sub fit-caveat">On-time and delay only count tasks completed after this feature shipped.</span>
     </div>
   );
 }
