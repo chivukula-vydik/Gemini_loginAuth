@@ -2,6 +2,13 @@
   "features": {
     "pmTaskBulk": true
   },
+  "shift": {
+    "startHour": 9,
+    "startMinute": 30,
+    "endHour": 18,
+    "endMinute": 30,
+    "durationMinutes": 540
+  },
   "providers": {
     "local": { "enabled": true, "displayName": "Email & Password" },
     "google": {

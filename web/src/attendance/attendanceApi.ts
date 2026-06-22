@@ -60,6 +60,17 @@ export type MonthStats = {
 
 // --- API Calls ---
 
+export type ShiftConfig = {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+  durationMinutes: number;
+};
+
+export const getShiftConfig = () =>
+  authed('/attendance/config') as Promise<ShiftConfig>;
+
 export const getState = () =>
   authed('/attendance/state') as Promise<AttendanceState>;
 
@@ -95,3 +106,16 @@ export const getPendingRegularise = () =>
 
 export const decideRegularise = (id: string, decision: 'approved' | 'rejected') =>
   authed(`/attendance/regularise/${id}/decide`, 'PATCH', { decision }) as Promise<AttendanceDoc>;
+
+export type TeamMemberStats = {
+  userId: string;
+  displayName: string;
+  email: string;
+  presentCount: number;
+  lateCount: number;
+  avgMinutesPerDay: number;
+  onTimePct: number;
+};
+
+export const getTeamStats = (year: number, month: number) =>
+  authed(`/attendance/team?year=${year}&month=${month}`) as Promise<TeamMemberStats[]>;

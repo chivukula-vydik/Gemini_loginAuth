@@ -4,13 +4,13 @@ import { personName } from '../pm/personName';
 import {
   getState, getToday, checkIn as apiCheckIn, checkOut as apiCheckOut,
   startBreak as apiStartBreak, endBreak as apiEndBreak,
-  getMonth, requestRegularise,
-  AttendanceDoc, AttendanceStatus, AttendanceState, PunchType,
+  getMonth, requestRegularise, getTeamStats, getShiftConfig,
+  AttendanceDoc, AttendanceStatus, AttendanceState, PunchType, TeamMemberStats, ShiftConfig,
 } from './attendanceApi';
-import { getMyLeave, LeaveRequest, LEAVE_TYPE_LABELS } from './leaveApi';
+import { getMyLeave, getBalance, cancelLeave, LeaveBalance, LeaveRequest, LEAVE_TYPE_LABELS } from './leaveApi';
 import { LeaveModal } from './LeaveModal';
 
-const SHIFT_MINUTES = 540; // 9 hours (9 AM – 6 PM)
+const DEFAULT_SHIFT: ShiftConfig = { startHour: 9, startMinute: 30, endHour: 18, endMinute: 30, durationMinutes: 540 };
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 // --- date helpers ---
@@ -58,16 +58,24 @@ function fmtTime(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-const SHIFT_START_MIN = 9 * 60 + 30;   // 9:30 reference (matches backend on-time calc)
+// Tooltip text for the log bar: worked/break totals plus each break's
+// start–end so people can see *when* they stepped away, not just how long.
+function breakTooltip(effMins: number, brkMins: number, breaks: { start: string; end: string | null }[]): string {
+  const base = `${fmtHM(effMins)} worked · ${fmtHM(brkMins)} break`;
+  if (!breaks || breaks.length === 0) return base;
+  const ranges = breaks.map((b) => `${fmtTime(b.start)}–${b.end ? fmtTime(b.end) : 'ongoing'}`);
+  return `${base}\n${ranges.join('\n')}`;
+}
+const DEFAULT_SHIFT_START_MIN = 9 * 60 + 30;   // fallback until /attendance/config loads
 
-function isLate(iso: string | null): boolean {
-  return lateMinutes(iso) > 0;
+function isLate(iso: string | null, shiftStartMin = DEFAULT_SHIFT_START_MIN): boolean {
+  return lateMinutes(iso, shiftStartMin) > 0;
 }
 // Minutes the arrival is past shift start (0 if on time / absent).
-function lateMinutes(iso: string | null): number {
+function lateMinutes(iso: string | null, shiftStartMin = DEFAULT_SHIFT_START_MIN): number {
   if (!iso) return 0;
   const d = new Date(iso);
-  return Math.max(0, d.getHours() * 60 + d.getMinutes() - SHIFT_START_MIN);
+  return Math.max(0, d.getHours() * 60 + d.getMinutes() - shiftStartMin);
 }
 // "8h 33m" / "45m" — for showing the *degree* of lateness or a duration.
 function fmtDur(mins: number): string {
@@ -105,10 +113,10 @@ function badgeClass(status: AttendanceStatus): string {
 type Period = '30days' | 'current' | 'prev';
 
 // Aggregate a set of docs into the same summary numbers the cards show.
-function summarize(docs: AttendanceDoc[]) {
+function summarize(docs: AttendanceDoc[], shiftStartMin = DEFAULT_SHIFT_START_MIN) {
   const worked = docs.filter((d) => d.checkIn);
   const totalEff = worked.reduce((s, d) => s + (d.effectiveMinutes || 0), 0);
-  const late = worked.filter((d) => isLate(d.checkIn)).length;
+  const late = worked.filter((d) => isLate(d.checkIn, shiftStartMin)).length;
   return {
     avgMinutes: worked.length ? Math.round(totalEff / worked.length) : 0,
     onTimePct: worked.length ? Math.round(((worked.length - late) / worked.length) * 100) : 0,
@@ -124,7 +132,12 @@ export function AttendancePage() {
   const initial = (name[0] ?? '?').toUpperCase();
 
   const [today, setToday] = useState<AttendanceDoc | null>(null);
-  const [docs, setDocs] = useState<AttendanceDoc[]>([]);   // current + previous month merged
+  // Current month is always needed (week circles, stats, today's row); the
+  // previous month is only fetched lazily once something on screen actually
+  // needs it, so switching to the "this month" tab doesn't pull a second
+  // month's worth of docs for nothing.
+  const [curDocs, setCurDocs] = useState<AttendanceDoc[]>([]);
+  const [prevDocs, setPrevDocs] = useState<AttendanceDoc[] | null>(null);
   const [state, setState] = useState<AttendanceState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,6 +147,12 @@ export function AttendancePage() {
   const [myLeave, setMyLeave] = useState<LeaveRequest[]>([]);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);   // "More options" disclosure on the clock card
+  const [balance, setBalance] = useState<LeaveBalance | null>(null);
+  const [teamStats, setTeamStats] = useState<TeamMemberStats[] | null>(null);
+  const [shift, setShift] = useState<ShiftConfig>(DEFAULT_SHIFT);
+  const [decisionNotice, setDecisionNotice] = useState<string[]>([]);
+  const isTeamLead = user?.role === 'pm' || user?.role === 'admin';
+  const shiftStartMin = shift.startHour * 60 + shift.startMinute;
 
   const ref = new Date();
   const curY = ref.getFullYear();
@@ -160,14 +179,42 @@ export function AttendancePage() {
     catch (e) { setError((e as Error).message); }
   }, []);
 
-  const loadDocs = useCallback(async () => {
-    try {
-      const [cur, pr] = await Promise.all([getMonth(curY, curM), getMonth(prevY, prevM)]);
-      setDocs([...pr, ...cur]);
-    } catch (e) { setError((e as Error).message); }
-  }, [curY, curM, prevY, prevM]);
+  const loadBalance = useCallback(async () => {
+    try { setBalance(await getBalance()); }
+    catch (e) { setError((e as Error).message); }
+  }, []);
 
-  useEffect(() => { loadState(); loadToday(); loadDocs(); loadLeave(); }, [loadState, loadToday, loadDocs, loadLeave]);
+  const loadShift = useCallback(async () => {
+    try { setShift(await getShiftConfig()); }
+    catch (e) { setError((e as Error).message); }
+  }, []);
+
+  const loadTeamStats = useCallback(async () => {
+    if (!isTeamLead) return;
+    try { setTeamStats(await getTeamStats(curY, curM)); }
+    catch (e) { setError((e as Error).message); }
+  }, [isTeamLead, curY, curM]);
+
+  const loadCurDocs = useCallback(async () => {
+    try { setCurDocs(await getMonth(curY, curM)); }
+    catch (e) { setError((e as Error).message); }
+  }, [curY, curM]);
+
+  const loadPrevDocs = useCallback(async () => {
+    try { setPrevDocs(await getMonth(prevY, prevM)); }
+    catch (e) { setError((e as Error).message); }
+  }, [prevY, prevM]);
+
+  // Reloads whatever's currently in view — used after an action (checkin,
+  // regularise/leave decision) that can change either month's docs.
+  const loadDocs = useCallback(async () => {
+    await loadCurDocs();
+    if (prevDocs !== null) await loadPrevDocs();
+  }, [loadCurDocs, loadPrevDocs, prevDocs]);
+
+  useEffect(() => {
+    loadState(); loadToday(); loadCurDocs(); loadLeave(); loadBalance(); loadTeamStats(); loadShift();
+  }, [loadState, loadToday, loadCurDocs, loadLeave, loadBalance, loadTeamStats, loadShift]);
 
   useEffect(() => {
     const poll = setInterval(loadToday, 60_000);
@@ -179,11 +226,56 @@ export function AttendancePage() {
     return () => clearInterval(t);
   }, []);
 
+  // Week circles — computed early since the lazy previous-month load below
+  // needs to know whether the current week dips into the previous month.
+  const weekDates = useMemo(currentWeekDates, []);
+  const curMonthStart = `${curY}-${String(curM).padStart(2, '0')}-01`;
+  const weekSpansPrevMonth = weekDates.some((d) => d < curMonthStart);
+  const needsPrevMonth = period === 'prev' || period === '30days' || weekSpansPrevMonth;
+
+  useEffect(() => {
+    if (needsPrevMonth && prevDocs === null) loadPrevDocs();
+  }, [needsPrevMonth, prevDocs, loadPrevDocs]);
+
+  const docs = useMemo(
+    () => (prevDocs ? [...prevDocs, ...curDocs] : curDocs),
+    [prevDocs, curDocs],
+  );
+
   const byDate = useMemo(() => {
     const map = new Map<string, AttendanceDoc>();
     for (const d of docs) map.set(d.date, d);
     return map;
   }, [docs]);
+
+  // Minimal in-app notification for decisions made elsewhere (a PM approving
+  // or rejecting leave/regularise): diff against a localStorage "seen" set so
+  // a banner appears exactly once per decision, without any backend support.
+  useEffect(() => {
+    if (myLeave.length === 0 && docs.length === 0) return;
+    const seenRaw = localStorage.getItem('att-seen-decisions');
+    const seen = new Set<string>(seenRaw ? JSON.parse(seenRaw) : []);
+    const decided: { key: string; label: string }[] = [];
+    for (const lv of myLeave) {
+      if (lv.status === 'pending') continue;
+      const key = `leave:${lv._id}:${lv.status}`;
+      if (!seen.has(key)) {
+        decided.push({ key, label: `${LEAVE_TYPE_LABELS[lv.type]} leave (${lv.startDate}) ${lv.status}` });
+      }
+    }
+    for (const d of docs) {
+      const st = d.regularise?.status;
+      if (st !== 'approved' && st !== 'rejected') continue;
+      const key = `reg:${d._id}:${st}`;
+      if (!seen.has(key)) decided.push({ key, label: `Regularise for ${d.date} ${st}` });
+    }
+    if (decided.length > 0) {
+      setDecisionNotice((prev) => [...prev, ...decided.map((x) => x.label)]);
+      const next = new Set(seen);
+      for (const x of decided) next.add(x.key);
+      localStorage.setItem('att-seen-decisions', JSON.stringify(Array.from(next)));
+    }
+  }, [myLeave, docs]);
 
   const punchState = derivePunchState(today);
 
@@ -230,8 +322,6 @@ export function AttendancePage() {
     return { eff: d.effectiveMinutes || 0, gross: d.totalMinutes || 0, brk: d.breakMinutes || 0 };
   }, [liveEffective, liveGross, liveBreak]);
 
-  // Week circles.
-  const weekDates = useMemo(currentWeekDates, []);
   const ts = todayStr();
 
   // First-run / onboarding gating.
@@ -246,9 +336,16 @@ export function AttendancePage() {
 
   // Card stats.
   const weekStats = useMemo(
-    () => summarize(weekDates.map((d) => byDate.get(d)).filter(Boolean) as AttendanceDoc[]),
-    [weekDates, byDate],
+    () => summarize(weekDates.map((d) => byDate.get(d)).filter(Boolean) as AttendanceDoc[], shiftStartMin),
+    [weekDates, byDate, shiftStartMin],
   );
+
+  const teamSummary = useMemo(() => {
+    if (!teamStats || teamStats.length === 0) return null;
+    const avgMinutes = Math.round(teamStats.reduce((s, m) => s + m.avgMinutesPerDay, 0) / teamStats.length);
+    const onTimePct = Math.round(teamStats.reduce((s, m) => s + m.onTimePct, 0) / teamStats.length);
+    return { avgMinutes, onTimePct };
+  }, [teamStats]);
 
   // Logs: build a row per calendar day in the selected period, from the
   // activation date forward (never before — those days predate the feature).
@@ -272,6 +369,13 @@ export function AttendancePage() {
 
   function clockInPrimary() { run(() => apiCheckIn('office')); }
 
+  async function cancelLeaveRequest(id: string) {
+    setBusy(true); setError('');
+    try { await cancelLeave(id); await loadLeave(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
   return (
     <div className="ts-page att-page">
       <header className="ts-header">
@@ -280,6 +384,15 @@ export function AttendancePage() {
       </header>
 
       {error && <p className="ts-error">{error}</p>}
+
+      {decisionNotice.length > 0 && (
+        <div className="att-notice">
+          <ul className="att-notice-list">
+            {decisionNotice.map((label, i) => <li key={i}>{label}</li>)}
+          </ul>
+          <button className="att-notice-close" onClick={() => setDecisionNotice([])} aria-label="Dismiss">×</button>
+        </div>
+      )}
 
       {/* ===== Top row: cards (stats hidden until a couple days of data) ===== */}
       <div className={`att-top${showStatsCard ? '' : ' att-top-2'}`}>
@@ -301,19 +414,25 @@ export function AttendancePage() {
                   </div>
                 </div>
               </div>
+              {isTeamLead && (
               <div className="att-team-row">
                 <span className="att-team-label">My Team</span>
                 <div className="att-stat-metrics">
                   <div className="att-metric">
-                    <span className="att-metric-value att-muted">—</span>
+                    <span className={teamSummary ? 'att-metric-value' : 'att-metric-value att-muted'}>
+                      {teamSummary ? fmtHM(teamSummary.avgMinutes) : '—'}
+                    </span>
                     <span className="att-metric-label">Avg / day</span>
                   </div>
                   <div className="att-metric">
-                    <span className="att-metric-value att-muted">—</span>
+                    <span className={teamSummary ? 'att-metric-value' : 'att-metric-value att-muted'}>
+                      {teamSummary ? `${teamSummary.onTimePct}%` : '—'}
+                    </span>
                     <span className="att-metric-label">On time</span>
                   </div>
                 </div>
               </div>
+              )}
             </>
           ) : (
             <div className="att-onboard">
@@ -427,6 +546,13 @@ export function AttendancePage() {
         <>
           {/* Leave — compact strip when empty, full card when there's data */}
           <div className="att-section-break" />
+          {balance && (
+            <div className="att-leave-balance">
+              <span className="att-leave-balance-item">Casual <strong>{balance.casual.remaining}</strong>/{balance.casual.total}</span>
+              <span className="att-leave-balance-item">Sick <strong>{balance.sick.remaining}</strong>/{balance.sick.total}</span>
+              <span className="att-leave-balance-item">Earned <strong>{balance.earned.remaining}</strong>/{balance.earned.total}</span>
+            </div>
+          )}
           {myLeave.length === 0 ? (
             <div className="att-leave-strip">
               <span className="att-leave-strip-title">My leave</span>
@@ -449,6 +575,11 @@ export function AttendancePage() {
                     </span>
                     {lv.reason && <span className="att-leave-reason">{lv.reason}</span>}
                     <span className={`att-leave-status att-leave-${lv.status}`}>{lv.status}</span>
+                    {lv.status === 'pending' && (
+                      <button className="link-btn att-leave-cancel" disabled={busy} onClick={() => cancelLeaveRequest(lv._id)}>
+                        Cancel
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -491,18 +622,25 @@ export function AttendancePage() {
                   const label = new Date(date + 'T00:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
                   const badge = d ? STATUS_BADGE[d.status] : undefined;
                   const pendingReg = d?.regularise?.status === 'pending';
+                  const decidedReg = d?.regularise?.status === 'approved' ? 'approved'
+                    : d?.regularise?.status === 'rejected' ? 'rejected' : null;
 
                   if (!d || !d.checkIn) {
                     const isLeave = d?.status === 'leave';
+                    const isHoliday = d?.status === 'holiday';
                     return (
                       <tr key={date} className={dayOff ? 'att-row-off' : ''}>
                         <td className="ts-task">
                           {label}
                           {isLeave
                             ? <span className="att-tag att-tag-leave">LEAVE</span>
-                            : dayOff
-                              ? <span className="att-tag att-tag-off">Day off</span>
-                              : <button className="link-btn att-reg-link" onClick={() => setRegulariseDate(date)}>{pendingReg ? 'Pending' : 'Regularise'}</button>}
+                            : isHoliday
+                              ? <span className="att-tag att-tag-holiday">HOLIDAY</span>
+                              : dayOff
+                                ? <span className="att-tag att-tag-off">Day off</span>
+                                : <button className="link-btn att-reg-link" onClick={() => setRegulariseDate(date)}>{pendingReg ? 'Pending' : 'Regularise'}</button>}
+                          {decidedReg === 'approved' && <span className="att-tag att-tag-approved">Approved ✓</span>}
+                          {decidedReg === 'rejected' && <span className="att-tag att-tag-rejected">Rejected ✕</span>}
                         </td>
                         <td className="col-left"><span className="att-muted">—</span></td>
                         <td><span className="att-muted">—</span></td>
@@ -515,9 +653,9 @@ export function AttendancePage() {
 
                   // Live values for today's open session; stored values otherwise.
                   const m = rowMetrics(d);
-                  const effPct = Math.min(100, (m.eff / SHIFT_MINUTES) * 100);
-                  const brkPct = Math.min(100 - effPct, (m.brk / SHIFT_MINUTES) * 100);
-                  const lm = lateMinutes(d.checkIn);
+                  const effPct = Math.min(100, (m.eff / shift.durationMinutes) * 100);
+                  const brkPct = Math.min(100 - effPct, (m.brk / shift.durationMinutes) * 100);
+                  const lm = lateMinutes(d.checkIn, shiftStartMin);
                   const sev = d.checkOut ? severityOf(m.eff) : null;   // classify finished sessions only
                   return (
                     <tr key={date}>
@@ -526,9 +664,11 @@ export function AttendancePage() {
                         {badge && <span className={badgeClass(d.status)}>{badge}</span>}
                         {sev === 'short' && <span className="att-tag att-tag-short">SHORT</span>}
                         {pendingReg && <span className="att-tag att-tag-pending">PENDING</span>}
+                        {decidedReg === 'approved' && <span className="att-tag att-tag-approved">Approved ✓</span>}
+                        {decidedReg === 'rejected' && <span className="att-tag att-tag-rejected">Rejected ✕</span>}
                       </td>
                       <td className="col-left">
-                        <div className="att-logbar" title={`${fmtHM(m.eff)} worked · ${fmtHM(m.brk)} break`}>
+                        <div className="att-logbar" title={breakTooltip(m.eff, m.brk, d.breaks)}>
                           <div className="att-logbar-eff" style={{ width: `${effPct}%` }} />
                           {brkPct > 0 && <div className="att-logbar-brk" style={{ width: `${brkPct}%` }} />}
                         </div>
@@ -567,7 +707,7 @@ export function AttendancePage() {
         <LeaveModal
           today={ts}
           onClose={() => setLeaveOpen(false)}
-          onSubmitted={() => { setLeaveOpen(false); loadLeave(); }}
+          onSubmitted={() => { setLeaveOpen(false); loadLeave(); loadBalance(); loadDocs(); }}
         />
       )}
     </div>

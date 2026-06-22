@@ -4,6 +4,13 @@ const VALID_IDS = ['local', 'google', 'saml'];
 const FEATURE_DEFAULTS = {
   pmTaskBulk: true,
 };
+const SHIFT_DEFAULTS = {
+  startHour: 9,
+  startMinute: 30,
+  endHour: 18,
+  endMinute: 30,
+  durationMinutes: 540,
+};
 
 function resolveEnv(value) {
   if (typeof value === 'string' && value.startsWith('env:')) {
@@ -42,6 +49,16 @@ function loadFeatureFlags(raw) {
   return flags;
 }
 
+function loadShiftConfig(raw) {
+  const fromConfig = raw && typeof raw === 'object' ? raw : {};
+  const shift = { ...SHIFT_DEFAULTS };
+  for (const key of Object.keys(SHIFT_DEFAULTS)) {
+    const v = Number(fromConfig[key]);
+    if (Number.isFinite(v)) shift[key] = v;
+  }
+  return shift;
+}
+
 export function loadConfig(path = process.env.AUTH_CONFIG_PATH || 'auth.config.json') {
   const raw = JSON.parse(readFileSync(path, 'utf8'));
   if (!raw.providers || typeof raw.providers !== 'object') {
@@ -57,7 +74,11 @@ export function loadConfig(path = process.env.AUTH_CONFIG_PATH || 'auth.config.j
     enabled.push({ id, ...resolved });
   }
   if (enabled.length === 0) throw new Error('[config] no providers enabled');
-  return { enabled, featureFlags: loadFeatureFlags(raw.features) };
+  return {
+    enabled,
+    featureFlags: loadFeatureFlags(raw.features),
+    shift: loadShiftConfig(raw.shift),
+  };
 }
 
 function validateProvider(id, c) {

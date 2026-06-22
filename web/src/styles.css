@@ -1278,6 +1278,9 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
   text-transform: uppercase; color: var(--warning);
 }
 
+.att-leave-balance { display: flex; gap: 16px; margin-bottom: 12px; font-size: var(--fs-sm); color: var(--text-muted); }
+.att-leave-balance-item strong { color: var(--text); }
+
 /* My leave — compact one-line strip for the empty state */
 .att-leave-strip {
   display: flex; align-items: center; gap: 12px;
@@ -1300,6 +1303,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
   padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2);
 }
 .att-leave-range { font-size: var(--fs-sm); color: var(--text); font-variant-numeric: tabular-nums; }
+.att-leave-cancel { margin-left: auto; font-size: var(--fs-sm); color: var(--danger, #c0392b); }
 .att-leave-reason { font-size: var(--fs-xs); color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-leave-status {
   margin-left: auto; flex-shrink: 0; padding: 2px 10px; border-radius: 999px;
@@ -1456,7 +1460,20 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .att-tag-short { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
 .att-tag-leave { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
 .att-tag-holiday { background: var(--st-planning-bg); color: var(--st-planning); }
+.att-tag-approved { background: var(--st-done-bg); color: var(--success); }
+.att-tag-rejected { background: var(--danger-soft); color: var(--danger); }
 .att-reg-link { margin-left: 8px; font-size: var(--fs-xs); }
+
+.att-notice {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--st-done-bg); color: var(--success);
+  border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 12px;
+}
+.att-notice-list { margin: 0; padding-left: 18px; flex: 1; }
+.att-notice-close {
+  background: none; border: none; color: inherit; font-size: 18px;
+  line-height: 1; cursor: pointer; padding: 0 2px;
+}
 
 /* Regularise modal */
 .att-modal-backdrop {

@@ -15,7 +15,10 @@ function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// A Date at the given local clock time on `date` (a Date).
+// A Date at the given local clock time on `date` (a Date). Uses setHours,
+// which is local-to-the-machine-running-this-script — fine for a single-region
+// dev seed, but see the timezone note in models/Attendance.js if this script
+// is ever run against a server in a different timezone than the deployed app.
 function at(date, hour, minute) {
   const d = new Date(date);
   d.setHours(hour, minute, 0, 0);

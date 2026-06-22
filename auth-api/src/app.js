@@ -17,10 +17,15 @@ import { createClaimRequestsRouter } from './routes/claimRequests.js';
 import { createAssignmentOffersRouter } from './routes/assignmentOffers.js';
 import { createAttendanceRouter } from './routes/attendance.js';
 import { createLeaveRouter } from './routes/leave.js';
+import { createHolidaysRouter } from './routes/holidays.js';
 
 export function createApp(config) {
   const app = express();
   const featureFlags = { pmTaskBulk: true, ...(config?.featureFlags || {}) };
+  const shiftConfig = {
+    startHour: 9, startMinute: 30, endHour: 18, endMinute: 30, durationMinutes: 540,
+    ...(config?.shift || {}),
+  };
   const configuredOrigins = String(process.env.WEB_URL || '')
     .split(',')
     .map((origin) => origin.trim())
@@ -43,6 +48,7 @@ export function createApp(config) {
   };
 
   app.locals.featureFlags = featureFlags;
+  app.locals.shiftConfig = shiftConfig;
   app.use(
     cors({
       origin(origin, callback) {
@@ -75,8 +81,9 @@ export function createApp(config) {
   app.use('/marketplace', createMarketplaceRouter());
   app.use('/claim-requests', createClaimRequestsRouter());
   app.use('/assignment-offers', createAssignmentOffersRouter());
-  app.use('/attendance', createAttendanceRouter());
+  app.use('/attendance', createAttendanceRouter(shiftConfig));
   app.use('/leave', createLeaveRouter());
+  app.use('/holidays', createHolidaysRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

@@ -6,11 +6,46 @@ import {
   Attendance, deriveStatus, calcMinutes, todayStr,
   SHIFT_START_HOUR, SHIFT_START_MINUTE,
 } from '../models/Attendance.js';
+// Default shift falls back to the model's constants when no config is
+// supplied (e.g. older callers/tests that don't pass one).
+const DEFAULT_SHIFT = {
+  startHour: SHIFT_START_HOUR, startMinute: SHIFT_START_MINUTE,
+  endHour: 18, endMinute: 30, durationMinutes: 540,
+};
 import { User } from '../models/User.js';
+import { Holiday } from '../models/Holiday.js';
+import { Project } from '../models/Project.js';
 
-export function createAttendanceRouter() {
+// Synthetic, unsaved "holiday" entries for dates in range that have no real
+// attendance doc — lets the calendar render a HOLIDAY badge without ever
+// writing a row for a day nobody punched.
+function holidayPlaceholder(userId, holiday) {
+  return {
+    _id: `holiday-${holiday.date}`,
+    userId,
+    date: holiday.date,
+    checkIn: null,
+    checkOut: null,
+    totalMinutes: 0,
+    breakMinutes: 0,
+    effectiveMinutes: 0,
+    status: 'holiday',
+    punchType: 'office',
+    breaks: [],
+    note: holiday.name,
+    regularise: { status: 'none', reason: '', correctedCheckIn: null, correctedCheckOut: null, requestedAt: null, decidedBy: null, decidedAt: null },
+  };
+}
+
+export function createAttendanceRouter(shiftConfig) {
   const router = express.Router();
+  const shift = { ...DEFAULT_SHIFT, ...(shiftConfig || {}) };
   router.use(requireAuth);
+
+  // GET /attendance/config — shift timings, sourced from auth.config.json
+  router.get('/config', asyncHandler(async (req, res) => {
+    res.json(shift);
+  }));
 
   // GET /attendance/state — activation boundary + whether any clock-in exists.
   // Drives the first-run/empty experience on the frontend.
@@ -67,7 +102,17 @@ export function createAttendanceRouter() {
       });
     }
 
-    await doc.save();
+    try {
+      await doc.save();
+    } catch (err) {
+      // Concurrent double-tap: another request won the race and inserted the
+      // (userId, date) doc first. Treat it the same as "already checked in"
+      // rather than surfacing a 500.
+      if (err.code === 11000) {
+        return res.status(409).json({ error: 'already checked in' });
+      }
+      throw err;
+    }
 
     // Stamp the activation day on the very first clock-in so prior days are
     // never treated as missed.
@@ -151,7 +196,14 @@ export function createAttendanceRouter() {
       date: { $gte: startDate, $lte: endDate },
     }).sort({ date: 1 });
 
-    res.json(docs);
+    const covered = new Set(docs.map((d) => d.date));
+    const holidays = await Holiday.find({ date: { $gte: startDate, $lte: endDate } });
+    const synthetic = holidays
+      .filter((h) => !covered.has(h.date))
+      .map((h) => holidayPlaceholder(req.user.sub, h));
+
+    const merged = [...docs.map((d) => d.toObject()), ...synthetic].sort((a, b) => a.date.localeCompare(b.date));
+    res.json(merged);
   }));
 
   // GET /attendance/stats?year=2026&month=6
@@ -169,13 +221,17 @@ export function createAttendanceRouter() {
       date: { $gte: startDate, $lte: endDate },
     });
 
+    const holidayDates = new Set(
+      (await Holiday.find({ date: { $gte: startDate, $lte: endDate } })).map((h) => h.date),
+    );
+
     let present = 0, partial = 0, absent = 0, wfh = 0, lateCount = 0, totalMinutes = 0;
     const workedDays = docs.filter(d => d.checkIn);
 
     for (const d of docs) {
       if (d.status === 'present') present++;
       else if (d.status === 'partial') partial++;
-      else if (d.status === 'absent') absent++;
+      else if (d.status === 'absent' && !holidayDates.has(d.date)) absent++;
       else if (d.status === 'wfh' || d.status === 'wfh-partial') wfh++;
 
       totalMinutes += d.effectiveMinutes || 0;
@@ -183,8 +239,8 @@ export function createAttendanceRouter() {
       // Late = checkIn after shift start (9:30 AM)
       if (d.checkIn) {
         const ci = new Date(d.checkIn);
-        if (ci.getHours() > SHIFT_START_HOUR ||
-            (ci.getHours() === SHIFT_START_HOUR && ci.getMinutes() > SHIFT_START_MINUTE)) {
+        if (ci.getHours() > shift.startHour ||
+            (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute)) {
           lateCount++;
         }
       }
@@ -198,6 +254,62 @@ export function createAttendanceRouter() {
     res.json({ present, partial, absent, wfh, lateCount, totalMinutes, avgMinutesPerDay, onTimePct });
   }));
 
+  // GET /attendance/team?year=2026&month=6 — per-member summary for a PM's
+  // direct reports (project members across projects they own) or, for an
+  // admin, every user.
+  router.get('/team', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
+    const { year, month } = req.query;
+    if (!year || !month) return res.status(400).json({ error: 'year and month required' });
+
+    const y = Number(year);
+    const m = String(month).padStart(2, '0');
+    const startDate = `${y}-${m}-01`;
+    const endDate = `${y}-${m}-31`;
+
+    let memberIds;
+    if (req.user.role === 'admin') {
+      memberIds = (await User.find({ _id: { $ne: req.user.sub } }).select('_id')).map((u) => u._id);
+    } else {
+      const projects = await Project.find({ ownerPm: req.user.sub }).select('members');
+      const set = new Set();
+      for (const p of projects) for (const member of p.members) set.add(String(member));
+      memberIds = Array.from(set);
+    }
+
+    const users = await User.find({ _id: { $in: memberIds } }).select('displayName email').sort('displayName');
+    const docs = await Attendance.find({
+      userId: { $in: memberIds },
+      date: { $gte: startDate, $lte: endDate },
+    });
+
+    const byUser = new Map();
+    for (const id of memberIds) byUser.set(String(id), []);
+    for (const d of docs) {
+      const key = String(d.userId);
+      if (byUser.has(key)) byUser.get(key).push(d);
+    }
+
+    const team = users.map((u) => {
+      const userDocs = byUser.get(String(u._id)) || [];
+      const worked = userDocs.filter((d) => d.checkIn);
+      const presentCount = userDocs.filter((d) => d.status === 'present' || d.status === 'wfh').length;
+      const lateCount = worked.filter((d) => {
+        const ci = new Date(d.checkIn);
+        return ci.getHours() > shift.startHour ||
+          (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute);
+      }).length;
+      const totalMinutes = worked.reduce((s, d) => s + (d.effectiveMinutes || 0), 0);
+      const avgMinutesPerDay = worked.length ? Math.round(totalMinutes / worked.length) : 0;
+      return {
+        userId: u._id, displayName: u.displayName, email: u.email,
+        presentCount, lateCount, avgMinutesPerDay,
+        onTimePct: worked.length ? Math.round(((worked.length - lateCount) / worked.length) * 100) : 0,
+      };
+    });
+
+    res.json(team);
+  }));
+
   // POST /attendance/regularise — employee submits a correction request
   router.post('/regularise', asyncHandler(async (req, res) => {
     const { date, reason, correctedCheckIn, correctedCheckOut } = req.body;
@@ -207,6 +319,10 @@ export function createAttendanceRouter() {
     if (!doc) {
       // Create a stub doc for the day if none exists (missed punch entirely)
       doc = new Attendance({ userId: req.user.sub, date, status: 'absent' });
+    }
+
+    if (doc.regularise.status === 'pending') {
+      return res.status(409).json({ error: 'a regularise request is already pending for this day' });
     }
 
     doc.regularise = {

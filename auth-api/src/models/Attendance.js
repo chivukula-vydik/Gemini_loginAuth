@@ -45,6 +45,18 @@ attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
 
 export const Attendance = mongoose.model('Attendance', attendanceSchema);
 
+// Timezone assumption: `date` is a YYYY-MM-DD string (deliberately not a
+// Date) so the calendar day a punch belongs to never shifts under UTC/local
+// conversion. `checkIn`/`checkOut`, however, ARE real Date objects, and
+// calcMinutes/deriveStatus below do raw Date arithmetic on them — that math
+// is timezone-agnostic (it's a duration, not a wall-clock comparison), but
+// anything that reads getHours()/getMinutes() off them (late-arrival checks
+// in routes/attendance.js) implicitly assumes the Node process and the user
+// are in the same timezone (currently: server local time). For a
+// distributed team spanning timezones, that assumption breaks; fixing it
+// would mean storing a timezone/offset alongside checkIn/checkOut and
+// computing "late" against the user's local shift start rather than the
+// server's.
 export function deriveStatus(doc) {
   if (!doc.checkIn) return 'absent';
 
