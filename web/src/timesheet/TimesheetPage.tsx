@@ -7,7 +7,9 @@ import { blankRow, rowFromAssignable } from './addRow';
 import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
 import { setTaskProgress } from '../pm/pmApi';
-import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek } from './time';
+import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, dayDates, todayISO } from './time';
+import { getMyLeave, LeaveRequest, LEAVE_TYPE_LABELS } from '../attendance/leaveApi';
+import { LeaveModal } from '../attendance/LeaveModal';
 
 function newTask(name = ''): Task {
   const entries = {} as Entries;
@@ -28,6 +30,8 @@ export function TimesheetPage() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('draft');
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
+  const [myLeave, setMyLeave] = useState<LeaveRequest[]>([]);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -63,6 +67,19 @@ export function TimesheetPage() {
     setPendingKeys([]);
     load(weekStart);
   }, [weekStart, load]);
+
+  const loadLeave = useCallback(() => {
+    getMyLeave().then(setMyLeave).catch(() => {});
+  }, []);
+  useEffect(() => { loadLeave(); }, [loadLeave]);
+
+  // Approved leave that overlaps the visible week, mapped day -> type label.
+  const dd = dayDates(weekStart);
+  const leaveDays: Partial<Record<Day, string>> = {};
+  for (const d of DAYS) {
+    const lv = myLeave.find((l) => l.status === 'approved' && dd[d] >= l.startDate && dd[d] <= l.endDate);
+    if (lv) leaveDays[d] = LEAVE_TYPE_LABELS[lv.type];
+  }
 
   // Listen for PM task deletions and remove matching timesheet rows (by taskId)
   useEffect(() => {
@@ -177,9 +194,12 @@ export function TimesheetPage() {
 
   return (
     <div className="ts-page">
-      <header className="ts-header">
-        <h1 className="ts-h1">Timesheet</h1>
-        <p className="ts-sub">Log hours per task across the week. Totals update as you type.</p>
+      <header className="ts-header ts-header-row">
+        <div>
+          <h1 className="ts-h1">Timesheet</h1>
+          <p className="ts-sub">Log hours per task across the week. Totals update as you type.</p>
+        </div>
+        <button className="att-act att-act-sm ts-leave-btn" onClick={() => setLeaveOpen(true)}>Apply for leave</button>
       </header>
 
       <WeekNav
@@ -226,6 +246,7 @@ export function TimesheetPage() {
         todayDay={todayDay}
         grants={grants}
         pendingKeys={new Set(pendingKeys)}
+        leaveDays={leaveDays}
         onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}
@@ -234,6 +255,14 @@ export function TimesheetPage() {
         onAddBlank={onAddBlank}
         onProgress={onProgress}
       />
+
+      {leaveOpen && (
+        <LeaveModal
+          today={todayISO()}
+          onClose={() => setLeaveOpen(false)}
+          onSubmitted={() => { setLeaveOpen(false); loadLeave(); }}
+        />
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
 } from './pmApi';
 import { personName } from './personName';
 import { getPendingRegularise, decideRegularise, RegularisePending } from '../attendance/attendanceApi';
+import { getPendingLeave, decideLeave, LeavePending, LEAVE_TYPE_LABELS } from '../attendance/leaveApi';
 
 const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' };
 
@@ -14,6 +15,7 @@ export function Requests() {
   const [claims, setClaims] = useState<ClaimReq[]>([]);
   const [sheets, setSheets] = useState<SubmittedTimesheet[]>([]);
   const [regs, setRegs] = useState<RegularisePending[]>([]);
+  const [leaves, setLeaves] = useState<LeavePending[]>([]);
   const [error, setError] = useState('');
 
   function reload() {
@@ -21,12 +23,19 @@ export function Requests() {
     listClaimRequests().then(setClaims).catch((e) => setError(e.message));
     listSubmittedTimesheets().then(setSheets).catch((e) => setError(e.message));
     getPendingRegularise().then(setRegs).catch((e) => setError(e.message));
+    getPendingLeave().then(setLeaves).catch((e) => setError(e.message));
   }
   useEffect(() => { reload(); }, []);
 
   async function decideReg(id: string, decision: 'approved' | 'rejected') {
     setError('');
     try { await decideRegularise(id, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function decideLeaveReq(id: string, decision: 'approved' | 'rejected') {
+    setError('');
+    try { await decideLeave(id, decision); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -48,7 +57,7 @@ export function Requests() {
     catch (e) { setError((e as Error).message); }
   }
 
-  const totalPending = sheets.length + reqs.length + claims.length + regs.length;
+  const totalPending = sheets.length + reqs.length + claims.length + regs.length + leaves.length;
 
   return (
     <div className="ts-page">
@@ -75,6 +84,10 @@ export function Requests() {
         <div className="ts-tile">
           <span className="ts-tile-label">Regularise</span>
           <span className="ts-tile-value">{regs.length}</span>
+        </div>
+        <div className="ts-tile">
+          <span className="ts-tile-label">Leave</span>
+          <span className="ts-tile-value">{leaves.length}</span>
         </div>
       </div>
 
@@ -172,6 +185,31 @@ export function Requests() {
                   <div className="row-actions">
                     <button className="table-action approve" onClick={() => decideReg(r._id, 'approved')}>Approve</button>
                     <button className="table-action danger" onClick={() => decideReg(r._id, 'rejected')}>Reject</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 className="section-title">Leave requests</h2>
+      <div className="ts-card">
+        <table className="ts-table">
+          <thead><tr><th className="ts-task">Employee</th><th className="col-left">Type</th><th className="col-left">Dates</th><th>Days</th><th className="col-left">Reason</th><th className="col-left">Actions</th></tr></thead>
+          <tbody>
+            {leaves.length === 0 && <tr><td colSpan={6} className="ts-empty">No pending leave requests.</td></tr>}
+            {leaves.map((lv) => (
+              <tr key={lv._id}>
+                <td className="ts-task">{personName(lv.userId)}</td>
+                <td className="col-left">{LEAVE_TYPE_LABELS[lv.type]}</td>
+                <td className="col-left">{lv.startDate === lv.endDate ? lv.startDate : `${lv.startDate} → ${lv.endDate}`}</td>
+                <td>{lv.days}</td>
+                <td className="col-left">{lv.reason || '—'}</td>
+                <td className="col-left">
+                  <div className="row-actions">
+                    <button className="table-action approve" onClick={() => decideLeaveReq(lv._id, 'approved')}>Approve</button>
+                    <button className="table-action danger" onClick={() => decideLeaveReq(lv._id, 'rejected')}>Reject</button>
                   </div>
                 </td>
               </tr>

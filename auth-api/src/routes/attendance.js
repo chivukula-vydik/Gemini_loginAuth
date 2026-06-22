@@ -6,10 +6,22 @@ import {
   Attendance, deriveStatus, calcMinutes, todayStr,
   SHIFT_START_HOUR, SHIFT_START_MINUTE,
 } from '../models/Attendance.js';
+import { User } from '../models/User.js';
 
 export function createAttendanceRouter() {
   const router = express.Router();
   router.use(requireAuth);
+
+  // GET /attendance/state — activation boundary + whether any clock-in exists.
+  // Drives the first-run/empty experience on the frontend.
+  router.get('/state', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.sub).select('attendanceActivatedDate');
+    const hasClockIn = await Attendance.exists({ userId: req.user.sub, checkIn: { $ne: null } });
+    res.json({
+      activatedDate: user?.attendanceActivatedDate || null,
+      hasClockIn: Boolean(hasClockIn),
+    });
+  }));
 
   // GET /attendance/today — current day's doc for the logged-in user
   router.get('/today', asyncHandler(async (req, res) => {
@@ -56,6 +68,14 @@ export function createAttendanceRouter() {
     }
 
     await doc.save();
+
+    // Stamp the activation day on the very first clock-in so prior days are
+    // never treated as missed.
+    await User.updateOne(
+      { _id: req.user.sub, attendanceActivatedDate: null },
+      { $set: { attendanceActivatedDate: date } },
+    );
+
     res.json(doc);
   }));
 

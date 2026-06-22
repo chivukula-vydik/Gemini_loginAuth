@@ -56,6 +56,11 @@ export type AttendanceDoc = {
 // As returned by /regularise/pending, where userId is populated.
 export type RegularisePending = Omit<AttendanceDoc, 'userId'> & { userId: Person };
 
+export type AttendanceState = {
+  activatedDate: string | null;   // "2026-06-22" — day the feature went live for this user
+  hasClockIn: boolean;            // has the user ever clocked in?
+};
+
 export type MonthStats = {
   present: number;
   partial: number;
@@ -68,6 +73,9 @@ export type MonthStats = {
 };
 
 // --- API Calls ---
+
+export const getState = () =>
+  authed('/attendance/state') as Promise<AttendanceState>;
 
 export const getToday = () =>
   authed('/attendance/today') as Promise<AttendanceDoc>;

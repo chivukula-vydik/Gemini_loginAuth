@@ -21,6 +21,7 @@ type Props = {
   todayDay: Day | null;
   grants: Grant[];
   pendingKeys: Set<string>;
+  leaveDays?: Partial<Record<Day, string>>;   // day -> leave type label, for approved leave
   onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
@@ -31,7 +32,7 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, onRequestEdit,
+  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, leaveDays = {}, onRequestEdit,
   onRename, onCellChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
@@ -75,7 +76,14 @@ export function TimesheetGrid({
             {DAYS.map((d) => {
               const isFuture = dates[d] > today;
               const isToday = todayDay === d;
-              return <th key={d} className={`${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}`.trim() || undefined}>{cols[d]}</th>;
+              const leave = leaveDays[d];
+              const cls = `${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}${leave ? ' ts-day-leave' : ''}`.trim() || undefined;
+              return (
+                <th key={d} className={cls}>
+                  {cols[d]}
+                  {leave && <span className="ts-leave-badge" title={`${leave} leave`}>Leave</span>}
+                </th>
+              );
             })}
             <th className="ts-rowtotal">Total</th>
             <th className="ts-actions" aria-hidden="true"></th>

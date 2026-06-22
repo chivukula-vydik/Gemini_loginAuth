@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "backfill-display-names": "node scripts/backfill-display-names.js"
+    "backfill-display-names": "node scripts/backfill-display-names.js",
+    "seed-attendance": "node scripts/seed-attendance.js"
   },
   "dependencies": {
     "@node-saml/passport-saml": "^4.0.4",
