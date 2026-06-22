@@ -36,7 +36,7 @@ function ExtensionRequest({ task, forceOffer, onRequest }: { task: Task; forceOf
   if (task.dueProposalStatus === 'proposed') {
     return (
       <span className="ext-note ext-pending" title="Waiting for your PM to approve">
-        ⏳ Extension requested{task.dueProposalDate ? ` → ${task.dueProposalDate}` : ''} (pending)
+         Extension requested{task.dueProposalDate ? ` → ${task.dueProposalDate}` : ''} (pending)
       </span>
     );
   }
