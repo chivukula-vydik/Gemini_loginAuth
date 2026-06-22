@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
   project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
+  phase: { type: mongoose.Schema.Types.ObjectId, ref: 'Phase', default: null },
+  billingType: { type: String, enum: ['billable', 'non-billable'], default: 'billable' },
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   estimatedHours: { type: Number, default: 0 },

@@ -18,6 +18,7 @@ import { createAssignmentOffersRouter } from './routes/assignmentOffers.js';
 import { createAttendanceRouter } from './routes/attendance.js';
 import { createLeaveRouter } from './routes/leave.js';
 import { createHolidaysRouter } from './routes/holidays.js';
+import { createClientsRouter } from './routes/clients.js';
 
 export function createApp(config) {
   const app = express();
@@ -84,6 +85,7 @@ export function createApp(config) {
   app.use('/attendance', createAttendanceRouter(shiftConfig));
   app.use('/leave', createLeaveRouter());
   app.use('/holidays', createHolidaysRouter());
+  app.use('/clients', createClientsRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

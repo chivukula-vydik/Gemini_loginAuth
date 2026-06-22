@@ -7,6 +7,8 @@ import { Project } from '../models/Project.js';
 import { Task } from '../models/Task.js';
 import { Skill } from '../models/Skill.js';
 import { User } from '../models/User.js';
+import { Client } from '../models/Client.js';
+import { Phase } from '../models/Phase.js';
 import { requireFeature } from '../middleware/requireFeature.js';
 import { canViewProject, canEditProject, canCreateTask } from '../services/authz.js';
 import { actualMinutesByTask } from '../services/actuals.js';
@@ -24,22 +26,73 @@ async function validActiveSkillIds(ids) {
   return found.map((s) => s._id);
 }
 
+const BILLING_TYPES = ['hourly', 'fixed', 'milestone'];
+
+function normalizeBilling(input, current) {
+  const billing = { type: current?.type || 'hourly', allowExpenses: current?.allowExpenses || false };
+  if (input?.type !== undefined) {
+    if (!BILLING_TYPES.includes(input.type)) throw new Error('invalid billing type');
+    billing.type = input.type;
+  }
+  if (input?.allowExpenses !== undefined) billing.allowExpenses = Boolean(input.allowExpenses);
+  return billing;
+}
+
+// Allocations describe a member's persistent commitment to the project (% of
+// time, a date window, billing role) — every user listed must already be a
+// project member.
+function normalizeAllocations(input, memberSet) {
+  if (!Array.isArray(input)) return null;
+  for (const a of input) {
+    if (!a || !memberSet.has(String(a.user))) throw new Error('every allocation must reference a project member');
+  }
+  return input.map((a) => ({
+    user: a.user,
+    allocationPct: Math.max(25, Math.min(100, Number(a.allocationPct) || 100)),
+    startDate: a.startDate || null,
+    endDate: a.endDate || null,
+    billingRole: String(a.billingRole || ''),
+  }));
+}
+
 export function createProjectsRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
   router.post('/', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
-    const { name, description, members, startDate, targetDate, requiredSkills } = req.body || {};
+    const {
+      name, description, members, startDate, targetDate, requiredSkills,
+      projectCode, clientId, billing,
+    } = req.body || {};
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
-    const project = await Project.create({
-      name: String(name).trim(),
-      description: String(description || ''),
-      ownerPm: req.user.sub,
-      members: Array.isArray(members) ? members : [],
-      requiredSkills: await validActiveSkillIds(requiredSkills),
-      startDate: startDate || null,
-      targetDate: targetDate || null,
-    });
+
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      if (!client) return res.status(400).json({ error: 'client not found' });
+    }
+
+    let billingValue;
+    try { billingValue = normalizeBilling(billing); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
+
+    let project;
+    try {
+      project = await Project.create({
+        name: String(name).trim(),
+        ...(projectCode ? { projectCode: String(projectCode).trim() } : {}),
+        description: String(description || ''),
+        ownerPm: req.user.sub,
+        clientId: clientId || null,
+        members: Array.isArray(members) ? members : [],
+        requiredSkills: await validActiveSkillIds(requiredSkills),
+        startDate: startDate || null,
+        targetDate: targetDate || null,
+        billing: billingValue,
+      });
+    } catch (e) {
+      if (e.code === 11000) return res.status(409).json({ error: 'project code already in use' });
+      throw e;
+    }
     res.status(201).json(project);
   }));
 
@@ -82,8 +135,11 @@ export function createProjectsRouter() {
     await project.populate('members', 'displayName email');
     await project.populate('ownerPm', 'displayName email role');
     await project.populate('requiredSkills', 'name active');
+    await project.populate('clientId', 'name contactName contactEmail');
+    await project.populate('allocations.user', 'displayName email');
     const tasks = await Task.find({ project: project._id })
       .populate('assignees.user', 'displayName email')
+      .populate('phase', 'name order')
       .sort('createdAt');
     const map = await actualMinutesByTask(tasks.map((t) => t._id));
     const tasksOut = tasks.map((t) => {
@@ -154,8 +210,38 @@ export function createProjectsRouter() {
     for (const f of ['name', 'description', 'status', 'startDate', 'targetDate']) {
       if (f in (req.body || {})) project[f] = req.body[f];
     }
-    if (Array.isArray(req.body?.members)) project.members = req.body.members;
+    if ('projectCode' in (req.body || {})) {
+      if (req.body.projectCode) {
+        project.projectCode = String(req.body.projectCode).trim();
+      } else {
+        project.projectCode = undefined;
+      }
+    }
+    if ('clientId' in (req.body || {})) {
+      if (req.body.clientId) {
+        const client = await Client.findById(req.body.clientId);
+        if (!client) return res.status(400).json({ error: 'client not found' });
+        project.clientId = client._id;
+      } else {
+        project.clientId = null;
+      }
+    }
+    if ('billing' in (req.body || {})) {
+      try { project.billing = normalizeBilling(req.body.billing, project.billing); }
+      catch (e) { return res.status(400).json({ error: e.message }); }
+    }
+    if (Array.isArray(req.body?.members)) {
+      project.members = req.body.members;
+      // Drop allocations for anyone no longer on the team.
+      const stillMembers = new Set(req.body.members.map((m) => String(m)));
+      project.allocations = project.allocations.filter((a) => stillMembers.has(String(a.user)));
+    }
     if (Array.isArray(req.body?.requiredSkills)) project.requiredSkills = await validActiveSkillIds(req.body.requiredSkills);
+    if (Array.isArray(req.body?.allocations)) {
+      const memberSet = new Set(project.members.map((m) => String(m)));
+      try { project.allocations = normalizeAllocations(req.body.allocations, memberSet); }
+      catch (e) { return res.status(400).json({ error: e.message }); }
+    }
     if ('ownerPm' in (req.body || {}) && req.body.ownerPm) {
       const owner = await User.findById(req.body.ownerPm).select('role');
       if (!owner || !['pm', 'admin'].includes(owner.role)) {
@@ -163,7 +249,12 @@ export function createProjectsRouter() {
       }
       project.ownerPm = owner._id;
     }
-    await project.save();
+    try {
+      await project.save();
+    } catch (e) {
+      if (e.code === 11000) return res.status(409).json({ error: 'project code already in use' });
+      throw e;
+    }
     res.json(project);
   }));
 
@@ -172,6 +263,7 @@ export function createProjectsRouter() {
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
     await Task.deleteMany({ project: project._id });
+    await Phase.deleteMany({ project: project._id });
     await Project.deleteOne({ _id: project._id });
     res.json({ ok: true });
   }));
@@ -180,7 +272,7 @@ export function createProjectsRouter() {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canCreateTask(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    const { title, description, requiredSkills, assignees, assignee, dueDate, startDate, dependsOn } = req.body || {};
+    const { title, description, requiredSkills, assignees, assignee, dueDate, startDate, dependsOn, phase, billingType } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
 
     // Accept `assignees: [userId]` (preferred) or legacy single `assignee`.
@@ -192,10 +284,22 @@ export function createProjectsRouter() {
     const shares = equalShares(requested.length);
     const assigneeDocs = requested.map((user, i) => ({ user, sharePct: shares[i] }));
 
+    let phaseId = null;
+    if (phase) {
+      const phaseDoc = await Phase.findOne({ _id: phase, project: project._id });
+      if (!phaseDoc) return res.status(400).json({ error: 'phase not found on this project' });
+      phaseId = phaseDoc._id;
+    }
+    if (billingType !== undefined && !['billable', 'non-billable'].includes(billingType)) {
+      return res.status(400).json({ error: 'invalid billingType' });
+    }
+
     const skillIds = Array.isArray(requiredSkills) ? requiredSkills : [];
     const validSkills = await Skill.find({ _id: { $in: skillIds }, active: true }).select('_id');
     const task = await Task.create({
       project: project._id,
+      phase: phaseId,
+      billingType: billingType || 'billable',
       title: String(title).trim(),
       description: String(description || ''),
       requiredSkills: validSkills.map((s) => s._id),
@@ -206,6 +310,51 @@ export function createProjectsRouter() {
       createdBy: req.user.sub,
     });
     res.status(201).json(task);
+  }));
+
+  // --- Phases ---
+
+  router.get('/:id/phases', asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canViewProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const phases = await Phase.find({ project: project._id }).sort('order');
+    res.json(phases);
+  }));
+
+  router.post('/:id/phases', asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const { name, order } = req.body || {};
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+    const phase = await Phase.create({
+      project: project._id,
+      name: String(name).trim(),
+      order: Number.isFinite(Number(order)) ? Number(order) : 0,
+    });
+    res.status(201).json(phase);
+  }));
+
+  router.patch('/phases/:phaseId', asyncHandler(async (req, res) => {
+    const phase = await Phase.findById(req.params.phaseId);
+    if (!phase) return res.status(404).json({ error: 'not found' });
+    const project = await Project.findById(phase.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    if ('name' in (req.body || {})) phase.name = String(req.body.name || '').trim() || phase.name;
+    if ('order' in (req.body || {})) phase.order = Number(req.body.order) || 0;
+    await phase.save();
+    res.json(phase);
+  }));
+
+  router.delete('/phases/:phaseId', asyncHandler(async (req, res) => {
+    const phase = await Phase.findById(req.params.phaseId);
+    if (!phase) return res.status(404).json({ error: 'not found' });
+    const project = await Project.findById(phase.project);
+    if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    await Task.updateMany({ phase: phase._id }, { $set: { phase: null } });
+    await phase.deleteOne();
+    res.json({ ok: true });
   }));
 
   router.patch('/:id/tasks/bulk', requireFeature('pmTaskBulk'), asyncHandler(async (req, res) => {
