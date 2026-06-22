@@ -79,6 +79,11 @@ export function createTasksRouter() {
     }
     if ('status' in (req.body || {}) && ['todo', 'in_progress', 'blocked', 'done'].includes(req.body.status)) {
       task.status = req.body.status;
+      if (task.status === 'done') {
+        if (!task.completedAt) task.completedAt = new Date();
+      } else {
+        task.completedAt = null;
+      }
     }
     await task.save();
     res.json(task);

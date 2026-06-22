@@ -113,6 +113,23 @@ test('PATCH /tasks/:id/progress: assignee can set, non-assignee gets 403, value 
   assert.equal(ok.body.status, 'in_progress');
 });
 
+test('PATCH /tasks/:id/progress: marking done stamps completedAt, leaving done clears it', async () => {
+  const pm = await User.create({ email: 'pp2@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ee2@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
+  const done = await request(app).patch(`/tasks/${task._id}/progress`)
+    .set('Authorization', bearer(emp)).send({ status: 'done' });
+  assert.equal(done.status, 200);
+  assert.equal(done.body.status, 'done');
+  assert.ok(done.body.completedAt);
+  const reopened = await request(app).patch(`/tasks/${task._id}/progress`)
+    .set('Authorization', bearer(emp)).send({ status: 'in_progress' });
+  assert.equal(reopened.status, 200);
+  assert.equal(reopened.body.status, 'in_progress');
+  assert.equal(reopened.body.completedAt, null);
+});
+
 test('GET /timesheets offers assigned tasks to add (current week only), never auto-injecting them', async () => {
   const pm = await User.create({ email: 'tpm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'temp@x.com', displayName: 'E', role: 'employee' });
