@@ -22,7 +22,7 @@ export function Marketplace() {
       <header className="ts-header">
         <div>
           <h1 className="ts-h1">Marketplace</h1>
-          <p className="ts-sub">Unassigned tasks in your projects that match your skills. Claim one to request it.</p>
+          <p className="ts-sub">Unassigned tasks that match your skills — from any project, even ones you're not on. Claim one to request it.</p>
         </div>
       </header>
 

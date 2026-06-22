@@ -55,10 +55,7 @@ export function createTasksRouter() {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (task.assignees.length > 0 || task.status === 'done') return res.status(400).json({ error: 'task is not claimable' });
-    const project = await Project.findById(task.project);
-    if (!project || !project.members.some((m) => String(m) === String(req.user.sub))) {
-      return res.status(400).json({ error: 'you are not a member of this project' });
-    }
+    // Anyone whose skills match may claim, member or not — the PM still approves.
     const me = await User.findById(req.user.sub).select('skills');
     if (!skillsMatch(task.requiredSkills, me?.skills || [])) {
       return res.status(400).json({ error: 'your skills do not match this task' });

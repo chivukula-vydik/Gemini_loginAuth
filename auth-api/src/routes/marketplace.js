@@ -13,7 +13,9 @@ export function createMarketplaceRouter() {
   router.get('/', requireAuth, asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.sub).select('skills');
     const mySkills = (me?.skills || []).map(String);
-    const projects = await Project.find({ members: req.user.sub }).select('_id name');
+    // Open to the whole company: any non-archived project's unassigned tasks are
+    // claimable by anyone whose skills match — membership is not required.
+    const projects = await Project.find({ status: { $ne: 'archived' } }).select('_id name');
     const projNameById = new Map(projects.map((p) => [String(p._id), p.name]));
     const tasks = await Task.find({
       project: { $in: projects.map((p) => p._id) },

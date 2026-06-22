@@ -519,7 +519,8 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-rowtotal { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .ts-coltotal { font-weight: 600; font-variant-numeric: tabular-nums; }
 .ts-coltoday { background: var(--surface); border-color: #bbf7d0; }
-.ts-actions { width: 40px; }
+.ts-actions { white-space: nowrap; }
+.ts-actions-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .ts-table tfoot td { background: var(--surface); font-weight: 600; border-bottom: none; }
 .ts-del { border: none; background: transparent; color: var(--faint); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 6px; border-radius: 6px; transition: color 0.12s; }
 .ts-del:hover { color: var(--danger); }
@@ -532,8 +533,9 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 }
 .ts-add:hover { background: var(--surface); border-color: var(--primary); color: var(--primary); }
 .ts-add-wrap { position: relative; display: inline-block; }
+.ts-add-backdrop { position: fixed; inset: 0; z-index: 1000; }
 .ts-add-menu {
-  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 20; min-width: 260px; max-height: 320px;
+  position: fixed; z-index: 1001; min-width: 260px; max-height: 320px;
   overflow-y: auto; background: var(--card); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); padding: 6px;
 }

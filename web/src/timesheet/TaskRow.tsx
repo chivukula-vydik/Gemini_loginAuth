@@ -88,30 +88,31 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
       })}
       <td className="ts-rowtotal">{formatMinutes(rowTotal)}</td>
       <td className="ts-actions">
-        {isPm ? (
-          <div className="ts-progress">
-            <input
-              className="ts-pct"
-              type="number"
-              min={0}
-              max={100}
-              value={task.percentComplete ?? 0}
-              disabled={readOnly}
-              onChange={(e) => onProgress({ percentComplete: Number(e.target.value) })}
-            />
-            <span>%</span>
-            <select
-              className="input ts-status"
-              value={task.status ?? 'todo'}
-              disabled={readOnly}
-              onChange={(e) => onProgress({ status: e.target.value })}
-            >
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        ) : (
-          !readOnly && <button className="ts-del" type="button" aria-label="Delete task" onClick={onDelete}>×</button>
-        )}
+        <div className="ts-actions-wrap">
+          {isPm && (
+            <div className="ts-progress">
+              <input
+                className="ts-pct"
+                type="number"
+                min={0}
+                max={100}
+                value={task.percentComplete ?? 0}
+                disabled={readOnly}
+                onChange={(e) => onProgress({ percentComplete: Number(e.target.value) })}
+              />
+              <span>%</span>
+              <select
+                className="input ts-status"
+                value={task.status ?? 'todo'}
+                disabled={readOnly}
+                onChange={(e) => onProgress({ status: e.target.value })}
+              >
+                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
+          {!readOnly && <button className="ts-del" type="button" aria-label="Remove task" onClick={onDelete}>×</button>}
+        </div>
       </td>
     </tr>
   );

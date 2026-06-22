@@ -416,41 +416,54 @@ test('edit-request is rejected for the current week (requests are previous-weeks
 // endpoint now returns 409 for any task with assignees (the only tasks its
 // auth gate can reach). The 409 behavior is covered by the test above.
 
-test('GET /marketplace returns only unassigned, member-project, skill-matched tasks', async () => {
+test('GET /marketplace returns unassigned, skill-matched tasks across all non-archived projects', async () => {
   const pm = await User.create({ email: 'mk-pm@x.com', displayName: 'PM', role: 'pm' });
   const emp = await User.create({ email: 'mk-e@x.com', displayName: 'E', role: 'employee', skills: [] });
   const memberProject = await Project.create({ name: 'Mine', ownerPm: pm._id, members: [emp._id] });
   const otherProject = await Project.create({ name: 'Other', ownerPm: pm._id, members: [] });
+  const archivedProject = await Project.create({ name: 'Archived', ownerPm: pm._id, members: [], status: 'archived' });
   const open = await Task.create({ project: memberProject._id, title: 'Open', createdBy: pm._id });
   await Task.create({ project: memberProject._id, title: 'Assigned', assignees: assignedTo(pm._id), createdBy: pm._id });
   await Task.create({ project: otherProject._id, title: 'NotMember', createdBy: pm._id });
+  await Task.create({ project: archivedProject._id, title: 'Archived task', createdBy: pm._id });
 
   const res = await request(app).get('/marketplace').set('Authorization', bearer(emp));
   assert.equal(res.status, 200);
+  // A non-member's project ('NotMember') is now included; assigned and archived
+  // are excluded. (Other tests share this DB, so assert by membership, not an
+  // exact list.)
   const titles = res.body.map((t) => t.title);
-  assert.deepEqual(titles, ['Open']);
-  assert.equal(res.body[0].myClaimStatus, 'none');
+  assert.ok(titles.includes('Open'));
+  assert.ok(titles.includes('NotMember'));
+  assert.ok(!titles.includes('Assigned'));
+  assert.ok(!titles.includes('Archived task'));
+  assert.equal(res.body.find((t) => t.title === 'Open').myClaimStatus, 'none');
 
   // claim, then it shows pending
   await request(app).post(`/tasks/${open._id}/claim`).set('Authorization', bearer(emp));
   const res2 = await request(app).get('/marketplace').set('Authorization', bearer(emp));
-  assert.equal(res2.body[0].myClaimStatus, 'pending');
+  assert.equal(res2.body.find((t) => t.title === 'Open').myClaimStatus, 'pending');
 });
 
-test('POST /tasks/:id/claim rejects a non-member; dedupes a second pending claim', async () => {
+test('POST /tasks/:id/claim allows a skill-matched non-member, rejects a skill mismatch, dedupes', async () => {
   const pm = await User.create({ email: 'cl-pm@x.com', displayName: 'PM', role: 'pm' });
-  const member = await User.create({ email: 'cl-m@x.com', displayName: 'M', role: 'employee' });
-  const outsider = await User.create({ email: 'cl-o@x.com', displayName: 'O', role: 'employee' });
-  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [member._id] });
-  const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const outsider = await User.create({ email: 'cl-o@x.com', displayName: 'O', role: 'employee', skills: [] });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [] });
 
-  const out = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(outsider));
-  assert.equal(out.status, 400);
-
-  const first = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(member));
-  assert.equal(first.status, 201);
-  const dup = await request(app).post(`/tasks/${task._id}/claim`).set('Authorization', bearer(member));
+  // No required skills → a non-member can claim despite not being on the project.
+  const open = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
+  const out = await request(app).post(`/tasks/${open._id}/claim`).set('Authorization', bearer(outsider));
+  assert.equal(out.status, 201);
+  const dup = await request(app).post(`/tasks/${open._id}/claim`).set('Authorization', bearer(outsider));
   assert.equal(dup.status, 409);
+
+  // Task requires a skill the outsider lacks → rejected even though now company-wide.
+  const skilled = await Task.create({
+    project: project._id, title: 'Skilled', createdBy: pm._id,
+    requiredSkills: [new mongoose.Types.ObjectId()],
+  });
+  const miss = await request(app).post(`/tasks/${skilled._id}/claim`).set('Authorization', bearer(outsider));
+  assert.equal(miss.status, 400);
 });
 
 test('claim-requests: GET 403 for employee; approve assigns task and auto-denies competitors', async () => {

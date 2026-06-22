@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TaskRow } from './TaskRow';
 import { weekBarSegment } from './bar';
 import { addableTasks } from './addRow';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
 import type { Task, Entries, Grant, Assignable } from './timesheetApi';
+import { popoverPosition, type Placement } from '../pm/popoverPosition';
+
+// Rough size of the add-task menu, used to flip it above the trigger when there
+// isn't room below. Real height is capped by max-height in CSS.
+const ADD_MENU_WIDTH = 260;
+const ADD_MENU_HEIGHT = 320;
 
 type Props = {
   weekStart: string;
@@ -33,16 +40,27 @@ export function TimesheetGrid({
   const weekIsPast = weekStart < mondayOf();
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [place, setPlace] = useState<Placement | null>(null);
   const addable = addableTasks(assignable, tasks);
+
+  // The menu is portaled to <body> so the card's `overflow: hidden` can't clip
+  // it. Anchor it to the trigger, flipping above when there's no room below.
+  useLayoutEffect(() => {
+    if (!pickerOpen || !triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPlace(popoverPosition(
+      { left: r.left, top: r.top, bottom: r.bottom, width: r.width },
+      { width: window.innerWidth, height: window.innerHeight },
+      ADD_MENU_HEIGHT, ADD_MENU_WIDTH,
+    ));
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return undefined;
-    function onDocClick(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
-    }
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [pickerOpen]);
 
   const dayTotal = (day: keyof Entries) =>
@@ -101,8 +119,9 @@ export function TimesheetGrid({
       </table>
       {!readOnly && (
         <div className="ts-card-foot">
-          <div className="ts-add-wrap" ref={pickerRef}>
+          <div className="ts-add-wrap">
             <button
+              ref={triggerRef}
               className="ts-add"
               type="button"
               aria-haspopup="menu"
@@ -111,40 +130,48 @@ export function TimesheetGrid({
             >
               + Add a task
             </button>
-            {pickerOpen && (
-              <div className="ts-add-menu" role="menu">
-                {addable.length > 0 && (
+            {pickerOpen && place && createPortal(
+              <>
+                <div className="ts-add-backdrop" onClick={() => setPickerOpen(false)} />
+                <div
+                  className="ts-add-menu"
+                  role="menu"
+                  style={{ left: place.left, top: place.top ?? undefined, bottom: place.bottom ?? undefined }}
+                >
+                  {addable.length > 0 && (
+                    <div className="ts-add-group">
+                      <div className="ts-add-group-label">My assigned tasks</div>
+                      {addable.map((a) => (
+                        <button
+                          key={a.taskId}
+                          className="ts-add-item"
+                          type="button"
+                          role="menuitem"
+                          onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
+                        >
+                          <span className="ts-add-item-title">{a.title}</span>
+                          {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {addable.length === 0 && (
+                    <div className="ts-add-empty">No assigned tasks left to add.</div>
+                  )}
                   <div className="ts-add-group">
-                    <div className="ts-add-group-label">My assigned tasks</div>
-                    {addable.map((a) => (
-                      <button
-                        key={a.taskId}
-                        className="ts-add-item"
-                        type="button"
-                        role="menuitem"
-                        onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
-                      >
-                        <span className="ts-add-item-title">{a.title}</span>
-                        {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
-                      </button>
-                    ))}
+                    <button
+                      className="ts-add-item"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { onAddBlank(); setPickerOpen(false); }}
+                    >
+                      <span className="ts-add-item-title">No task assigned</span>
+                      <span className="ts-add-item-meta">Meetings, admin, training…</span>
+                    </button>
                   </div>
-                )}
-                {addable.length === 0 && (
-                  <div className="ts-add-empty">No assigned tasks left to add.</div>
-                )}
-                <div className="ts-add-group">
-                  <button
-                    className="ts-add-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => { onAddBlank(); setPickerOpen(false); }}
-                  >
-                    <span className="ts-add-item-title">No task assigned</span>
-                    <span className="ts-add-item-meta">Meetings, admin, training…</span>
-                  </button>
                 </div>
-              </div>
+              </>,
+              document.body,
             )}
           </div>
         </div>
