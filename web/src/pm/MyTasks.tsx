@@ -147,13 +147,6 @@ export function MyTasks() {
     setError('');
     try { await proposeExtension(id, value, unit); reload(); }
     catch (e) { setError((e as Error).message); }
-
-
-
-
-
-
-    
   }
 
   async function requestMyEstimate(id: string, value: number, unit: EstimateUnit, reason: string) {

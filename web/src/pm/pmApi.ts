@@ -1,20 +1,6 @@
-import { getAccessToken } from '../api';
+import { authed } from '../fetchHelper';
 import type { Role } from './nav';
 import type { Reputation } from './reputation';
-
-const API = 'http://localhost:4000';
-
-async function authed(path: string, method = 'GET', body?: unknown) {
-  const r = await fetch(`${API}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAccessToken()}` },
-    credentials: 'include',
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error((data && data.error) || `request failed (${r.status})`);
-  return data;
-}
 
 export type Skill = { _id: string; name: string; active: boolean };
 export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean; reestimationCount?: number };
