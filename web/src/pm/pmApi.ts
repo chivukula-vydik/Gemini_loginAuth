@@ -33,7 +33,7 @@ export type Candidate = {
   _id: string; displayName: string; email: string; role: Role;
   status: Availability; loadPct: number; hours: number; capacity: number;
   skillsOk: boolean; matchedSkills: string[]; missingSkills: string[];
-  pastRecord: PastRecord; isMember: boolean;
+  activeTaskCount: number; isMember: boolean;
 };
 export type CandidatesResponse = {
   capacity: number; requiredSkills: { _id: string; name: string }[]; candidates: Candidate[];
