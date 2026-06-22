@@ -4,7 +4,9 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { User } from '../models/User.js';
+import { Task } from '../models/Task.js';
 import { summarize } from '../services/reestimations.js';
+import { directionCounts, completionStats, onTimeStats } from '../services/reputation.js';
 
 export function createUsersRouter() {
   const router = express.Router();
@@ -19,6 +21,35 @@ export function createUsersRouter() {
   router.get('/reestimations/summary', requireAuth, requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
     const requesters = await User.countDocuments({ reestimationCount: { $gt: 0 } });
     res.json({ requesters });
+  }));
+
+  // Per-person reputation (company fit). Admin only.
+  router.get('/reputation', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+    const users = await User.find({ active: { $ne: false } })
+      .select('displayName email role reestimations').sort('displayName');
+    const tasks = await Task.find({}).select('status dueDate completedAt assignees');
+
+    const byUser = new Map();
+    for (const t of tasks) {
+      for (const a of t.assignees || []) {
+        const uid = String(a.user);
+        const arr = byUser.get(uid) || [];
+        arr.push({ status: t.status, dueDate: t.dueDate, completedAt: t.completedAt });
+        byUser.set(uid, arr);
+      }
+    }
+
+    const people = users.map((u) => {
+      const ut = byUser.get(String(u._id)) || [];
+      return {
+        _id: String(u._id), displayName: u.displayName, email: u.email, role: u.role,
+        reestimations: summarize(u.reestimations),
+        direction: directionCounts(u.reestimations),
+        completion: completionStats(ut),
+        onTime: onTimeStats(ut),
+      };
+    });
+    res.json({ people });
   }));
 
   // A user's re-estimation history. A person sees their own; PM/admin see anyone's.

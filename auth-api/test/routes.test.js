@@ -978,6 +978,31 @@ test('GET /users/:id/reestimations: self/PM allowed, others forbidden; aggregate
   assert.equal(aggForbidden.status, 403);
 });
 
+test('GET /users/reputation: admin only, returns per-person company-fit shape', async () => {
+  const admin = await User.create({ email: 'rep-a@x.com', displayName: 'A', role: 'admin' });
+  const pm = await User.create({ email: 'rep-pm@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'rep-e@x.com', displayName: 'E', role: 'employee' });
+  const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
+  await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
+
+  // Non-admins (employee and PM) are forbidden.
+  const empRes = await request(app).get('/users/reputation').set('Authorization', bearer(emp));
+  assert.equal(empRes.status, 403);
+  const pmRes = await request(app).get('/users/reputation').set('Authorization', bearer(pm));
+  assert.equal(pmRes.status, 403);
+
+  // Admin sees the per-person shape.
+  const res = await request(app).get('/users/reputation').set('Authorization', bearer(admin));
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(res.body.people));
+  assert.ok(res.body.people.length > 0);
+  const person = res.body.people[0];
+  assert.ok('reestimations' in person && typeof person.reestimations === 'object');
+  assert.ok('direction' in person && typeof person.direction === 'object');
+  assert.ok('completion' in person && typeof person.completion === 'object');
+  assert.ok('onTime' in person && typeof person.onTime === 'object');
+});
+
 test('candidates no longer carry the re-estimation pastRecord, even when the user has one (Part 2 × Part 4)', async () => {
   const pm = await User.create({ email: 'pr-pm@x.com', displayName: 'PM', role: 'pm' });
   const u1 = await User.create({ email: 'pr-u1@x.com', displayName: 'U1', role: 'employee' });
