@@ -5,7 +5,7 @@ import {
   decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
-import { CandidatePicker } from './CandidatePicker';
+import { StaffMembers } from './StaffMembers';
 import { ProgressRing } from './ProgressRing';
 import { StatusBadge } from './StatusBadge';
 import { personName, initials } from './personName';
@@ -142,6 +142,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [staffing, setStaffing] = useState(false);
 
   function reload() {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
@@ -254,6 +255,15 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     </div>
   );
 
+  if (staffing) return (
+    <StaffMembers
+      projectId={id}
+      projectName={project.name}
+      onAdd={async (uid) => { await addMemberById(uid); setStaffing(false); }}
+      onBack={() => setStaffing(false)}
+    />
+  );
+
   const ownerCandidates = directory.filter((d) => (d.role === 'pm' || d.role === 'admin') && d._id !== project.ownerPm._id);
 
   const overall = tasks.length
@@ -345,8 +355,9 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
               </span>
             ))}
           </div>
-          <span className="field-hint">Add member — sorted by availability &amp; skill fit</span>
-          <CandidatePicker projectId={id} onAdd={addMemberById} />
+          <button className="btn btn-auto btn-primary" type="button" onClick={() => setStaffing(true)}>
+            Staff members
+          </button>
         </div>
       </div>
 
