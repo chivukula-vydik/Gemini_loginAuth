@@ -1,12 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { todayISO } from '../timesheet/time';
 import { etaStatus } from './eta';
-import { presetDates, etaIsoAt } from './etaPresets';
 import { popoverPosition, type Placement } from './popoverPosition';
 
-const POPOVER_WIDTH = 200;
-const POPOVER_HEIGHT = 260;
+const POPOVER_WIDTH = 220;
+const POPOVER_HEIGHT = 150;
 
 type Props = {
   etaAt: string | null;
@@ -14,6 +12,8 @@ type Props = {
   taskStatus?: string;
   onSave: (etaAt: string | null) => void;
 };
+
+function pad(n: number): string { return String(n).padStart(2, '0'); }
 
 function triggerLabel(etaAt: string | null): string {
   if (!etaAt) return 'Set completion date';
@@ -23,8 +23,7 @@ function triggerLabel(etaAt: string | null): string {
 
 export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
   const [open, setOpen] = useState(false);
-  const [custom, setCustom] = useState('');
-  const [showTime, setShowTime] = useState(false);
+  const [date, setDate] = useState('');
   const [time, setTime] = useState('18:00');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [place, setPlace] = useState<Placement | null>(null);
@@ -39,6 +38,14 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
     ));
   }, [open]);
 
+  // Prefill the inputs from the current value each time the picker opens.
+  useEffect(() => {
+    if (!open || !etaAt) return;
+    const d = new Date(etaAt);
+    setDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+  }, [open, etaAt]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -46,12 +53,11 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const presets = presetDates(todayISO(), deadline);
   const status = etaStatus(etaAt, deadline);
 
-  function commit(dateISO: string) {
-    const iso = showTime && time ? new Date(`${dateISO}T${time}`).toISOString() : etaIsoAt(dateISO);
-    onSave(iso);
+  function commit() {
+    if (!date) return;
+    onSave(new Date(`${date}T${time || '18:00'}`).toISOString());
     setOpen(false);
   }
 
@@ -75,22 +81,12 @@ export function EtaPicker({ etaAt, deadline, taskStatus, onSave }: Props) {
               width: POPOVER_WIDTH,
             }}
           >
-            <div className="eta-pop-presets">
-              {presets.map((p) => (
-                <button key={p.key} className="eta-opt" type="button" onClick={() => commit(p.dateISO)}>{p.label}</button>
-              ))}
-            </div>
             <div className="eta-pop-custom">
-              <input className="input eta-date" type="date" value={custom} onChange={(e) => setCustom(e.target.value)} />
-              <button className="eta-opt" type="button" disabled={!custom} onClick={() => custom && commit(custom)}>Set</button>
+              <input className="input eta-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input className="input eta-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
             <div className="eta-pop-foot">
-              <button className="link-btn" type="button" onClick={() => setShowTime((s) => !s)}>
-                {showTime ? 'Use 6 PM' : 'Adjust time'}
-              </button>
-              {showTime && (
-                <input className="input eta-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-              )}
+              <button className="eta-opt" type="button" disabled={!date} onClick={commit}>Set</button>
               {etaAt && (
                 <button className="link-btn eta-clear" type="button" onClick={() => { onSave(null); setOpen(false); }}>Clear</button>
               )}

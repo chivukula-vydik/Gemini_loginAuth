@@ -654,7 +654,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 }
 .eta-opt:hover { background: var(--surface); }
 .eta-opt:disabled { opacity: 0.5; cursor: not-allowed; }
-.eta-pop-custom { display: flex; gap: 4px; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.eta-pop-custom { display: flex; gap: 4px; align-items: center; }
 .eta-date { font-size: 12px; padding: 3px 6px; flex: 1; }
 .eta-time { font-size: 12px; padding: 3px 6px; }
 .eta-pop-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
