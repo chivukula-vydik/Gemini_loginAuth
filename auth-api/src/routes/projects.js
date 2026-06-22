@@ -14,7 +14,6 @@ import { effectiveDueDate, proposedDueDate } from '../services/estimate.js';
 import { equalShares } from '../services/workload.js';
 import { skillsMatch } from '../services/match.js';
 import { CAPACITY_HOURS, committedHours, classifyAvailability } from '../services/staffing.js';
-import { summarize } from '../services/reestimations.js';
 
 // Keeps only ids that refer to active skills. Returns [] for a non-array input.
 async function validActiveSkillIds(ids) {
@@ -124,10 +123,11 @@ export function createProjectsRouter() {
       }
     }
 
-    const users = await User.find({ active: true }).select('displayName email role skills reestimations');
+    const users = await User.find({ active: true }).select('displayName email role skills');
     const candidates = users.map((u) => {
       const uid = String(u._id);
-      const avail = classifyAvailability(committedHours(entriesByUser.get(uid) || []));
+      const entries = entriesByUser.get(uid) || [];
+      const avail = classifyAvailability(committedHours(entries));
       const userSkillSet = new Set((u.skills || []).map(String));
       const matchedSkills = requiredSkills.filter((s) => userSkillSet.has(s._id)).map((s) => s.name);
       const missingSkills = requiredSkills.filter((s) => !userSkillSet.has(s._id)).map((s) => s.name);
@@ -136,7 +136,7 @@ export function createProjectsRouter() {
         ...avail,
         skillsOk: skillsMatch(requiredIds, [...userSkillSet]),
         matchedSkills, missingSkills,
-        pastRecord: summarize(u.reestimations), // re-estimation scoping-risk signal (Part 4)
+        activeTaskCount: entries.length, // open (non-done) assignments
         isMember: memberSet.has(uid),
       };
     });

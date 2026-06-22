@@ -784,6 +784,12 @@ test('GET /projects/:id/candidates: workload + skill match, sorted, PM-only', as
 
   assert.equal(byId[String(member._id)].isMember, true);
 
+  // Each candidate exposes an open-task count and no longer carries the re-estimation past record.
+  for (const cand of res.body.candidates) {
+    assert.equal(typeof cand.activeTaskCount, 'number');
+    assert.equal('pastRecord' in cand, false);
+  }
+
   // Skilled-and-available sorts before busy/unskilled.
   const order = res.body.candidates.map((c) => c._id);
   assert.ok(order.indexOf(String(free._id)) < order.indexOf(String(busy._id)));
@@ -972,7 +978,7 @@ test('GET /users/:id/reestimations: self/PM allowed, others forbidden; aggregate
   assert.equal(aggForbidden.status, 403);
 });
 
-test('candidates carry pastRecord re-estimation summary (Part 2 × Part 4)', async () => {
+test('candidates no longer carry the re-estimation pastRecord, even when the user has one (Part 2 × Part 4)', async () => {
   const pm = await User.create({ email: 'pr-pm@x.com', displayName: 'PM', role: 'pm' });
   const u1 = await User.create({ email: 'pr-u1@x.com', displayName: 'U1', role: 'employee' });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
@@ -984,5 +990,6 @@ test('candidates carry pastRecord re-estimation summary (Part 2 × Part 4)', asy
   const res = await request(app).get(`/projects/${project._id}/candidates`).set('Authorization', bearer(pm));
   assert.equal(res.status, 200);
   const c = res.body.candidates.find((x) => x._id === String(u1._id));
-  assert.deepEqual(c.pastRecord, { total: 1, approved: 0, rejected: 0, pending: 1 });
+  assert.equal('pastRecord' in c, false);
+  assert.equal(typeof c.activeTaskCount, 'number');
 });
