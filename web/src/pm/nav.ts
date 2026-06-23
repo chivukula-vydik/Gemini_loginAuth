@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'pm' | 'employee';
+export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager';
 export type NavKey = 'users' | 'skills' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance';
 export type NavItem = { key: NavKey; label: string };
 
@@ -18,6 +18,13 @@ export function navForRole(role: Role): NavItem[] {
   }
   if (role === 'pm') {
     return [{ key: 'projects', label: 'Projects' }, { key: 'requests', label: 'Requests' }, timesheet, attendance];
+  }
+  if (role === 'reporting_manager') {
+    return [
+      { key: 'requests', label: 'Requests' },
+      timesheet,
+      attendance,
+    ];
   }
   return [
     { key: 'my-tasks', label: 'My Tasks' },

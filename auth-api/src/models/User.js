@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, default: '' },
   passwordHash: { type: String, default: null },
   providers: { type: [linkSchema], default: [] },
-  role: { type: String, enum: ['admin', 'pm', 'employee'], default: 'employee' },
+  role: { type: String, enum: ['admin', 'pm', 'employee', 'reporting_manager'], default: 'employee' },
   active: { type: Boolean, default: true },
   skills: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }], default: [] },
   reestimations: { type: [reestimationSchema], default: [] },
@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
   // Day the attendance feature went live for this user ("YYYY-MM-DD"), stamped on
   // first clock-in. Days before this are never flagged as missed/absent.
   attendanceActivatedDate: { type: String, default: null },
+  reportingManagerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   createdAt: { type: Date, default: Date.now },
 });
 

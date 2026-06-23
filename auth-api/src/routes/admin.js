@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -10,7 +11,7 @@ import { Timesheet } from '../models/Timesheet.js';
 import { RefreshToken } from '../models/RefreshToken.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
 
-const ROLES = ['admin', 'pm', 'employee'];
+const ROLES = ['admin', 'pm', 'employee', 'reporting_manager'];
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -21,7 +22,7 @@ export function createAdminRouter() {
   router.use(requireAuth, requireRole('admin'));
 
   router.get('/users', asyncHandler(async (req, res) => {
-    const users = await User.find().select('email displayName role active reestimationCount').sort('email');
+    const users = await User.find().select('email displayName role active reestimationCount reportingManagerId').sort('email');
     res.json(users);
   }));
 
@@ -50,6 +51,26 @@ export function createAdminRouter() {
     target.active = active;
     await target.save();
     res.json({ _id: target._id, email: target.email, displayName: target.displayName, role: target.role, active: target.active });
+  }));
+
+  router.patch('/users/:id/reporting-manager', asyncHandler(async (req, res) => {
+    const { reportingManagerId } = req.body || {};
+    if (reportingManagerId !== null) {
+      if (!reportingManagerId || !mongoose.isValidObjectId(reportingManagerId)) {
+        return res.status(400).json({ error: 'invalid reportingManagerId' });
+      }
+      const rm = await User.findById(reportingManagerId);
+      if (!rm || rm.role !== 'reporting_manager') {
+        return res.status(400).json({ error: 'target user must have reporting_manager role' });
+      }
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { reportingManagerId: reportingManagerId || null },
+      { new: true },
+    ).select('email displayName role active reportingManagerId');
+    if (!user) return res.status(404).json({ error: 'not found' });
+    res.json(user);
   }));
 
   router.delete('/users/:id', asyncHandler(async (req, res) => {
