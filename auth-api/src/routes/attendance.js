@@ -235,7 +235,7 @@ export function createAttendanceRouter(shiftConfig) {
         const openBreakElapsed = openBreak ? (now - new Date(openBreak.start)) / 60000 : 0;
         const liveBreakMinutes = (doc.breakMinutes || 0) + openBreakElapsed;
         const liveGrossMinutes = (now - new Date(doc.checkIn)) / 60000;
-        return { ...doc, effectiveMinutes: Math.max(0, liveGrossMinutes - liveBreakMinutes) };
+        return { ...doc, effectiveMinutes: Math.round(Math.max(0, liveGrossMinutes - liveBreakMinutes)) };
       }
 
       if (doc.date < today) {
