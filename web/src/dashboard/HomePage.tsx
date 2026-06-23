@@ -74,7 +74,7 @@ export function HomePage({ onNavigate }: Props) {
                 )}
                 <div className="dash-progress">
                   <div className="dash-progress-fill" style={{
-                    width: `${Math.min(100, Math.round((data.attendance.effectiveMinutes / data.attendance.shiftDuration) * 100))}%`,
+                    width: `${data.attendance.shiftDuration > 0 ? Math.min(100, Math.round((data.attendance.effectiveMinutes / data.attendance.shiftDuration) * 100)) : 0}%`,
                   }} />
                 </div>
                 <span className="dash-metric-sub">{fmtMin(data.attendance.effectiveMinutes)} / {fmtMin(data.attendance.shiftDuration)}</span>
@@ -119,7 +119,7 @@ export function HomePage({ onNavigate }: Props) {
                 <span className="dash-metric-value">{fmtMin(data.timesheet.totalMinutes)}</span>
                 <div className="dash-progress">
                   <div className="dash-progress-fill" style={{
-                    width: `${Math.min(100, Math.round((data.timesheet.totalMinutes / data.timesheet.targetMinutes) * 100))}%`,
+                    width: `${data.timesheet.targetMinutes > 0 ? Math.min(100, Math.round((data.timesheet.totalMinutes / data.timesheet.targetMinutes) * 100)) : 0}%`,
                   }} />
                 </div>
                 <span className="dash-metric-sub">Target: {fmtMin(data.timesheet.targetMinutes)}</span>
