@@ -151,6 +151,43 @@ test('GET /attendance/month merges holidays as synthetic entries without persist
   assert.equal(persisted, null);
 });
 
+test('GET /attendance/range returns docs for an arbitrary date span, merging holiday placeholders', async () => {
+  const admin = await User.create({ email: 'range-admin@x.com', displayName: 'A', role: 'admin' });
+  const emp = await User.create({ email: 'range-emp@x.com', displayName: 'E', role: 'employee' });
+  await request(app).post('/holidays')
+    .set('Authorization', bearer(admin)).send({ date: '2026-11-03', name: 'Mid-week Holiday' });
+  await Attendance.create({ userId: emp._id, date: '2026-11-01', status: 'present', effectiveMinutes: 480 });
+
+  const res = await request(app)
+    .get('/attendance/range?start=2026-11-01&end=2026-11-05')
+    .set('Authorization', bearer(emp));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.length, 2);
+  const present = res.body.find((d) => d.date === '2026-11-01');
+  assert.equal(present.status, 'present');
+  const holiday = res.body.find((d) => d.date === '2026-11-03');
+  assert.equal(holiday.status, 'holiday');
+  assert.equal(holiday.note, 'Mid-week Holiday');
+});
+
+test('GET /attendance/range spanning two calendar months returns both months\' docs', async () => {
+  const emp = await User.create({ email: 'range-span@x.com', displayName: 'E', role: 'employee' });
+  await Attendance.create({ userId: emp._id, date: '2026-01-30', status: 'present', effectiveMinutes: 480 });
+  await Attendance.create({ userId: emp._id, date: '2026-02-02', status: 'present', effectiveMinutes: 480 });
+
+  const res = await request(app)
+    .get('/attendance/range?start=2026-01-29&end=2026-02-02')
+    .set('Authorization', bearer(emp));
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.map((d) => d.date), ['2026-01-30', '2026-02-02']);
+});
+
+test('GET /attendance/range requires both start and end', async () => {
+  const emp = await User.create({ email: 'range-missing@x.com', displayName: 'E', role: 'employee' });
+  const res = await request(app).get('/attendance/range?start=2026-09-01').set('Authorization', bearer(emp));
+  assert.equal(res.status, 400);
+});
+
 test('GET /attendance/stats excludes holiday dates from the absent count', async () => {
   const admin = await User.create({ email: 'hol-stats-admin@x.com', displayName: 'A', role: 'admin' });
   const emp = await User.create({ email: 'hol-stats@x.com', displayName: 'E', role: 'employee' });

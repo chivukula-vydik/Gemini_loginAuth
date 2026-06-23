@@ -37,6 +37,24 @@ function holidayPlaceholder(userId, holiday) {
   };
 }
 
+// Shared by /month and /range: real docs for [startDate, endDate] (inclusive,
+// "YYYY-MM-DD" string compare) merged with synthetic holiday placeholders for
+// any date in range that has no real doc.
+async function fetchRange(userId, startDate, endDate) {
+  const docs = await Attendance.find({
+    userId,
+    date: { $gte: startDate, $lte: endDate },
+  }).sort({ date: 1 });
+
+  const covered = new Set(docs.map((d) => d.date));
+  const holidays = await Holiday.find({ date: { $gte: startDate, $lte: endDate } });
+  const synthetic = holidays
+    .filter((h) => !covered.has(h.date))
+    .map((h) => holidayPlaceholder(userId, h));
+
+  return [...docs.map((d) => d.toObject()), ...synthetic].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function createAttendanceRouter(shiftConfig) {
   const router = express.Router();
   const shift = { ...DEFAULT_SHIFT, ...(shiftConfig || {}) };
@@ -191,18 +209,18 @@ export function createAttendanceRouter(shiftConfig) {
     const startDate = `${y}-${m}-01`;
     const endDate = `${y}-${m}-31`;       // inclusive range, Mongo string compare handles it
 
-    const docs = await Attendance.find({
-      userId: req.user.sub,
-      date: { $gte: startDate, $lte: endDate },
-    }).sort({ date: 1 });
+    const merged = await fetchRange(req.user.sub, startDate, endDate);
+    res.json(merged);
+  }));
 
-    const covered = new Set(docs.map((d) => d.date));
-    const holidays = await Holiday.find({ date: { $gte: startDate, $lte: endDate } });
-    const synthetic = holidays
-      .filter((h) => !covered.has(h.date))
-      .map((h) => holidayPlaceholder(req.user.sub, h));
+  // GET /attendance/range?start=2026-06-22&end=2026-06-26 — arbitrary date
+  // span, e.g. a Mon-Fri timesheet week (which can cross a month boundary,
+  // unlike /month).
+  router.get('/range', asyncHandler(async (req, res) => {
+    const { start, end } = req.query;
+    if (!start || !end) return res.status(400).json({ error: 'start and end required' });
 
-    const merged = [...docs.map((d) => d.toObject()), ...synthetic].sort((a, b) => a.date.localeCompare(b.date));
+    const merged = await fetchRange(req.user.sub, start, end);
     res.json(merged);
   }));
 
