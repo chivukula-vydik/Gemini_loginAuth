@@ -55,18 +55,34 @@ export function createTimesheetRouter() {
     const docs = await Timesheet.find(filter)
       .populate('userId', 'displayName email')
       .sort('-submittedAt');
-    res.json(docs.map((d) => ({
-      _id: String(d._id),
-      user: d.userId
-        ? { _id: String(d.userId._id), displayName: d.userId.displayName, email: d.userId.email }
-        : null,
-      weekStart: d.weekStart,
-      submittedAt: d.submittedAt,
-      totalMinutes: d.tasks.reduce(
-        (sum, t) => sum + DAYS.reduce((a, day) => a + (t.entries?.[day] || 0), 0),
-        0,
-      ),
-    })));
+    res.json(docs.map((d) => {
+      let billableMinutes = 0;
+      let nonBillableMinutes = 0;
+      for (const t of d.tasks || []) {
+        for (const day of DAYS) {
+          const mins = t.entries?.[day] || 0;
+          if (mins > 0) {
+            const isBillable = t.billable?.[day] != null ? t.billable[day] : false;
+            if (isBillable) billableMinutes += mins;
+            else nonBillableMinutes += mins;
+          }
+        }
+      }
+      return {
+        _id: String(d._id),
+        user: d.userId
+          ? { _id: String(d.userId._id), displayName: d.userId.displayName, email: d.userId.email }
+          : null,
+        weekStart: d.weekStart,
+        submittedAt: d.submittedAt,
+        totalMinutes: d.tasks.reduce(
+          (sum, t) => sum + DAYS.reduce((a, day) => a + (t.entries?.[day] || 0), 0),
+          0,
+        ),
+        billableMinutes,
+        nonBillableMinutes,
+      };
+    }));
   }));
 
   router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
@@ -193,7 +209,23 @@ export function createTimesheetRouter() {
       projectId: t.project ? String(t.project) : null,
     }]));
 
+    const projectIds = [...new Set(infoTasks.map((t) => String(t.project)).filter(Boolean))];
+    const billingProjects = projectIds.length
+      ? await Project.find({ _id: { $in: projectIds } }).select('billingType')
+      : [];
+    const billingByProject = new Map(billingProjects.map((p) => [String(p._id), p.billingType === 'billable']));
+
     const tasks = mergeWeekRows({ savedRows, taskInfoById });
+    const tasksWithBillable = tasks.map((t) => {
+      const savedRow = (doc?.tasks || []).find((s) => s.id === t.id);
+      const projectBillable = t.projectId ? (billingByProject.get(t.projectId) ?? false) : false;
+      const billableRaw = savedRow?.billable || {};
+      const effectiveBillable = {};
+      for (const d of DAYS) {
+        effectiveBillable[d] = billableRaw[d] != null ? billableRaw[d] : projectBillable;
+      }
+      return { ...t, billable: billableRaw, effectiveBillable };
+    });
     const assignable = assignableTasks(
       assignedTasks.map((t) => ({
         _id: String(t._id), title: t.title, description: t.description || '', status: t.status,
@@ -227,7 +259,7 @@ export function createTimesheetRouter() {
     }
 
     res.json({
-      weekStart, tasks, assignable, todayDay, grants, pending, readOnly,
+      weekStart, tasks: tasksWithBillable, assignable, todayDay, grants, pending, readOnly,
       status,
       submittedAt: doc?.submittedAt || null,
       reviewedAt: doc?.reviewedAt || null,
@@ -264,10 +296,20 @@ export function createTimesheetRouter() {
     const ds = doc?.dayStatus || {};
     const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, taskStartById, weekStart, todayDay, grants, dayStatus: ds });
 
+    const billableByRowId = new Map(
+      (Array.isArray(req.body?.tasks) ? req.body.tasks : [])
+        .filter((t) => t?.id && t?.billable)
+        .map((t) => [t.id, t.billable]),
+    );
+    const rowsWithBillable = rows.map((r) => ({
+      ...r,
+      billable: billableByRowId.get(r.id) || r.billable || {},
+    }));
+
     const updatedAt = new Date();
     await Timesheet.updateOne(
       { userId, weekStart },
-      { $set: { tasks: rows, updatedAt }, $setOnInsert: { userId, weekStart } },
+      { $set: { tasks: rowsWithBillable, updatedAt }, $setOnInsert: { userId, weekStart } },
       { upsert: true },
     );
     for (const g of consumed) {
