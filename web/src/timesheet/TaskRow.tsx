@@ -79,6 +79,8 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
               minutes={task.entries[d] || 0}
               readOnly={!editable}
               onChange={(m) => onCellChange(d, m)}
+              note={task.notes?.[d] || ''}
+              onNoteChange={(text) => onNoteChange(d, text)}
             />
             {canRequest && (
               pending
