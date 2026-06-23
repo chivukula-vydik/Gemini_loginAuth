@@ -11,6 +11,7 @@ import { MyTasks } from './pm/MyTasks';
 import { MySkills } from './pm/MySkills';
 import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
+import { Utilization } from './pm/Utilization';
 import { UrlTracking } from './pm/UrlTracking';
 import { UrlCategories } from './pm/UrlCategories';
 import { ThemeToggle } from './ThemeToggle';
@@ -28,6 +29,7 @@ function viewFor(key: NavKey) {
     case 'marketplace': return <Marketplace />;
     case 'timesheet': return <TimesheetPage />;
     case 'attendance': return <AttendancePage />;
+    case 'utilization': return <Utilization />;
     case 'url-tracking': return <UrlTracking />;
     case 'url-categories': return <UrlCategories />;
   }
@@ -44,6 +46,7 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'my-skills': <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />,
   timesheet: <path d="M12 8v4l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
   attendance: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11l-4 4-2-2" />,
+  utilization: <path d="M18 20V10M12 20V4M6 20v-6" />,
   'url-tracking': <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />,
   'url-categories': <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />,
 };
