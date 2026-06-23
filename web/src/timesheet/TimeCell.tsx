@@ -57,14 +57,16 @@ export function TimeCell({ minutes, onChange, note = '', onNoteChange, readOnly 
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
       />
-      <button
-        className={`note-icon${hasNote ? ' note-icon-filled' : ''}`}
-        type="button"
-        aria-label={hasNote ? 'Edit note' : 'Add note'}
-        onClick={() => setNoteOpen(true)}
-      >
-        🗒
-      </button>
+      {onNoteChange && (
+        <button
+          className={`note-icon${hasNote ? ' note-icon-filled' : ''}`}
+          type="button"
+          aria-label={hasNote ? 'Edit note' : 'Add note'}
+          onClick={() => setNoteOpen(true)}
+        >
+          🗒
+        </button>
+      )}
       {noteOpen && onNoteChange && (
         <NotePopover note={note} readOnly={false} onChange={onNoteChange} onClose={() => setNoteOpen(false)} anchorRef={cellRef} />
       )}
