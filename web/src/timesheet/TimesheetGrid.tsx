@@ -7,6 +7,8 @@ import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from '
 import type { Day } from './time';
 import type { Task, Entries, Grant, Assignable } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
+import { attendanceLabel, attendanceBadgeClass } from './attendanceRow';
+import type { AttendanceCell } from './attendanceRow';
 
 // Rough size of the add-task menu, used to flip it above the trigger when there
 // isn't room below. Real height is capped by max-height in CSS.
@@ -22,6 +24,7 @@ type Props = {
   grants: Grant[];
   pendingKeys: Set<string>;
   leaveDays?: Partial<Record<Day, string>>;   // day -> leave type label, for approved leave
+  attendance?: Partial<Record<Day, AttendanceCell>>;
   onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
@@ -32,7 +35,7 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, leaveDays = {}, onRequestEdit,
+  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, leaveDays = {}, attendance = {}, onRequestEdit,
   onRename, onCellChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
@@ -97,6 +100,25 @@ export function TimesheetGrid({
               </td>
             </tr>
           )}
+          <tr className="ts-attendance-row">
+            <td className="ts-task">Attendance</td>
+            {DAYS.map((d) => {
+              const cell = attendance[d];
+              return (
+                <td key={d} className="ts-attendance-cell">
+                  {cell ? (
+                    <>
+                      <span className={attendanceBadgeClass(cell.status)}>{attendanceLabel(cell.status)}</span>
+                      <div className="ts-attendance-hours">{formatMinutes(cell.effectiveMinutes)}</div>
+                    </>
+                  ) : (
+                    <span className="ts-muted">—</span>
+                  )}
+                </td>
+              );
+            })}
+            <td></td><td></td>
+          </tr>
           {tasks.map((t) => (
             <TaskRow
               key={t.id}
@@ -155,10 +177,12 @@ export function TimesheetGrid({
                           className="ts-add-item"
                           type="button"
                           role="menuitem"
+                          title={a.description || undefined}
                           onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
                         >
                           <span className="ts-add-item-title">{a.title}</span>
                           {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
+                          {a.description && <span className="ts-add-item-meta">{a.description}</span>}
                         </button>
                       ))}
                     </div>
