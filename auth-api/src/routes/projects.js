@@ -29,8 +29,9 @@ export function createProjectsRouter() {
   router.use(requireAuth);
 
   router.post('/', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
-    const { name, description, members, startDate, targetDate, requiredSkills } = req.body || {};
+    const { name, description, members, startDate, targetDate, requiredSkills, clientName, billingType, billingRate, currency } = req.body || {};
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+    if (!clientName || !String(clientName).trim()) return res.status(400).json({ error: 'clientName required' });
     const project = await Project.create({
       name: String(name).trim(),
       description: String(description || ''),
@@ -39,6 +40,10 @@ export function createProjectsRouter() {
       requiredSkills: await validActiveSkillIds(requiredSkills),
       startDate: startDate || null,
       targetDate: targetDate || null,
+      clientName: String(clientName).trim(),
+      billingType: ['billable', 'non-billable'].includes(billingType) ? billingType : 'non-billable',
+      billingRate: billingType === 'billable' && billingRate != null ? Number(billingRate) : null,
+      currency: billingType === 'billable' && currency ? String(currency) : null,
     });
     res.status(201).json(project);
   }));
@@ -151,7 +156,7 @@ export function createProjectsRouter() {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    for (const f of ['name', 'description', 'status', 'startDate', 'targetDate']) {
+    for (const f of ['name', 'description', 'status', 'startDate', 'targetDate', 'clientName', 'billingType', 'billingRate', 'currency']) {
       if (f in (req.body || {})) project[f] = req.body[f];
     }
     if (Array.isArray(req.body?.members)) project.members = req.body.members;
