@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../authContext';
 import { personName } from '../pm/personName';
 import { getDashboard, DashboardData } from './dashboardApi';
-import type { NavKey } from '../pm/nav';
-
-type Props = { onNavigate: (key: NavKey) => void };
+import { pathForKey } from '../pm/nav';
 
 function fmtMin(m: number): string {
   const h = Math.floor(m / 60);
@@ -26,8 +25,9 @@ const STATUS_COLOR: Record<string, string> = {
   done: 'var(--info, #3b82f6)',
 };
 
-export function HomePage({ onNavigate }: Props) {
+export function HomePage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
 
@@ -60,7 +60,7 @@ export function HomePage({ onNavigate }: Props) {
         <div className="dash-grid">
           {/* Attendance */}
           {data.attendance && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('attendance')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('attendance'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-status-dot" style={{ background: STATUS_COLOR[data.attendance.status] }} />
                 <span className="dash-card-title">Attendance</span>
@@ -84,7 +84,7 @@ export function HomePage({ onNavigate }: Props) {
 
           {/* Leave Balance */}
           {data.leave && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('attendance')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('attendance'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-card-title">Leave Balance</span>
                 {data.leave.pendingCount > 0 && (
@@ -110,7 +110,7 @@ export function HomePage({ onNavigate }: Props) {
 
           {/* Timesheet */}
           {data.timesheet && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('timesheet')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('timesheet'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-card-title">Timesheet</span>
                 <span className="dash-card-sub">This week</span>
@@ -133,7 +133,7 @@ export function HomePage({ onNavigate }: Props) {
 
           {/* Tasks */}
           {data.tasks && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('my-tasks')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('my-tasks'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-card-title">My Tasks</span>
               </div>
@@ -160,7 +160,7 @@ export function HomePage({ onNavigate }: Props) {
 
           {/* Pending Approvals — team roles only */}
           {isTeam && data.pendingApprovals && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('requests')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('requests'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-card-title">Pending Approvals</span>
               </div>
@@ -182,7 +182,7 @@ export function HomePage({ onNavigate }: Props) {
 
           {/* Team Overview — team roles only */}
           {isTeam && data.teamSummary && (
-            <div className="ts-card dash-card" onClick={() => onNavigate('attendance')} role="button" tabIndex={0}>
+            <div className="ts-card dash-card" onClick={() => navigate(pathForKey('attendance'))} role="button" tabIndex={0}>
               <div className="dash-card-head">
                 <span className="dash-card-title">Team Overview</span>
                 <span className="dash-card-sub">Today</span>
