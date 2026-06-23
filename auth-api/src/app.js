@@ -20,6 +20,7 @@ import { createLeaveRouter } from './routes/leave.js';
 import { createHolidaysRouter } from './routes/holidays.js';
 import { createReportsRouter } from './routes/reports.js';
 import { createUrlTrackingRouter } from './routes/urlTracking.js';
+import { createDashboardRouter } from './routes/dashboard.js';
 
 export function createApp(config) {
   const app = express();
@@ -89,6 +90,7 @@ export function createApp(config) {
   app.use('/holidays', createHolidaysRouter());
   app.use('/reports', createReportsRouter());
   app.use('/url-tracking', createUrlTrackingRouter());
+  app.use('/dashboard', createDashboardRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
