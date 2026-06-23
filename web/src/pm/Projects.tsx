@@ -18,6 +18,10 @@ export function Projects() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [billingType, setBillingType] = useState<'billable' | 'non-billable'>('non-billable');
+  const [billingRate, setBillingRate] = useState('');
+  const [currency, setCurrency] = useState('USD');
   const [error, setError] = useState('');
   const today = todayISO();
 
@@ -26,10 +30,17 @@ export function Projects() {
 
   async function add() {
     if (!name.trim()) return;
+    if (!clientName.trim()) { setError('Client name is required'); return; }
     setError('');
     try {
-      await createProject({ name: name.trim(), description: description.trim() });
-      setName(''); setDescription(''); reload();
+      await createProject({
+        name: name.trim(), description: description.trim(),
+        clientName: clientName.trim(), billingType,
+        billingRate: billingType === 'billable' && billingRate ? Number(billingRate) : null,
+        currency: billingType === 'billable' ? currency : null,
+      });
+      setName(''); setDescription(''); setClientName(''); setBillingType('non-billable'); setBillingRate(''); setCurrency('USD');
+      reload();
     } catch (e) { setError((e as Error).message); }
   }
 
@@ -49,6 +60,26 @@ export function Projects() {
           <input className="input" placeholder="Description (optional)" value={description}
             onChange={(e) => setDescription(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+          <input className="input" placeholder="Client name *" value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+          <select className="input pm-select" value={billingType}
+            onChange={(e) => setBillingType(e.target.value as 'billable' | 'non-billable')}>
+            <option value="non-billable">Non-Billable</option>
+            <option value="billable">Billable</option>
+          </select>
+          {billingType === 'billable' && (
+            <>
+              <input className="input" type="number" placeholder="Billing rate" value={billingRate}
+                onChange={(e) => setBillingRate(e.target.value)} style={{ width: 100 }} />
+              <select className="input pm-select" value={currency} onChange={(e) => setCurrency(e.target.value)} style={{ width: 80 }}>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="INR">INR</option>
+              </select>
+            </>
+          )}
           <button className="btn btn-auto btn-primary" onClick={add}>Create</button>
         </div>
       </header>
@@ -86,7 +117,7 @@ export function Projects() {
           </div>
         ) : (
         <table className="ts-table">
-          <thead><tr><th className="ts-task">Project</th><th className="col-left">Progress</th><th className="col-left">Tasks</th><th className="col-left">Status</th></tr></thead>
+          <thead><tr><th className="ts-task">Project</th><th className="col-left">Client</th><th className="col-left">Progress</th><th className="col-left">Tasks</th><th className="col-left">Status</th></tr></thead>
           <tbody>
             {projects.map((p) => {
               const pct = p.progress ?? 0;
@@ -118,6 +149,7 @@ export function Projects() {
                     );
                   })()}
                 </td>
+                <td className="col-left ts-sub">{p.clientName || '—'}</td>
                 <td className="col-left">
                   <div className="prog">
                     <div className="prog-track"><div className={`prog-fill ${barClass}`} style={{ width: `${pct}%` }} /></div>
@@ -325,6 +357,17 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         ) : (
           <>
             <p className="ts-sub">{project.description || 'No description yet.'}</p>
+            <div className="ts-sub" style={{ marginTop: 8 }}>
+              <strong>Client:</strong> {project.clientName || 'Unassigned'}
+              {' · '}
+              <span className={`status-badge ${project.billingType === 'billable' ? 'status-done' : 'status-archived'}`}>
+                <span className="status-dot" aria-hidden="true" />
+                {project.billingType === 'billable' ? 'Billable' : 'Non-Billable'}
+              </span>
+              {project.billingType === 'billable' && project.billingRate != null && (
+                <span> · {project.currency ?? 'USD'} {project.billingRate}/hr</span>
+              )}
+            </div>
             <button className="btn btn-auto" onClick={() => { setDescriptionDraft(project.description || ''); setEditingDescription(true); }}>
               Edit description
             </button>

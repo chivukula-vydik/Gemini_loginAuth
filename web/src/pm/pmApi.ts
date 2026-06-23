@@ -13,6 +13,7 @@ export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; requiredSkills?: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
+  clientName?: string; billingType?: 'billable' | 'non-billable'; billingRate?: number | null; currency?: string | null;
 };
 export type Availability = 'available' | 'standby' | 'busy';
 export type PastRecord = { total: number; approved: number; rejected: number; pending: number };
