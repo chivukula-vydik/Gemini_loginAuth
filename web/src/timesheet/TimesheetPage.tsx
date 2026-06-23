@@ -3,7 +3,8 @@ import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
 import { getWeek, saveWeek, submitWeek, submitDays, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
-import type { DayStatusMap, ProjectRef } from './timesheetApi';
+import type { DayStatusMap, ProjectRef, Attachment } from './timesheetApi';
+import { AttachmentBar } from './AttachmentBar';
 import { blankRow, rowFromAssignable } from './addRow';
 import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
@@ -41,6 +42,7 @@ export function TimesheetPage() {
   const [targetMinutes, setTargetMinutes] = useState(2400);
   const [dayStatus, setDayStatus] = useState<DayStatusMap>({} as DayStatusMap);
   const [checkedDays, setCheckedDays] = useState<Set<Day>>(new Set());
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [projects, setProjects] = useState<ProjectRef[]>([]);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,6 +69,7 @@ export function TimesheetPage() {
       setTargetMinutes(loaded.targetMinutes);
       setDayStatus(loaded.dayStatus);
       setCheckedDays(new Set());
+      setAttachments(loaded.attachments);
       setProjects(loaded.projects);
     } catch (e) {
       if (weekStartRef.current !== week) return;
@@ -309,6 +312,13 @@ export function TimesheetPage() {
         onProgress={onProgress}
         projects={projects}
         onTaskCreated={(a) => onAddAssigned(a)}
+      />
+
+      <AttachmentBar
+        weekStart={weekStart}
+        attachments={attachments}
+        readOnly={readOnly}
+        onUpdate={setAttachments}
       />
 
       {leaveOpen && (

@@ -1,5 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import multer from 'multer';
+import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -29,6 +31,12 @@ async function approvedGrantsFor(userId, weekStart) {
 async function pendingGrantsFor(userId, weekStart) {
   const reqs = await EditRequest.find({ userId, weekStart, status: 'pending' }).select('day projectId');
   return reqs.map((r) => ({ day: r.day, projectId: String(r.projectId) }));
+}
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function getBucket() {
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'timesheetFiles' });
 }
 
 export function createTimesheetRouter() {
@@ -127,6 +135,22 @@ export function createTimesheetRouter() {
     res.json(rows);
   }));
 
+  router.get('/attachments/:fileId', asyncHandler(async (req, res) => {
+    const { fileId } = req.params;
+    if (!mongoose.isValidObjectId(fileId)) return res.status(400).json({ error: 'invalid fileId' });
+    const bucket = getBucket();
+    const files = await bucket.find({ _id: new mongoose.Types.ObjectId(fileId) }).toArray();
+    if (files.length === 0) return res.status(404).json({ error: 'file not found' });
+    const file = files[0];
+    const meta = file.metadata || {};
+    if (String(meta.userId) !== String(req.user.sub) && !['pm', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    res.set('Content-Type', file.contentType || 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${file.filename}"`);
+    bucket.openDownloadStream(file._id).pipe(res);
+  }));
+
   router.get('/:weekStart', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
@@ -206,6 +230,10 @@ export function createTimesheetRouter() {
       dayStatus: dayStatusOut,
       targetMinutes,
       projects: userProjects.map((p) => ({ _id: String(p._id), name: p.name })),
+      attachments: (doc?.attachments || []).map((a) => ({
+        fileId: String(a.fileId), filename: a.filename, contentType: a.contentType,
+        size: a.size, uploadedAt: a.uploadedAt,
+      })),
     });
   }));
 
@@ -348,6 +376,49 @@ export function createTimesheetRouter() {
       status: task.status,
       estimatedHours: 0,
     });
+  }));
+
+  router.post('/:weekStart/attachments', upload.single('file'), asyncHandler(async (req, res) => {
+    const { weekStart } = req.params;
+    if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday' });
+    if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
+    const userId = req.user.sub;
+    const doc = await Timesheet.findOne({ userId, weekStart });
+    if (!doc) return res.status(404).json({ error: 'no timesheet found' });
+    if ((doc.attachments || []).length >= 5) return res.status(400).json({ error: 'max 5 attachments' });
+    const bucket = getBucket();
+    const stream = bucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype,
+      metadata: { userId, weekStart },
+    });
+    const readable = new Readable();
+    readable.push(req.file.buffer);
+    readable.push(null);
+    readable.pipe(stream);
+    await new Promise((resolve, reject) => { stream.on('finish', resolve); stream.on('error', reject); });
+    const attachment = {
+      fileId: stream.id, filename: req.file.originalname, contentType: req.file.mimetype,
+      size: req.file.size, uploadedAt: new Date(),
+    };
+    doc.attachments.push(attachment);
+    await doc.save();
+    res.status(201).json({ fileId: String(attachment.fileId), filename: attachment.filename, contentType: attachment.contentType, size: attachment.size, uploadedAt: attachment.uploadedAt });
+  }));
+
+  router.delete('/:weekStart/attachments/:fileId', asyncHandler(async (req, res) => {
+    const { weekStart, fileId } = req.params;
+    if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday' });
+    if (!mongoose.isValidObjectId(fileId)) return res.status(400).json({ error: 'invalid fileId' });
+    const userId = req.user.sub;
+    const doc = await Timesheet.findOne({ userId, weekStart });
+    if (!doc) return res.status(404).json({ error: 'no timesheet found' });
+    const idx = doc.attachments.findIndex((a) => String(a.fileId) === fileId);
+    if (idx === -1) return res.status(404).json({ error: 'attachment not found' });
+    const bucket = getBucket();
+    await bucket.delete(new mongoose.Types.ObjectId(fileId));
+    doc.attachments.splice(idx, 1);
+    await doc.save();
+    res.json({ ok: true });
   }));
 
   return router;

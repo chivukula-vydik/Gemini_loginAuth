@@ -44,10 +44,15 @@ export type Assignable = {
 
 export type ProjectRef = { _id: string; name: string };
 
+export type Attachment = {
+  fileId: string; filename: string; contentType: string; size: number; uploadedAt: string;
+};
+
 export type WeekData = {
   weekStart: string; tasks: Task[]; assignable: Assignable[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
   readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
   rejectionReason: string; targetMinutes: number; dayStatus: DayStatusMap; projects: ProjectRef[];
+  attachments: Attachment[];
 };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
@@ -69,6 +74,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     targetMinutes: Number(data.targetMinutes ?? 2400),
     dayStatus: (data.dayStatus ?? {}) as DayStatusMap,
     projects: (data.projects ?? []) as ProjectRef[],
+    attachments: (data.attachments ?? []) as Attachment[],
   };
 }
 
@@ -132,4 +138,36 @@ export async function submitDays(weekStart: string, days: Day[]): Promise<void> 
     const d = await r.json().catch(() => ({}));
     throw new Error(d.error || `submit failed (${r.status})`);
   }
+}
+
+export async function uploadAttachment(weekStart: string, file: File): Promise<Attachment> {
+  const form = new FormData();
+  form.append('file', file);
+  const r = await fetch(`${API}/timesheets/${weekStart}/attachments`, {
+    method: 'POST',
+    headers: authHeaders(),
+    credentials: 'include',
+    body: form,
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `upload failed (${r.status})`);
+  }
+  return r.json();
+}
+
+export async function deleteAttachment(weekStart: string, fileId: string): Promise<void> {
+  const r = await fetch(`${API}/timesheets/${weekStart}/attachments/${fileId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+    credentials: 'include',
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `delete failed (${r.status})`);
+  }
+}
+
+export function attachmentUrl(fileId: string): string {
+  return `${API}/timesheets/attachments/${fileId}`;
 }

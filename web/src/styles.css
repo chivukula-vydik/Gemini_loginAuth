@@ -1515,6 +1515,15 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .cs-table thead th { background: var(--surface-2); color: var(--faint); font-weight: 600; font-size: 11px; text-transform: uppercase; }
 .cs-note { white-space: pre-wrap; max-width: 300px; }
 
+/* --- File attachments (#14) --- */
+.ts-att-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.ts-att-item { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 10px; font-size: 13px; }
+.ts-att-link { color: var(--primary); text-decoration: none; }
+.ts-att-link:hover { text-decoration: underline; }
+.ts-att-size { color: var(--faint); font-size: 11px; }
+.ts-att-del { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 14px; padding: 0 2px; }
+.ts-att-del:hover { color: var(--danger, #ef4444); }
+
 /* --- Daily submission (#9/#18) --- */
 .ts-day-header { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .ts-day-check { width: 14px; height: 14px; cursor: pointer; accent-color: var(--primary); }
