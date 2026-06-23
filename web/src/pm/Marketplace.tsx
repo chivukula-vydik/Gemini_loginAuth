@@ -61,7 +61,10 @@ export function Marketplace() {
             )}
             {tasks.map((t) => (
               <tr key={t._id}>
-                <td className="ts-task">{t.title}</td>
+                <td className="ts-task">
+                  {t.title}
+                  {t.description && <div className="ts-sub">{t.description}</div>}
+                </td>
                 <td className="col-left">{t.project}</td>
                 <td className="col-left">
                   {t.requiredSkills.length

@@ -134,6 +134,8 @@ export const decideExtension = (id: string, decision: 'approve' | 'reject') =>
 
 export const updateProjectMembers = (id: string, members: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { members });
+export const updateProjectDescription = (id: string, description: string) =>
+  authed(`/projects/${id}`, 'PATCH', { description });
 export const updateProjectRequiredSkills = (id: string, requiredSkills: string[]) =>
   authed(`/projects/${id}`, 'PATCH', { requiredSkills });
 export const listCandidates = (projectId: string) =>
@@ -153,7 +155,7 @@ export const listEditRequests = () => authed('/edit-requests?status=pending') as
 export const decideEditRequest = (id: string, decision: 'approved' | 'denied') =>
   authed(`/edit-requests/${id}`, 'PATCH', { decision });
 export type MarketTask = {
-  _id: string; title: string; project: string; requiredSkills: string[];
+  _id: string; title: string; description: string; project: string; requiredSkills: string[];
   estimatedHours: number; myClaimStatus: 'none' | 'pending';
 };
 export type ClaimReq = {

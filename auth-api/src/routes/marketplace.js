@@ -33,6 +33,7 @@ export function createMarketplaceRouter() {
     res.json(matched.map((t) => ({
       _id: t._id,
       title: t.title,
+      description: t.description || '',
       project: projNameById.get(String(t.project)) || '',
       requiredSkills: t.requiredSkills.map((s) => s.name),
       estimatedHours: t.estimatedHours,

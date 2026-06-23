@@ -233,7 +233,10 @@ export function MyTasks() {
             {tasks.length === 0 && <tr><td colSpan={7} className="ts-empty">No tasks assigned to you yet.</td></tr>}
             {tasks.map((t) => (
               <tr key={t._id}>
-                <td className="ts-task">{t.title}</td>
+                <td className="ts-task">
+                  {t.title}
+                  {t.description && <div className="ts-sub">{t.description}</div>}
+                </td>
                 <td className="col-left">{typeof t.project === 'object' ? t.project.name : '—'}</td>
                 <td className="col-left">
                   <EstimateCell task={t} onRequest={(v, u, r) => requestMyEstimate(t._id, v, u, r)} />

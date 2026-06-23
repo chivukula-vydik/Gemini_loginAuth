@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
-  decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills,
+  decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills, updateProjectDescription,
   Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
 import { StaffMembers } from './StaffMembers';
@@ -17,6 +17,7 @@ export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const today = todayISO();
 
@@ -26,8 +27,10 @@ export function Projects() {
   async function add() {
     if (!name.trim()) return;
     setError('');
-    try { await createProject({ name: name.trim() }); setName(''); reload(); }
-    catch (e) { setError((e as Error).message); }
+    try {
+      await createProject({ name: name.trim(), description: description.trim() });
+      setName(''); setDescription(''); reload();
+    } catch (e) { setError((e as Error).message); }
   }
 
   if (openId) return <ProjectDetail id={openId} onBack={() => { setOpenId(null); reload(); }} />;
@@ -42,6 +45,9 @@ export function Projects() {
         <div className="ts-nav-left">
           <input className="input" placeholder="New project name" value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+          <input className="input" placeholder="Description (optional)" value={description}
+            onChange={(e) => setDescription(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
           <button className="btn btn-auto btn-primary" onClick={add}>Create</button>
         </div>
@@ -137,12 +143,15 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [directory, setDirectory] = useState<Person[]>([]);
   const [title, setTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
   const [assignees, setAssignees] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [staffing, setStaffing] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
 
   function reload() {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
@@ -184,12 +193,13 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     try {
       await createTask(id, {
         title: title.trim(),
+        description: taskDescription.trim(),
         assignees: [...assignees],
         startDate: startDate || null,
         requiredSkills: [...reqSkills],
       });
       setNotice('');
-      setTitle(''); setAssignees(new Set()); setStartDate(''); setReqSkills(new Set());
+      setTitle(''); setTaskDescription(''); setAssignees(new Set()); setStartDate(''); setReqSkills(new Set());
       reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -197,6 +207,12 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   async function decide(taskId: string, decision: 'approve' | 'reject') {
     setError('');
     try { await decideEstimate(taskId, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveTaskDescription(taskId: string, description: string) {
+    setError('');
+    try { await updateTask(taskId, { description }); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -231,6 +247,16 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     setError('');
     try { await setProjectOwner(id, ownerId); reload(); }
     catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveDescription() {
+    if (!project) return;
+    setError('');
+    try {
+      await updateProjectDescription(id, descriptionDraft.trim());
+      setEditingDescription(false);
+      reload();
+    } catch (e) { setError((e as Error).message); }
   }
 
   async function removeProject() {
@@ -284,6 +310,28 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
       {error && <p className="ts-error">{error}</p>}
       {notice && <p className="ts-sub">{notice}</p>}
 
+      <div className="ts-card card-section">
+        <div className="card-title">Description</div>
+        {editingDescription ? (
+          <>
+            <textarea className="input" rows={3} value={descriptionDraft}
+              placeholder="What is this project about?"
+              onChange={(e) => setDescriptionDraft(e.target.value)} />
+            <div className="ts-nav-left" style={{ marginTop: 8 }}>
+              <button className="btn btn-auto btn-primary" onClick={saveDescription}>Save</button>
+              <button className="btn btn-auto" onClick={() => setEditingDescription(false)}>Cancel</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="ts-sub">{project.description || 'No description yet.'}</p>
+            <button className="btn btn-auto" onClick={() => { setDescriptionDraft(project.description || ''); setEditingDescription(true); }}>
+              Edit description
+            </button>
+          </>
+        )}
+      </div>
+
       <div className="ts-card overview">
         <div className="overview-ring">
           <ProgressRing value={overall} />
@@ -316,7 +364,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
               </svg>
             </span>
-            Owner
+            In charge
           </div>
           <div className="pm-row">
             <span className="person-pill">
@@ -326,7 +374,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
           <div className="pm-row-actions" style={{ marginTop: 10 }}>
             <select className="input pm-select" value="" onChange={(e) => reassignOwner(e.target.value)}>
-              <option value="">Reassign owner…</option>
+              <option value="">Reassign in charge…</option>
               {ownerCandidates.map((d) => <option key={d._id} value={d._id}>{personName(d)}</option>)}
             </select>
             <button className="btn btn-auto btn-danger-ghost" onClick={removeProject}>
@@ -389,6 +437,8 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
         <div className="ts-nav-left" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="input" placeholder="Task title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input" placeholder="Description (optional)" value={taskDescription}
+            onChange={(e) => setTaskDescription(e.target.value)} />
           <input className="input pm-select" type="date" value={startDate}
             onChange={(e) => setStartDate(e.target.value)} title="Start date" />
           <button className="btn btn-auto btn-primary" onClick={add}>Add task</button>
@@ -431,6 +481,7 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         onSaveDue={saveDue}
         onDecideExt={decideExt}
         onSaveAssignees={saveAssignees}
+        onSaveDescription={saveTaskDescription}
       />
     </div>
   );

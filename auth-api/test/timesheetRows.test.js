@@ -12,11 +12,12 @@ test('mergeWeekRows: does not auto-inject assigned tasks — only saved rows app
 
 test('mergeWeekRows: a saved linked row renders locked with task metadata', () => {
   const saved = [{ id: 't1', name: 'old', taskId: 't1', entries: { mon: 60, tue: 0, wed: 0, thu: 0, fri: 0 } }];
-  const info = new Map([['t1', { title: 'Build API', percentComplete: 25, estimatedHours: 8, actualMinutes: 120, status: 'in_progress' }]]);
+  const info = new Map([['t1', { title: 'Build API', description: 'Wire up the REST endpoints', percentComplete: 25, estimatedHours: 8, actualMinutes: 120, status: 'in_progress' }]]);
   const rows = mergeWeekRows({ savedRows: saved, taskInfoById: info });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].taskId, 't1');
   assert.equal(rows[0].name, 'Build API'); // name comes from the task, not the saved 'old'
+  assert.equal(rows[0].description, 'Wire up the REST endpoints');
   assert.equal(rows[0].locked, true);
   assert.equal(rows[0].percentComplete, 25);
   assert.equal(rows[0].actualMinutes, 120);
@@ -36,11 +37,11 @@ test('mergeWeekRows: keeps an ad-hoc (unlinked) row', () => {
 test('assignableTasks: excludes tasks already saved in the week, keeps the rest', () => {
   const assigned = [
     { _id: 't1', title: 'A', projectName: 'P1', status: 'todo', estimatedHours: 8 },
-    { _id: 't2', title: 'B', projectName: 'P2', status: 'in_progress', estimatedHours: 4 },
+    { _id: 't2', title: 'B', projectName: 'P2', status: 'in_progress', estimatedHours: 4, description: 'Build the widget' },
   ];
   const saved = [{ id: 'r1', taskId: 't1', entries: z }];
   assert.deepEqual(assignableTasks(assigned, saved), [
-    { taskId: 't2', title: 'B', projectName: 'P2', status: 'in_progress', estimatedHours: 4 },
+    { taskId: 't2', title: 'B', description: 'Build the widget', projectName: 'P2', status: 'in_progress', estimatedHours: 4 },
   ]);
 });
 

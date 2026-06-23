@@ -82,7 +82,7 @@ export function createTimesheetRouter() {
     let assignedTasks = [];
     if (pickable) {
       assignedTasks = await Task.find({ 'assignees.user': userId, status: { $ne: 'done' } })
-        .select('title status estimatedHours project')
+        .select('title description status estimatedHours project')
         .populate('project', 'name');
     }
 
@@ -91,10 +91,10 @@ export function createTimesheetRouter() {
     const idList = savedRows.filter((r) => r.taskId).map((r) => r.taskId);
     const actualMap = await actualMinutesByTask(idList);
     const infoTasks = idList.length
-      ? await Task.find({ _id: { $in: idList } }).select('title percentComplete estimatedHours status startDate project')
+      ? await Task.find({ _id: { $in: idList } }).select('title description percentComplete estimatedHours status startDate project')
       : [];
     const taskInfoById = new Map(infoTasks.map((t) => [String(t._id), {
-      title: t.title, percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
+      title: t.title, description: t.description || '', percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
       status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
       startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
       projectId: t.project ? String(t.project) : null,
@@ -103,7 +103,7 @@ export function createTimesheetRouter() {
     const tasks = mergeWeekRows({ savedRows, taskInfoById });
     const assignable = assignableTasks(
       assignedTasks.map((t) => ({
-        _id: String(t._id), title: t.title, status: t.status,
+        _id: String(t._id), title: t.title, description: t.description || '', status: t.status,
         estimatedHours: t.estimatedHours, projectName: t.project ? t.project.name : null,
       })),
       savedRows,

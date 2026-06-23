@@ -8,6 +8,7 @@ export type Entries = Record<Day, number>;
 export type Task = {
   id: string;
   name: string;
+  description?: string;
   entries: Entries;
   taskId?: string | null;
   locked?: boolean;
@@ -28,7 +29,7 @@ export type Grant = { day: Day; projectId: string };
 
 // A task the employee may add to the week via the "Add a task" picker.
 export type Assignable = {
-  taskId: string; title: string; projectName: string | null; status: string; estimatedHours: number;
+  taskId: string; title: string; description?: string; projectName: string | null; status: string; estimatedHours: number;
 };
 
 export type WeekData = {

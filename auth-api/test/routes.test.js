@@ -144,7 +144,7 @@ test('GET /timesheets offers assigned tasks to add (current week only), never au
   assert.equal(cur.body.tasks.length, 0);
   // ...but offered in the picker, labeled by project.
   assert.deepEqual(cur.body.assignable, [{
-    taskId: String(task._id), title: 'Assigned work', projectName: 'P', status: 'todo', estimatedHours: 0,
+    taskId: String(task._id), title: 'Assigned work', description: '', projectName: 'P', status: 'todo', estimatedHours: 0,
   }]);
 
   // Past weeks are read-only: nothing to add, nothing offered.

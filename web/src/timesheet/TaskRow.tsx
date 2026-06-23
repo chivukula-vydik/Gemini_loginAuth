@@ -40,6 +40,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
             {showDue && task.endDate && (
               <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
             )}
+            {task.description && <div className="ts-sub">{task.description}</div>}
             <div className="ts-pm-meta">
               Planned {task.estimatedHours ?? 0}h · Actual {((task.actualMinutes ?? 0) / 60).toFixed(1)}h
             </div>

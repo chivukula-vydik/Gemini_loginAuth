@@ -38,6 +38,7 @@ export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
         id: r.id || tid,
         taskId: tid,
         name: info.title || r.name || '',
+        description: info.description || '',
         locked: true,
         percentComplete: info.percentComplete || 0,
         estimatedHours: info.estimatedHours || 0,
@@ -67,6 +68,7 @@ export function assignableTasks(assignedTasks = [], savedRows = []) {
     .map((t) => ({
       taskId: String(t._id),
       title: t.title,
+      description: t.description || '',
       projectName: t.projectName,
       status: t.status,
       estimatedHours: t.estimatedHours,

@@ -27,6 +27,7 @@ type Props = {
   onSaveDue: (taskId: string, dueDate: string | null) => Promise<void>;
   onDecideExt: (taskId: string, decision: 'approve' | 'reject') => Promise<void>;
   onSaveAssignees: (taskId: string, next: { user: string; sharePct: number }[]) => Promise<void>;
+  onSaveDescription: (taskId: string, description: string) => Promise<void>;
 };
 
 function DueCell({ task, onSave, onDecideExt }: {
@@ -72,6 +73,8 @@ export function ProjectTasks(props: Props) {
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingAssignees, setEditingAssignees] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState<string | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
 
   const assigneeOptions = useMemo(() => (
     props.members.map((m) => ({ value: m._id, label: personName(m) }))
@@ -215,7 +218,32 @@ export function ProjectTasks(props: Props) {
                     />
                   </td>
                 )}
-                <td className="ts-task">{t.title}</td>
+                <td className="ts-task">
+                  {t.title}
+                  {editingDescription === t._id ? (
+                    <div className="ts-nav-left" style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                      <input className="input" value={descriptionDraft}
+                        placeholder="Task description"
+                        onChange={(e) => setDescriptionDraft(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            await props.onSaveDescription(t._id, descriptionDraft.trim());
+                            setEditingDescription(null);
+                          }
+                        }} />
+                      <button className="link-btn" onClick={async () => {
+                        await props.onSaveDescription(t._id, descriptionDraft.trim());
+                        setEditingDescription(null);
+                      }}>Save</button>
+                      <button className="link-btn" onClick={() => setEditingDescription(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="ts-sub" style={{ cursor: 'pointer' }}
+                      onClick={() => { setDescriptionDraft(t.description || ''); setEditingDescription(t._id); }}>
+                      {t.description || 'Add description'}
+                    </div>
+                  )}
+                </td>
                 <td className="col-left">
                   {editingAssignees === t._id ? (
                     <AssigneesEditor

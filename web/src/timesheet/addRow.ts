@@ -18,6 +18,7 @@ export function rowFromAssignable(a: Assignable): Task {
   return {
     id: crypto.randomUUID(),
     name: a.title,
+    description: a.description,
     taskId: a.taskId,
     locked: true,
     status: a.status,
