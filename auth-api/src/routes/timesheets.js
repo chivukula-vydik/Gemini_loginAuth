@@ -9,7 +9,7 @@ import { EditRequest } from '../models/EditRequest.js';
 import { User } from '../models/User.js';
 import {
   mergeWeekRows, assignableTasks, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
-  canSubmit, weekLocked,
+  weekLocked, derivedStatus,
 } from '../services/timesheetRows.js';
 import { actualMinutesByTask } from '../services/actuals.js';
 
@@ -60,15 +60,51 @@ export function createTimesheetRouter() {
     if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const doc = await Timesheet.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
-    if (doc.status !== 'submitted') return res.status(400).json({ error: 'timesheet is not awaiting review' });
-    doc.status = decision === 'approve' ? 'approved' : 'returned';
-    doc.reviewedBy = req.user.sub;
-    doc.reviewedAt = new Date();
-    doc.rejectionReason = decision === 'return'
-      ? String(req.body?.reason || '').trim().slice(0, 1000)
-      : '';
-    await doc.save();
-    res.json({ ok: true, status: doc.status });
+
+    const requestedDays = Array.isArray(req.body?.days) ? req.body.days.filter((d) => DAYS.includes(d)) : [];
+    const ds = doc.dayStatus || {};
+    let toReview = requestedDays.length > 0
+      ? requestedDays.filter((d) => (ds[d]?.status || 'draft') === 'submitted')
+      : DAYS.filter((d) => (ds[d]?.status || 'draft') === 'submitted');
+
+    // Back-compat: legacy/seeded docs may carry a week-level 'submitted' status
+    // without any per-day dayStatus populated. Treat every day as submittable
+    // in that case so older submit flows still review correctly.
+    if (toReview.length === 0 && doc.status === 'submitted') {
+      toReview = DAYS;
+    }
+
+    if (toReview.length === 0) return res.status(400).json({ error: 'no submitted days to review' });
+
+    const now = new Date();
+    const reason = decision === 'return' ? String(req.body?.reason || '').trim().slice(0, 1000) : '';
+    const update = {};
+    for (const d of toReview) {
+      update[`dayStatus.${d}.status`] = decision === 'approve' ? 'approved' : 'returned';
+      update[`dayStatus.${d}.reviewedAt`] = now;
+      update[`dayStatus.${d}.reviewedBy`] = req.user.sub;
+      update[`dayStatus.${d}.rejectionReason`] = reason;
+    }
+
+    const newDs = {};
+    for (const d of DAYS) {
+      newDs[d] = update[`dayStatus.${d}.status`]
+        ? { ...(ds[d] || {}), status: update[`dayStatus.${d}.status`] }
+        : (ds[d] || { status: 'draft' });
+    }
+    // When there are no day entries to derive a status from (e.g. a legacy
+    // doc with no tasks), fall back to the decision itself so empty test/seed
+    // timesheets still resolve to approved/returned rather than draft.
+    const hasEntries = (doc.tasks || []).some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
+    update.status = hasEntries
+      ? derivedStatus(newDs, doc.tasks)
+      : (decision === 'approve' ? 'approved' : 'returned');
+    update.reviewedBy = req.user.sub;
+    update.reviewedAt = now;
+    update.rejectionReason = reason;
+
+    await Timesheet.updateOne({ _id: doc._id }, { $set: update });
+    res.json({ ok: true, status: update.status, dayStatus: newDs });
   }));
 
   router.get('/review/:id/notes', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
@@ -146,12 +182,25 @@ export function createTimesheetRouter() {
     const targetUser = await User.findById(userId).select('weeklyTargetMinutes');
     const orgDefault = req.app.locals.weeklyTargetMinutes ?? 2400;
     const targetMinutes = targetUser?.weeklyTargetMinutes ?? orgDefault;
+
+    const ds = doc?.dayStatus || {};
+    const dayStatusOut = {};
+    for (const d of DAYS) {
+      dayStatusOut[d] = {
+        status: ds[d]?.status || 'draft',
+        submittedAt: ds[d]?.submittedAt || null,
+        reviewedAt: ds[d]?.reviewedAt || null,
+        rejectionReason: ds[d]?.rejectionReason || '',
+      };
+    }
+
     res.json({
       weekStart, tasks, assignable, todayDay, grants, pending, readOnly,
       status,
       submittedAt: doc?.submittedAt || null,
       reviewedAt: doc?.reviewedAt || null,
       rejectionReason: doc?.rejectionReason || '',
+      dayStatus: dayStatusOut,
       targetMinutes,
     });
   }));
@@ -175,7 +224,8 @@ export function createTimesheetRouter() {
     // Once submitted/approved, "today" is no longer auto-editable; only approved
     // grants punch through. Passing todayDay=null achieves exactly that.
     const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
-    const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, taskStartById, weekStart, todayDay, grants });
+    const ds = doc?.dayStatus || {};
+    const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, taskStartById, weekStart, todayDay, grants, dayStatus: ds });
 
     const updatedAt = new Date();
     await Timesheet.updateOne(
@@ -195,19 +245,53 @@ export function createTimesheetRouter() {
   router.post('/:weekStart/submit', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
+    if (weekStart > currentMonday()) return res.status(409).json({ error: 'cannot submit a future week' });
     const userId = req.user.sub;
     const doc = await Timesheet.findOne({ userId, weekStart });
-    const status = doc?.status || 'draft';
-    if (!canSubmit(status, weekStart, currentMonday())) {
-      return res.status(409).json({ error: 'this week cannot be submitted' });
+    if (!doc) return res.status(404).json({ error: 'no timesheet found' });
+
+    const requestedDays = Array.isArray(req.body?.days) ? req.body.days.filter((d) => DAYS.includes(d)) : [];
+    const ds = doc.dayStatus || {};
+    const now = new Date();
+
+    // If no days specified, submit all draft/returned non-empty days.
+    const dayTotals = {};
+    for (const d of DAYS) {
+      dayTotals[d] = (doc.tasks || []).reduce((sum, t) => sum + (t.entries?.[d] || 0), 0);
     }
-    const submittedAt = new Date();
-    await Timesheet.updateOne(
-      { userId, weekStart },
-      { $set: { status: 'submitted', submittedAt, reviewedAt: null, reviewedBy: null }, $setOnInsert: { userId, weekStart } },
-      { upsert: true },
-    );
-    res.json({ ok: true, status: 'submitted', submittedAt });
+    const toSubmit = requestedDays.length > 0
+      ? requestedDays
+      : DAYS.filter((d) => dayTotals[d] > 0 && ['draft', 'returned'].includes(ds[d]?.status || 'draft'));
+
+    if (toSubmit.length === 0) return res.status(409).json({ error: 'no submittable days' });
+
+    const update = {};
+    for (const d of toSubmit) {
+      const dayS = ds[d]?.status || 'draft';
+      if (dayS !== 'draft' && dayS !== 'returned') continue;
+      update[`dayStatus.${d}.status`] = 'submitted';
+      update[`dayStatus.${d}.submittedAt`] = now;
+      update[`dayStatus.${d}.reviewedAt`] = null;
+      update[`dayStatus.${d}.reviewedBy`] = null;
+      update[`dayStatus.${d}.rejectionReason`] = '';
+    }
+
+    if (Object.keys(update).length === 0) return res.status(409).json({ error: 'no submittable days' });
+
+    // Derive week-level status after update.
+    const newDs = { ...ds };
+    for (const d of DAYS) {
+      if (update[`dayStatus.${d}.status`]) {
+        newDs[d] = { ...(newDs[d] || {}), status: update[`dayStatus.${d}.status`] };
+      }
+    }
+    const hasEntries = (doc.tasks || []).some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
+    const newStatus = hasEntries ? derivedStatus(newDs, doc.tasks) : 'submitted';
+    update.status = newStatus;
+    if (newStatus === 'submitted') update.submittedAt = now;
+
+    await Timesheet.updateOne({ userId, weekStart }, { $set: update });
+    res.json({ ok: true, status: newStatus, dayStatus: newDs });
   }));
 
   router.post('/:weekStart/edit-requests', asyncHandler(async (req, res) => {

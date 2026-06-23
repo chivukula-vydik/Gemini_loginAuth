@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeWeekRows, assignableTasks, sanitizeRows, currentMonday, todayDayFor, computeRowLock, canSubmit, weekLocked } from '../src/services/timesheetRows.js';
+import { mergeWeekRows, assignableTasks, sanitizeRows, currentMonday, todayDayFor, computeRowLock, canSubmit, weekLocked, derivedStatus, isDayLocked } from '../src/services/timesheetRows.js';
 
 const z = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 };
 
@@ -243,4 +243,69 @@ test('weekLocked: only submitted and approved are locked', () => {
   assert.equal(weekLocked('approved'), true);
   assert.equal(weekLocked('draft'), false);
   assert.equal(weekLocked('returned'), false);
+});
+
+test('derivedStatus: all approved → approved', () => {
+  const ds = { mon: { status: 'approved' }, tue: { status: 'approved' }, wed: { status: 'approved' }, thu: { status: 'approved' }, fri: { status: 'approved' } };
+  const tasks = [{ entries: { mon: 60, tue: 60, wed: 60, thu: 60, fri: 60 } }];
+  assert.equal(derivedStatus(ds, tasks), 'approved');
+});
+
+test('derivedStatus: any returned → returned', () => {
+  const ds = { mon: { status: 'approved' }, tue: { status: 'returned' }, wed: { status: 'draft' }, thu: { status: 'draft' }, fri: { status: 'draft' } };
+  const tasks = [{ entries: { mon: 60, tue: 60, wed: 0, thu: 0, fri: 0 } }];
+  assert.equal(derivedStatus(ds, tasks), 'returned');
+});
+
+test('derivedStatus: all non-empty submitted → submitted', () => {
+  const ds = { mon: { status: 'submitted' }, tue: { status: 'submitted' }, wed: { status: 'draft' }, thu: { status: 'draft' }, fri: { status: 'draft' } };
+  const tasks = [{ entries: { mon: 60, tue: 60, wed: 0, thu: 0, fri: 0 } }];
+  assert.equal(derivedStatus(ds, tasks), 'submitted');
+});
+
+test('derivedStatus: mixed draft/submitted on non-empty days → draft', () => {
+  const ds = { mon: { status: 'submitted' }, tue: { status: 'draft' }, wed: { status: 'draft' }, thu: { status: 'draft' }, fri: { status: 'draft' } };
+  const tasks = [{ entries: { mon: 60, tue: 60, wed: 0, thu: 0, fri: 0 } }];
+  assert.equal(derivedStatus(ds, tasks), 'draft');
+});
+
+test('derivedStatus: no entries at all → draft', () => {
+  const ds = { mon: { status: 'draft' }, tue: { status: 'draft' }, wed: { status: 'draft' }, thu: { status: 'draft' }, fri: { status: 'draft' } };
+  const tasks = [];
+  assert.equal(derivedStatus(ds, tasks), 'draft');
+});
+
+test('isDayLocked: submitted day is locked', () => {
+  const ds = { mon: { status: 'submitted' } };
+  assert.equal(isDayLocked(ds, 'mon'), true);
+});
+
+test('isDayLocked: approved day is locked', () => {
+  const ds = { mon: { status: 'approved' } };
+  assert.equal(isDayLocked(ds, 'mon'), true);
+});
+
+test('isDayLocked: draft day is not locked', () => {
+  const ds = { mon: { status: 'draft' } };
+  assert.equal(isDayLocked(ds, 'mon'), false);
+});
+
+test('isDayLocked: returned day is not locked', () => {
+  const ds = { mon: { status: 'returned' } };
+  assert.equal(isDayLocked(ds, 'mon'), false);
+});
+
+test('isDayLocked: missing dayStatus defaults to draft (not locked)', () => {
+  assert.equal(isDayLocked({}, 'mon'), false);
+  assert.equal(isDayLocked(null, 'mon'), false);
+});
+
+test('computeRowLock: a submitted day is locked even in the current week', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 99, tue: 0, wed: 60, thu: 0, fri: 0 }, notes: { mon: '', tue: '', wed: '', thu: '', fri: '' } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1', entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 }, notes: { mon: '', tue: '', wed: '', thu: '', fri: '' } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const dayStatus = { mon: { status: 'submitted' }, tue: { status: 'draft' }, wed: { status: 'draft' }, thu: { status: 'draft' }, fri: { status: 'draft' } };
+  const { rows } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants: [], dayStatus });
+  assert.equal(rows[0].entries.mon, 30); // submitted day → locked, keeps saved value
+  assert.equal(rows[0].entries.wed, 60); // draft day → editable
 });

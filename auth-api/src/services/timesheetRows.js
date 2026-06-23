@@ -126,6 +126,7 @@ export function todayDayFor(weekStart, today) {
 export function computeRowLock({
   submittedRows = [], savedRows = [], taskProjectById = new Map(),
   taskStartById = new Map(), weekStart = null, todayDay = null, grants = [],
+  dayStatus = {},
 }) {
   const grantSet = new Set(grants.map((g) => `${g.day}:${String(g.projectId)}`));
   const savedById = new Map((savedRows || []).map((r) => [String(r.id), r]));
@@ -144,6 +145,7 @@ export function computeRowLock({
   // editable; future days are always locked and grants do not apply. In previous
   // weeks (todayDay null) a matching approved grant unlocks the day.
   const editableFor = (projectId, day, startDate) => {
+    if (isDayLocked(dayStatus, day)) return false;
     if (startDate) {
       const cd = dayDate(day);
       if (cd && cd < startDate) return false;
@@ -188,4 +190,24 @@ export function canSubmit(status, weekStart, currentMondayISO) {
 
 export function weekLocked(status) {
   return status === 'submitted' || status === 'approved';
+}
+
+export function derivedStatus(dayStatus, tasks) {
+  const dayTotals = {};
+  for (const d of DAYS) dayTotals[d] = 0;
+  for (const t of (tasks || [])) {
+    for (const d of DAYS) dayTotals[d] += cleanMinutes(t.entries?.[d]);
+  }
+  const nonEmpty = DAYS.filter((d) => dayTotals[d] > 0);
+  if (nonEmpty.length === 0) return 'draft';
+  const statuses = nonEmpty.map((d) => (dayStatus?.[d]?.status || 'draft'));
+  if (statuses.some((s) => s === 'returned')) return 'returned';
+  if (statuses.every((s) => s === 'approved')) return 'approved';
+  if (statuses.every((s) => s === 'submitted' || s === 'approved')) return 'submitted';
+  return 'draft';
+}
+
+export function isDayLocked(dayStatus, day) {
+  const s = dayStatus?.[day]?.status || 'draft';
+  return s === 'submitted' || s === 'approved';
 }
