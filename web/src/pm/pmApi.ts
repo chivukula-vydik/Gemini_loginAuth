@@ -3,7 +3,7 @@ import type { Role } from './nav';
 import type { Reputation } from './reputation';
 
 export type Skill = { _id: string; name: string; active: boolean };
-export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean; reestimationCount?: number };
+export type UserRow = { _id: string; email: string; displayName: string; role: Role; active?: boolean; reestimationCount?: number; reportingManagerId?: string | null };
 export type Person = { _id: string; displayName: string; email: string; role?: Role };
 export type EditReq = {
   _id: string; userId: Person; weekStart: string; day: string; reason: string; status: string; createdAt: string;
@@ -83,6 +83,8 @@ export const setUserRole = (id: string, role: Role) => authed(`/admin/users/${id
 export const setUserActive = (id: string, active: boolean) =>
   authed(`/admin/users/${id}/active`, 'PATCH', { active }) as Promise<UserRow>;
 export const deleteUser = (id: string) => authed(`/admin/users/${id}`, 'DELETE');
+export const setReportingManager = (id: string, reportingManagerId: string | null) =>
+  authed(`/admin/users/${id}/reporting-manager`, 'PATCH', { reportingManagerId });
 
 export type ReestimationEntry = {
   taskId: string; taskTitle: string; projectId: string | null; projectName: string;

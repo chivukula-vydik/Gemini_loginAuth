@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { listUsers, setUserRole, setUserActive, deleteUser, UserRow } from './pmApi';
+import { listUsers, setUserRole, setUserActive, deleteUser, setReportingManager, UserRow } from './pmApi';
 import { useAuth } from '../authContext';
 import { personName, initials } from './personName';
 import type { Role } from './nav';
 
-const ROLES: Role[] = ['admin', 'pm', 'employee'];
+const ROLES: Role[] = ['admin', 'pm', 'employee', 'reporting_manager'];
 
 export function AdminUsers() {
   const { user: me } = useAuth();
@@ -44,11 +44,22 @@ export function AdminUsers() {
     }
   }
 
+  async function assignRM(userId: string, rmId: string | null) {
+    setError('');
+    try {
+      await setReportingManager(userId, rmId);
+      setUsers((us) => us.map((u) => (u._id === userId ? { ...u, reportingManagerId: rmId } : u)));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   const total = users.length;
   const activeCount = users.filter((u) => u.active !== false).length;
   const admins = users.filter((u) => u.role === 'admin').length;
   const pms = users.filter((u) => u.role === 'pm').length;
   const employees = users.filter((u) => u.role === 'employee').length;
+  const rms = users.filter((u) => u.role === 'reporting_manager').length;
 
   return (
     <div className="ts-page">
@@ -77,6 +88,10 @@ export function AdminUsers() {
           <span className="ts-tile-label">Employees</span>
           <span className="ts-tile-value">{employees}</span>
         </div>
+        <div className="ts-tile stat-est">
+          <span className="ts-tile-label">Reporting Managers</span>
+          <span className="ts-tile-value">{rms}</span>
+        </div>
       </div>
 
       {error && <p className="ts-error">{error}</p>}
@@ -86,12 +101,13 @@ export function AdminUsers() {
             <tr>
               <th className="ts-task">User</th>
               <th className="col-left">Role</th>
+              <th className="col-left">Reporting Manager</th>
               <th className="col-left">Status</th>
               <th className="col-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 && <tr><td colSpan={4} className="ts-empty">No users found.</td></tr>}
+            {users.length === 0 && <tr><td colSpan={5} className="ts-empty">No users found.</td></tr>}
             {users.map((u) => {
               const inactive = u.active === false;
               const isSelf = u.email === me?.email;
@@ -113,6 +129,19 @@ export function AdminUsers() {
                     <select className="input pm-select" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
+                  </td>
+                  <td className="col-left">
+                    {(u.role === 'employee') ? (
+                      <select className="input pm-select" value={u.reportingManagerId || ''}
+                        onChange={(e) => assignRM(u._id, e.target.value || null)}>
+                        <option value="">None</option>
+                        {users.filter((x) => x.role === 'reporting_manager' && x.active !== false).map((rm) => (
+                          <option key={rm._id} value={rm._id}>{personName(rm)}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="ts-sub">—</span>
+                    )}
                   </td>
                   <td className="col-left">
                     <span className={`status-badge ${inactive ? 'status-archived' : 'status-done'}`}>
