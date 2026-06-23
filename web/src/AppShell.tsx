@@ -1,8 +1,9 @@
-import { useState, type ReactElement } from 'react';
+import { type ReactElement } from 'react';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
-import { navForRole, NavKey } from './pm/nav';
+import { navForRole, keyForPath, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
 import { CompanyFit } from './pm/CompanyFit';
@@ -15,23 +16,6 @@ import { Utilization } from './pm/Utilization';
 import { HomePage } from './dashboard/HomePage';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
-
-function viewFor(key: NavKey, setActive: (key: NavKey) => void) {
-  switch (key) {
-    case 'home': return <HomePage onNavigate={setActive} />;
-    case 'users': return <AdminUsers />;
-    case 'skills': return <AdminSkills />;
-    case 'company-fit': return <CompanyFit />;
-    case 'projects': return <Projects />;
-    case 'requests': return <Requests />;
-    case 'my-tasks': return <MyTasks />;
-    case 'my-skills': return <MySkills />;
-    case 'marketplace': return <Marketplace />;
-    case 'timesheet': return <TimesheetPage />;
-    case 'attendance': return <AttendancePage />;
-    case 'utilization': return <Utilization />;
-  }
-}
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -60,7 +44,9 @@ function NavIcon({ name }: { name: NavKey }) {
 export function AppShell() {
   const { user, signOut } = useAuth();
   const items = navForRole(user?.role ?? 'employee');
-  const [active, setActive] = useState<NavKey>('home');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const active = keyForPath(location.pathname);
   const name = personName(user);
   const initial = (name[0] ?? '?').toUpperCase();
 
@@ -71,7 +57,7 @@ export function AppShell() {
         <nav className="shell-nav">
           {items.map((it) => (
             <a key={it.key} className={`shell-nav-item${active === it.key ? ' active' : ''}`}
-              href="#" onClick={(e) => { e.preventDefault(); setActive(it.key); }}>
+              href={it.path} onClick={(e) => { e.preventDefault(); navigate(it.path); }}>
               <NavIcon name={it.key} />
               <span>{it.label}</span>
             </a>
@@ -95,7 +81,21 @@ export function AppShell() {
         </div>
       </aside>
       <main className="shell-content">
-        {viewFor(active, setActive)}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/users" element={<AdminUsers />} />
+          <Route path="/skills" element={<AdminSkills />} />
+          <Route path="/company-fit" element={<CompanyFit />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/requests" element={<Requests />} />
+          <Route path="/my-tasks" element={<MyTasks />} />
+          <Route path="/my-skills" element={<MySkills />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/timesheet" element={<TimesheetPage />} />
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/utilization" element={<Utilization />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </div>
   );
