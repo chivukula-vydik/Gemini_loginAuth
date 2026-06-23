@@ -24,6 +24,7 @@ export type AttendanceDoc = {
   totalMinutes: number;
   breakMinutes: number;
   effectiveMinutes: number;
+  needsRegularise?: boolean;       // set only by /attendance/range, for a past day with a missed checkout
   status: AttendanceStatus;
   punchType: PunchType;
   breaks: Break[];
