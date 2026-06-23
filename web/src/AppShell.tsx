@@ -14,11 +14,13 @@ import { Marketplace } from './pm/Marketplace';
 import { Utilization } from './pm/Utilization';
 import { UrlTracking } from './pm/UrlTracking';
 import { UrlCategories } from './pm/UrlCategories';
+import { HomePage } from './dashboard/HomePage';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 
-function viewFor(key: NavKey) {
+function viewFor(key: NavKey, setActive: (key: NavKey) => void) {
   switch (key) {
+    case 'home': return <HomePage onNavigate={setActive} />;
     case 'users': return <AdminUsers />;
     case 'skills': return <AdminSkills />;
     case 'company-fit': return <CompanyFit />;
@@ -36,6 +38,7 @@ function viewFor(key: NavKey) {
 }
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
+  home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
   users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
   skills: <path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1L12 16.6 5.7 21l2.3-7.1-6-4.5h7.6z" />,
   'company-fit': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3M9 11l3 3L22 4" />,
@@ -63,7 +66,7 @@ function NavIcon({ name }: { name: NavKey }) {
 export function AppShell() {
   const { user, signOut } = useAuth();
   const items = navForRole(user?.role ?? 'employee');
-  const [active, setActive] = useState<NavKey>(items[0].key);
+  const [active, setActive] = useState<NavKey>('home');
   const name = personName(user);
   const initial = (name[0] ?? '?').toUpperCase();
 
@@ -98,7 +101,7 @@ export function AppShell() {
         </div>
       </aside>
       <main className="shell-content">
-        {viewFor(active)}
+        {viewFor(active, setActive)}
       </main>
     </div>
   );
