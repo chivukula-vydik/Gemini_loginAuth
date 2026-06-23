@@ -177,12 +177,10 @@ export function TimesheetGrid({
                           className="ts-add-item"
                           type="button"
                           role="menuitem"
-                          title={a.description || undefined}
                           onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
                         >
                           <span className="ts-add-item-title">{a.title}</span>
                           {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
-                          {a.description && <span className="ts-add-item-meta">{a.description}</span>}
                         </button>
                       ))}
                     </div>
