@@ -73,7 +73,11 @@ export function createTimesheetRouter() {
     const userId = req.user.sub;
     const doc = await Timesheet.findOne({ userId, weekStart });
     const savedRows = doc
-      ? doc.tasks.map((t) => ({ id: t.id, name: t.name, entries: t.entries, taskId: t.taskId ? String(t.taskId) : null }))
+      ? doc.tasks.map((t) => ({
+          id: t.id, name: t.name, entries: t.entries,
+          taskId: t.taskId ? String(t.taskId) : null,
+          notes: t.notes || {},
+        }))
       : [];
 
     // The picker offers the employee's assigned, non-done tasks (across all

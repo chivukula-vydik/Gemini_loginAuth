@@ -11,11 +11,23 @@ const entriesSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const notesSchema = new mongoose.Schema(
+  {
+    mon: { type: String, default: '' },
+    tue: { type: String, default: '' },
+    wed: { type: String, default: '' },
+    thu: { type: String, default: '' },
+    fri: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const taskSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
     name: { type: String, default: '' },
     entries: { type: entriesSchema, default: () => ({}) },
+    notes: { type: notesSchema, default: () => ({}) },
     taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task', default: null },
   },
   { _id: false }

@@ -14,6 +14,23 @@ function entriesOf(row) {
   return out;
 }
 
+function notesOf(row) {
+  const n = (row && row.notes) || {};
+  const out = {};
+  for (const d of DAYS) {
+    const raw = n[d];
+    out[d] = typeof raw === 'string' ? raw.trim().slice(0, 500) : '';
+  }
+  return out;
+}
+
+function savedNotes(row) {
+  const n = (row && row.notes) || {};
+  const out = {};
+  for (const d of DAYS) out[d] = typeof n[d] === 'string' ? n[d] : '';
+  return out;
+}
+
 export function currentMonday() {
   const now = new Date();
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -48,10 +65,11 @@ export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
         endDate: endDateFrom(info.startDate || null, info.estimatedHours || 0),
         projectId: info.projectId || null,
         entries: entriesOf(r),
+        notes: savedNotes(r),
       });
       used.add(tid);
     } else {
-      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, entries: entriesOf(r) });
+      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, entries: entriesOf(r), notes: savedNotes(r) });
     }
   }
   return out;
@@ -82,7 +100,8 @@ export function sanitizeRows(rows, allowedTaskIds) {
     const entries = {};
     for (const day of DAYS) entries[day] = cleanMinutes(t?.entries?.[day]);
     const taskId = t?.taskId && allowed.has(String(t.taskId)) ? String(t.taskId) : null;
-    return { id: String(t?.id ?? ''), name: String(t?.name ?? ''), entries, taskId };
+    const notes = notesOf(t);
+    return { id: String(t?.id ?? ''), name: String(t?.name ?? ''), entries, taskId, notes };
   });
 }
 
@@ -138,12 +157,17 @@ export function computeRowLock({
     const projectId = projectOf(r);
     const startDate = startOf(r);
     const entries = {};
+    const notes = {};
     for (const d of DAYS) {
-      entries[d] = editableFor(projectId, d, startDate)
+      const editable = editableFor(projectId, d, startDate);
+      entries[d] = editable
         ? cleanMinutes(r?.entries?.[d])
         : cleanMinutes(prev?.entries?.[d]);
+      const subNote = typeof r?.notes?.[d] === 'string' ? r.notes[d] : '';
+      const prevNote = typeof prev?.notes?.[d] === 'string' ? prev.notes[d] : '';
+      notes[d] = editable ? subNote : prevNote;
     }
-    return { ...r, entries };
+    return { ...r, entries, notes };
   });
 
   const consumed = (grants || []).filter((g) => (submittedRows || []).some((r) => {

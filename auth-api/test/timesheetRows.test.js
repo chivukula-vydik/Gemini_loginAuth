@@ -73,6 +73,50 @@ test('sanitizeRows: keeps taskId only when assigned, cleans minutes', () => {
   assert.equal(rows[2].entries.mon, 15);
 });
 
+test('sanitizeRows: sanitizes notes — trims, caps at 500 chars, defaults missing to empty', () => {
+  const rows = sanitizeRows(
+    [
+      { id: 'x', name: 'A', taskId: 't1', entries: { mon: 60 }, notes: { mon: '  hello  ', tue: 'a'.repeat(600) } },
+      { id: 'y', name: 'B', entries: {}, notes: null },
+      { id: 'z', name: 'C', entries: {} },
+    ],
+    ['t1'],
+  );
+  assert.equal(rows[0].notes.mon, 'hello');
+  assert.equal(rows[0].notes.tue.length, 500);
+  assert.equal(rows[0].notes.wed, '');
+  assert.equal(rows[1].notes.mon, '');
+  assert.equal(rows[2].notes.mon, '');
+});
+
+test('mergeWeekRows: passes notes through from saved rows', () => {
+  const saved = [{ id: 'a', name: 'Email', taskId: null, entries: z, notes: { mon: 'standup', tue: '', wed: '', thu: '', fri: '' } }];
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: new Map() });
+  assert.equal(rows[0].notes.mon, 'standup');
+  assert.equal(rows[0].notes.tue, '');
+});
+
+test('mergeWeekRows: defaults missing notes to empty strings', () => {
+  const saved = [{ id: 'a', name: 'Email', taskId: null, entries: z }];
+  const rows = mergeWeekRows({ savedRows: saved, taskInfoById: new Map() });
+  assert.equal(rows[0].notes.mon, '');
+  assert.equal(rows[0].notes.fri, '');
+});
+
+test('computeRowLock: notes follow the same lock rules as minutes', () => {
+  const submitted = [{ id: 'r1', name: 'A', taskId: 't1',
+    entries: { mon: 60, tue: 0, wed: 60, thu: 0, fri: 0 },
+    notes: { mon: 'new mon', tue: '', wed: 'new wed', thu: '', fri: 'new fri' } }];
+  const saved = [{ id: 'r1', name: 'A', taskId: 't1',
+    entries: { mon: 30, tue: 0, wed: 0, thu: 0, fri: 0 },
+    notes: { mon: 'old mon', tue: '', wed: '', thu: '', fri: 'old fri' } }];
+  const taskProjectById = new Map([['t1', 'pA']]);
+  const { rows } = computeRowLock({ submittedRows: submitted, savedRows: saved, taskProjectById, todayDay: 'wed', grants: [] });
+  assert.equal(rows[0].notes.mon, 'new mon');  // editable (before today)
+  assert.equal(rows[0].notes.wed, 'new wed');  // editable (today)
+  assert.equal(rows[0].notes.fri, 'old fri');  // locked (future) — keeps saved value
+});
+
 test('currentMonday returns a Monday ISO date', () => {
   const m = currentMonday();
   assert.match(m, /^\d{4}-\d{2}-\d{2}$/);
