@@ -221,7 +221,34 @@ export function createAttendanceRouter(shiftConfig) {
     if (!start || !end) return res.status(400).json({ error: 'start and end required' });
 
     const merged = await fetchRange(req.user.sub, start, end);
-    res.json(merged);
+    const today = todayStr();
+    const now = new Date();
+
+    const withLiveData = merged.map((doc) => {
+      if (!doc.checkIn || doc.checkOut) return doc;
+
+      if (doc.date === today) {
+        // Still clocked in today: compute elapsed time live, mirroring the
+        // same formula AttendancePage already uses client-side for its own
+        // ticking display (gross time minus any closed or still-open break).
+        const openBreak = (doc.breaks || []).find((b) => !b.end);
+        const openBreakElapsed = openBreak ? (now - new Date(openBreak.start)) / 60000 : 0;
+        const liveBreakMinutes = (doc.breakMinutes || 0) + openBreakElapsed;
+        const liveGrossMinutes = (now - new Date(doc.checkIn)) / 60000;
+        return { ...doc, effectiveMinutes: Math.max(0, liveGrossMinutes - liveBreakMinutes) };
+      }
+
+      if (doc.date < today) {
+        // A past day stuck mid-session: the employee forgot to check out.
+        // Never invent an hours value — flag it so the timesheet can point
+        // back at the existing regularise flow instead.
+        return { ...doc, needsRegularise: true };
+      }
+
+      return doc;
+    });
+
+    res.json(withLiveData);
   }));
 
   // GET /attendance/stats?year=2026&month=6
