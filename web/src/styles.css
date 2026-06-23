@@ -1510,3 +1510,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .cs-table thead th { background: var(--surface-2); color: var(--faint); font-weight: 600; font-size: 11px; text-transform: uppercase; }
 .cs-note { white-space: pre-wrap; max-width: 300px; }
 
+/* --- Weekly target progress bar (#16) --- */
+.ts-progress-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin: 6px 0 4px; overflow: hidden; }
+.ts-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+

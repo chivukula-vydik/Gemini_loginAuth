@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
+import { User } from '../models/User.js';
 import {
   mergeWeekRows, assignableTasks, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
   canSubmit, weekLocked,
@@ -142,12 +143,16 @@ export function createTimesheetRouter() {
     // grants punch through. Mirrors the PUT handler's lock logic.
     const todayDay = weekLocked(status) ? null : todayDayFor(weekStart, todayISO());
     const readOnly = (weekStart < currentMonday() && grants.length === 0) || weekLocked(status);
+    const targetUser = await User.findById(userId).select('weeklyTargetMinutes');
+    const orgDefault = req.app.locals.weeklyTargetMinutes ?? 2400;
+    const targetMinutes = targetUser?.weeklyTargetMinutes ?? orgDefault;
     res.json({
       weekStart, tasks, assignable, todayDay, grants, pending, readOnly,
       status,
       submittedAt: doc?.submittedAt || null,
       reviewedAt: doc?.reviewedAt || null,
       rejectionReason: doc?.rejectionReason || '',
+      targetMinutes,
     });
   }));
 

@@ -37,7 +37,7 @@ export type Assignable = {
 export type WeekData = {
   weekStart: string; tasks: Task[]; assignable: Assignable[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
   readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
-  rejectionReason: string;
+  rejectionReason: string; targetMinutes: number;
 };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
@@ -56,6 +56,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     submittedAt: (data.submittedAt ?? null) as string | null,
     reviewedAt: (data.reviewedAt ?? null) as string | null,
     rejectionReason: String(data.rejectionReason ?? ''),
+    targetMinutes: Number(data.targetMinutes ?? 2400),
   };
 }
 

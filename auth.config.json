@@ -9,6 +9,7 @@
     "endMinute": 30,
     "durationMinutes": 540
   },
+  "weeklyTargetMinutes": 2400,
   "providers": {
     "local": { "enabled": true, "displayName": "Email & Password" },
     "google": {

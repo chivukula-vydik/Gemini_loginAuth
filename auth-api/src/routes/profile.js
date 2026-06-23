@@ -16,5 +16,20 @@ export function createProfileRouter() {
     res.json(user);
   }));
 
+  router.get('/target', requireAuth, asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.sub).select('weeklyTargetMinutes');
+    const orgDefault = req.app.locals.weeklyTargetMinutes ?? 2400;
+    const targetMinutes = user?.weeklyTargetMinutes ?? orgDefault;
+    res.json({ targetMinutes });
+  }));
+
+  router.patch('/target', requireAuth, asyncHandler(async (req, res) => {
+    const value = req.body?.weeklyTargetMinutes;
+    const weeklyTargetMinutes = value === null ? null : (Number(value) || null);
+    await User.updateOne({ _id: req.user.sub }, { $set: { weeklyTargetMinutes } });
+    const orgDefault = req.app.locals.weeklyTargetMinutes ?? 2400;
+    res.json({ targetMinutes: weeklyTargetMinutes ?? orgDefault });
+  }));
+
   return router;
 }

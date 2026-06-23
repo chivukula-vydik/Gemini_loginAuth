@@ -37,6 +37,7 @@ export function TimesheetPage() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [attendanceDocs, setAttendanceDocs] = useState<AttendanceDoc[]>([]);
   const [activatedDate, setActivatedDate] = useState<string | null>(null);
+  const [targetMinutes, setTargetMinutes] = useState(2400);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -59,6 +60,7 @@ export function TimesheetPage() {
       setSubmittedAt(loaded.submittedAt);
       setReviewedAt(loaded.reviewedAt);
       setRejectionReason(loaded.rejectionReason);
+      setTargetMinutes(loaded.targetMinutes);
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -241,6 +243,7 @@ export function TimesheetPage() {
 
       <SummaryTiles
         weekTotal={weekTotal}
+        targetMinutes={targetMinutes}
         busiestLabel={DAY_LABELS[busiest.day]}
         busiestMinutes={busiest.total}
         activeTasks={tasks.length}

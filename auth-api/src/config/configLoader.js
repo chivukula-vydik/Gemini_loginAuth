@@ -11,6 +11,9 @@ const SHIFT_DEFAULTS = {
   endMinute: 30,
   durationMinutes: 540,
 };
+const TIMESHEET_DEFAULTS = {
+  weeklyTargetMinutes: 2400,
+};
 
 function resolveEnv(value) {
   if (typeof value === 'string' && value.startsWith('env:')) {
@@ -78,6 +81,7 @@ export function loadConfig(path = process.env.AUTH_CONFIG_PATH || 'auth.config.j
     enabled,
     featureFlags: loadFeatureFlags(raw.features),
     shift: loadShiftConfig(raw.shift),
+    weeklyTargetMinutes: Number(raw.weeklyTargetMinutes) || TIMESHEET_DEFAULTS.weeklyTargetMinutes,
   };
 }
 

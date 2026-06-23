@@ -49,6 +49,7 @@ export function createApp(config) {
 
   app.locals.featureFlags = featureFlags;
   app.locals.shiftConfig = shiftConfig;
+  app.locals.weeklyTargetMinutes = Number(config?.weeklyTargetMinutes) || 2400;
   app.use(
     cors({
       origin(origin, callback) {
