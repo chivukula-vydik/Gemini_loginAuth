@@ -42,10 +42,12 @@ export type Assignable = {
   taskId: string; title: string; description?: string; projectName: string | null; status: string; estimatedHours: number;
 };
 
+export type ProjectRef = { _id: string; name: string };
+
 export type WeekData = {
   weekStart: string; tasks: Task[]; assignable: Assignable[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
   readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
-  rejectionReason: string; targetMinutes: number; dayStatus: DayStatusMap;
+  rejectionReason: string; targetMinutes: number; dayStatus: DayStatusMap; projects: ProjectRef[];
 };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
@@ -66,6 +68,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     rejectionReason: String(data.rejectionReason ?? ''),
     targetMinutes: Number(data.targetMinutes ?? 2400),
     dayStatus: (data.dayStatus ?? {}) as DayStatusMap,
+    projects: (data.projects ?? []) as ProjectRef[],
   };
 }
 
@@ -102,6 +105,20 @@ export async function submitWeek(weekStart: string): Promise<void> {
     const d = await r.json().catch(() => ({}));
     throw new Error(d.error || `submit failed (${r.status})`);
   }
+}
+
+export async function createTimesheetTask(title: string, projectId: string): Promise<Assignable> {
+  const r = await fetch(`${API}/timesheets/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    body: JSON.stringify({ title, projectId }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `create failed (${r.status})`);
+  }
+  return r.json();
 }
 
 export async function submitDays(weekStart: string, days: Day[]): Promise<void> {

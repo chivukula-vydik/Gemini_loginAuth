@@ -7,6 +7,7 @@ import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
 import { User } from '../models/User.js';
+import { Project } from '../models/Project.js';
 import {
   mergeWeekRows, assignableTasks, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
   weekLocked, derivedStatus,
@@ -172,6 +173,8 @@ export function createTimesheetRouter() {
       savedRows,
     );
 
+    const userProjects = await Project.find({ members: userId, status: 'active' }).select('name');
+
     const grants = await approvedGrantsFor(userId, weekStart);
     const pending = await pendingGrantsFor(userId, weekStart);
     const status = doc?.status || 'draft';
@@ -202,6 +205,7 @@ export function createTimesheetRouter() {
       rejectionReason: doc?.rejectionReason || '',
       dayStatus: dayStatusOut,
       targetMinutes,
+      projects: userProjects.map((p) => ({ _id: String(p._id), name: p.name })),
     });
   }));
 
@@ -317,6 +321,33 @@ export function createTimesheetRouter() {
     if (existing) return res.status(409).json({ error: 'a request for this day already exists' });
     const reqDoc = await EditRequest.create({ userId, weekStart, day, projectId, reason: String(req.body?.reason || '') });
     res.status(201).json(reqDoc);
+  }));
+
+  router.post('/tasks', asyncHandler(async (req, res) => {
+    const { title, projectId } = req.body || {};
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
+    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'invalid projectId' });
+    const userId = req.user.sub;
+    const project = await Project.findById(projectId);
+    if (!project) return res.status(404).json({ error: 'project not found' });
+    if (!project.members.some((m) => String(m) === String(userId))) {
+      return res.status(403).json({ error: 'not a member of this project' });
+    }
+    const task = await Task.create({
+      project: project._id,
+      title: String(title).trim(),
+      assignees: [{ user: userId, sharePct: 100 }],
+      status: 'todo',
+      createdBy: userId,
+    });
+    res.status(201).json({
+      taskId: String(task._id),
+      title: task.title,
+      projectId: String(project._id),
+      projectName: project.name,
+      status: task.status,
+      estimatedHours: 0,
+    });
   }));
 
   return router;

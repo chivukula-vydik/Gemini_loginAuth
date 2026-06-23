@@ -5,7 +5,8 @@ import { weekBarSegment } from './bar';
 import { addableTasks } from './addRow';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
-import type { Task, Entries, Grant, Assignable, DayStatusMap } from './timesheetApi';
+import type { Task, Entries, Grant, Assignable, DayStatusMap, ProjectRef } from './timesheetApi';
+import { createTimesheetTask } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
 import { attendanceIcon, attendanceIconColorClass, attendanceTooltip } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
@@ -35,12 +36,15 @@ type Props = {
   onAddAssigned: (a: Assignable) => void;
   onAddBlank: () => void;
   onProgress: (taskId: string, patch: { percentComplete?: number; status?: string }) => void;
+  projects?: ProjectRef[];
+  onTaskCreated?: (a: Assignable) => void;
 };
 
 export function TimesheetGrid({
   weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,
   checkedDays, onToggleDay, onRequestEdit,
   onRename, onCellChange, onNoteChange, onDelete, onAddAssigned, onAddBlank, onProgress,
+  projects, onTaskCreated,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
@@ -51,6 +55,10 @@ export function TimesheetGrid({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [place, setPlace] = useState<Placement | null>(null);
   const addable = addableTasks(assignable, tasks);
+  const [createMode, setCreateMode] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newProjectId, setNewProjectId] = useState('');
+  const [creating, setCreating] = useState(false);
 
   // The menu is portaled to <body> so the card's `overflow: hidden` can't clip
   // it. Anchor it to the trigger, flipping above when there's no room below.
@@ -69,6 +77,15 @@ export function TimesheetGrid({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [pickerOpen]);
+
+  // Reset the inline create form whenever the menu closes so reopening it
+  // starts fresh rather than showing a half-filled form from last time.
+  useEffect(() => {
+    if (pickerOpen) return;
+    setCreateMode(false);
+    setNewTitle('');
+    setNewProjectId('');
   }, [pickerOpen]);
 
   const dayTotal = (day: keyof Entries) =>
@@ -208,6 +225,45 @@ export function TimesheetGrid({
                       <span className="ts-add-item-title">No task assigned</span>
                       <span className="ts-add-item-meta">Meetings, admin, training…</span>
                     </button>
+                  </div>
+                  <div className="ts-add-group">
+                    <div className="ts-add-group-label">Create new task</div>
+                    {!createMode ? (
+                      <button className="ts-add-item" type="button" role="menuitem" onClick={() => setCreateMode(true)}>
+                        <span className="ts-add-item-title">+ New task</span>
+                        <span className="ts-add-item-meta">Create a task under a project</span>
+                      </button>
+                    ) : (
+                      <div className="ts-create-form">
+                        <select className="input ts-create-select" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)}>
+                          <option value="">Select project…</option>
+                          {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                        </select>
+                        <input className="input ts-create-input" placeholder="Task name" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                        <button
+                          className="btn btn-primary ts-create-btn"
+                          type="button"
+                          disabled={!newTitle.trim() || !newProjectId || creating}
+                          onClick={async () => {
+                            setCreating(true);
+                            try {
+                              const result = await createTimesheetTask(newTitle.trim(), newProjectId);
+                              onTaskCreated?.(result);
+                              setPickerOpen(false);
+                              setCreateMode(false);
+                              setNewTitle('');
+                              setNewProjectId('');
+                            } catch (e) {
+                              window.alert((e as Error).message);
+                            } finally {
+                              setCreating(false);
+                            }
+                          }}
+                        >
+                          {creating ? 'Creating…' : 'Create & add'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>,
