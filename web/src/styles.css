@@ -1271,22 +1271,13 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 /* Timesheet: apply-for-leave header action + leave-marked day columns */
 .ts-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .ts-leave-btn { flex: 0 0 auto; padding: 0 14px; }
-.ts-day-leave { background: color-mix(in srgb, var(--warning) 9%, transparent); }
-.ts-leave-badge {
-  display: block; margin-top: 2px;
-  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.3px;
-  text-transform: uppercase; color: var(--warning);
-}
 
-/* Timesheet: read-only attendance row above the task rows */
-.ts-attendance-row { background: var(--surface-2); border-bottom: 2px solid var(--border); }
-.ts-attendance-row .ts-task { font-weight: 600; color: var(--muted); }
-.ts-attendance-cell { text-align: center; }
-.ts-attendance-hours { margin-top: 2px; font-size: var(--fs-2xs); color: var(--muted); }
-.ts-muted { color: var(--muted); }
-.att-tag-present { background: var(--st-done-bg); color: var(--success); }
-.att-tag-partial { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
-.att-tag-absent { background: var(--danger-soft); color: var(--danger); }
+/* Timesheet: attendance status icon inside the day column header */
+.ts-th-icon { margin-left: 6px; font-size: 0.95em; cursor: default; }
+.ts-th-icon-present { color: var(--success); }
+.ts-th-icon-partial { color: var(--warning); }
+.ts-th-icon-absent { color: var(--danger); }
+.ts-th-icon-holiday { color: var(--st-planning); }
 
 .att-leave-balance { display: flex; gap: 16px; margin-bottom: 12px; font-size: var(--fs-sm); color: var(--text-muted); }
 .att-leave-balance-item strong { color: var(--text); }

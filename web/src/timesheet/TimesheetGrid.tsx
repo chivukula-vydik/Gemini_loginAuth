@@ -7,7 +7,7 @@ import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from '
 import type { Day } from './time';
 import type { Task, Entries, Grant, Assignable } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
-import { attendanceLabel, attendanceBadgeClass, attendanceIcon } from './attendanceRow';
+import { attendanceIcon, attendanceIconColorClass, attendanceTooltip } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
 
 // Rough size of the add-task menu, used to flip it above the trigger when there
@@ -23,7 +23,6 @@ type Props = {
   todayDay: Day | null;
   grants: Grant[];
   pendingKeys: Set<string>;
-  leaveDays?: Partial<Record<Day, string>>;   // day -> leave type label, for approved leave
   attendance?: Partial<Record<Day, AttendanceCell>>;
   onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
@@ -35,7 +34,7 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, leaveDays = {}, attendance = {}, onRequestEdit,
+  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, onRequestEdit,
   onRename, onCellChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
@@ -79,12 +78,19 @@ export function TimesheetGrid({
             {DAYS.map((d) => {
               const isFuture = dates[d] > today;
               const isToday = todayDay === d;
-              const leave = leaveDays[d];
-              const cls = `${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}${leave ? ' ts-day-leave' : ''}`.trim() || undefined;
+              const cls = `${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}`.trim() || undefined;
+              const cell = attendance[d];
               return (
                 <th key={d} className={cls}>
                   {cols[d]}
-                  {leave && <span className="ts-leave-badge" title={`${leave} leave`}>Leave</span>}
+                  {cell && (
+                    <span
+                      className={`ts-th-icon ${attendanceIconColorClass(cell.status)}`}
+                      title={attendanceTooltip(cell.status, cell.effectiveMinutes, cell.needsRegularise, cell.note)}
+                    >
+                      {attendanceIcon(cell.status)}{cell.needsRegularise ? '⚠' : ''}
+                    </span>
+                  )}
                 </th>
               );
             })}
@@ -93,27 +99,6 @@ export function TimesheetGrid({
           </tr>
         </thead>
         <tbody>
-          <tr className="ts-attendance-row">
-            <td className="ts-task">Attendance</td>
-            {DAYS.map((d) => {
-              const cell = attendance[d];
-              return (
-                <td key={d} className="ts-attendance-cell">
-                  {cell ? (
-                    <>
-                      <span className={attendanceBadgeClass(cell.status)}>
-                        {attendanceIcon(cell.status)} {attendanceLabel(cell.status)}
-                      </span>
-                      <div className="ts-attendance-hours">{formatMinutes(cell.effectiveMinutes)}</div>
-                    </>
-                  ) : (
-                    <span className="ts-muted">—</span>
-                  )}
-                </td>
-              );
-            })}
-            <td></td><td></td>
-          </tr>
           {tasks.length === 0 && (
             <tr>
               <td colSpan={8} className="ts-empty">
