@@ -2,6 +2,14 @@ import { getAccessToken } from '../api';
 import type { Day } from './time';
 import type { SubmitStatus } from './submit';
 
+export type DayStatusEntry = {
+  status: SubmitStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string;
+};
+export type DayStatusMap = Record<Day, DayStatusEntry>;
+
 const API = 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
@@ -37,7 +45,7 @@ export type Assignable = {
 export type WeekData = {
   weekStart: string; tasks: Task[]; assignable: Assignable[]; todayDay: Day | null; grants: Grant[]; pending: Grant[];
   readOnly: boolean; status: SubmitStatus; submittedAt: string | null; reviewedAt: string | null;
-  rejectionReason: string; targetMinutes: number;
+  rejectionReason: string; targetMinutes: number; dayStatus: DayStatusMap;
 };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
@@ -57,6 +65,7 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
     reviewedAt: (data.reviewedAt ?? null) as string | null,
     rejectionReason: String(data.rejectionReason ?? ''),
     targetMinutes: Number(data.targetMinutes ?? 2400),
+    dayStatus: (data.dayStatus ?? {}) as DayStatusMap,
   };
 }
 
@@ -88,6 +97,19 @@ export async function submitWeek(weekStart: string): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     credentials: 'include',
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || `submit failed (${r.status})`);
+  }
+}
+
+export async function submitDays(weekStart: string, days: Day[]): Promise<void> {
+  const r = await fetch(`${API}/timesheets/${weekStart}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    body: JSON.stringify({ days }),
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));

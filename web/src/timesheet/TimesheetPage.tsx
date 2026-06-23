@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
-import { getWeek, saveWeek, submitWeek, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
+import { getWeek, saveWeek, submitWeek, submitDays, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
+import type { DayStatusMap } from './timesheetApi';
 import { blankRow, rowFromAssignable } from './addRow';
 import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
@@ -38,6 +39,8 @@ export function TimesheetPage() {
   const [attendanceDocs, setAttendanceDocs] = useState<AttendanceDoc[]>([]);
   const [activatedDate, setActivatedDate] = useState<string | null>(null);
   const [targetMinutes, setTargetMinutes] = useState(2400);
+  const [dayStatus, setDayStatus] = useState<DayStatusMap>({} as DayStatusMap);
+  const [checkedDays, setCheckedDays] = useState<Set<Day>>(new Set());
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirty = useRef(false);
@@ -61,6 +64,8 @@ export function TimesheetPage() {
       setReviewedAt(loaded.reviewedAt);
       setRejectionReason(loaded.rejectionReason);
       setTargetMinutes(loaded.targetMinutes);
+      setDayStatus(loaded.dayStatus);
+      setCheckedDays(new Set());
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -184,6 +189,29 @@ export function TimesheetPage() {
     }
   }
 
+  async function onSubmitDays() {
+    const days = [...checkedDays];
+    if (days.length === 0) return;
+    if (!window.confirm(`Submit ${days.length} day(s) for review?`)) return;
+    try {
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+      if (dirty.current) { await saveWeek(weekStart, tasks); dirty.current = false; }
+      await submitDays(weekStart, days);
+      await load(weekStart);
+    } catch (e) {
+      window.alert((e as Error).message);
+    }
+  }
+
+  function onToggleDay(day: Day) {
+    setCheckedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day)) next.delete(day);
+      else next.add(day);
+      return next;
+    });
+  }
+
   async function onRequestEdit(day: Day, projectId: string) {
     const reason = window.prompt('Reason for editing this past day?') ?? '';
     try {
@@ -219,11 +247,13 @@ export function TimesheetPage() {
         submitStatus={submitStatus}
         submittedAt={submittedAt}
         submittable={submittable}
+        checkedCount={checkedDays.size}
         onPrev={() => goToWeek(prevWeek(weekStart))}
         onNext={() => goToWeek(nextWeek(weekStart))}
         onToday={() => goToWeek(mondayOf())}
         onCopyLastWeek={onCopyLastWeek}
         onSubmit={onSubmit}
+        onSubmitDays={onSubmitDays}
       />
 
       {readOnly && (
@@ -237,7 +267,11 @@ export function TimesheetPage() {
       )}
       {submitStatus === 'returned' && (
         <div className="ts-returned-banner">
-          Your PM sent this back{rejectionReason ? `: ${rejectionReason}` : ''} — review and resubmit.
+          {DAYS.filter((d) => dayStatus[d]?.status === 'returned').map((d) => {
+            const reason = dayStatus[d]?.rejectionReason;
+            return <div key={d}>{DAY_LABELS[d]} was returned{reason ? `: ${reason}` : ''}.</div>;
+          })}
+          Review and resubmit.
         </div>
       )}
 
@@ -260,6 +294,9 @@ export function TimesheetPage() {
         grants={grants}
         pendingKeys={new Set(pendingKeys)}
         attendance={attendance}
+        dayStatus={dayStatus}
+        checkedDays={checkedDays}
+        onToggleDay={onToggleDay}
         onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}

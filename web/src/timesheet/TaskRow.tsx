@@ -1,7 +1,7 @@
 import { TimeCell } from './TimeCell';
 import { DAYS, formatMinutes } from './time';
 import type { Day } from './time';
-import type { Task, Entries, Grant } from './timesheetApi';
+import type { Task, Entries, Grant, DayStatusMap } from './timesheetApi';
 import type { BarSegment } from './bar';
 import { isCellEditable, canRequestEdit } from './cellLock';
 import { dueUrgency, dueLabel } from './due';
@@ -17,6 +17,7 @@ type Props = {
   weekIsPast: boolean;
   pendingKeys: Set<string>;
   bar?: BarSegment | null;
+  dayStatus?: DayStatusMap;
   onRename: (name: string) => void;
   onCellChange: (day: keyof Entries, minutes: number) => void;
   onNoteChange: (day: Day, text: string) => void;
@@ -27,7 +28,7 @@ type Props = {
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, onRename, onCellChange, onNoteChange, onDelete, onRequestEdit, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, dayStatus, onRename, onCellChange, onNoteChange, onDelete, onRequestEdit, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   const urgency = isPm ? dueUrgency(task.endDate, today, task.status) : null;
@@ -64,7 +65,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
         const capL = inBar && i === bar!.startCol && !bar!.continuesLeft;
         const capR = inBar && i === bar!.endCol && !bar!.continuesRight;
         const isToday = todayDay === d;
-        const editable = isCellEditable(d, task.projectId, todayDay, grants, dates[d], task.startDate);
+        const editable = isCellEditable(d, task.projectId, todayDay, grants, dates[d], task.startDate, dayStatus?.[d]);
         const isPast = dates[d] < today;
         const canRequest = canRequestEdit(weekIsPast, editable, isPast, task);
         const pending = canRequest && pendingKeys.has(`${d}:${task.projectId}`);

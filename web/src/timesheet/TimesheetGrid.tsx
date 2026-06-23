@@ -5,7 +5,7 @@ import { weekBarSegment } from './bar';
 import { addableTasks } from './addRow';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
-import type { Task, Entries, Grant, Assignable } from './timesheetApi';
+import type { Task, Entries, Grant, Assignable, DayStatusMap } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
 import { attendanceIcon, attendanceIconColorClass, attendanceTooltip } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
@@ -24,6 +24,9 @@ type Props = {
   grants: Grant[];
   pendingKeys: Set<string>;
   attendance?: Partial<Record<Day, AttendanceCell>>;
+  dayStatus?: DayStatusMap;
+  checkedDays?: Set<Day>;
+  onToggleDay?: (day: Day) => void;
   onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
@@ -35,7 +38,8 @@ type Props = {
 };
 
 export function TimesheetGrid({
-  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, onRequestEdit,
+  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,
+  checkedDays, onToggleDay, onRequestEdit,
   onRename, onCellChange, onNoteChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
@@ -81,9 +85,23 @@ export function TimesheetGrid({
               const isToday = todayDay === d;
               const cls = `${isFuture ? 'ts-day-future' : ''}${isToday ? ' ts-day-today' : ''}`.trim() || undefined;
               const cell = attendance[d];
+              const ds = dayStatus?.[d];
+              const dayS = ds?.status || 'draft';
+              const showCheck = !readOnly && (dayS === 'draft' || dayS === 'returned') && !isFuture;
               return (
                 <th key={d} className={cls}>
-                  {cols[d]}
+                  <div className="ts-day-header">
+                    {showCheck && onToggleDay && (
+                      <input
+                        type="checkbox"
+                        className="ts-day-check"
+                        checked={checkedDays?.has(d) || false}
+                        onChange={() => onToggleDay(d)}
+                      />
+                    )}
+                    {cols[d]}
+                    {dayS !== 'draft' && <span className={`ts-day-dot ts-day-dot-${dayS}`} title={dayS} />}
+                  </div>
                   {cell && (
                     <span
                       className={`ts-th-icon ${attendanceIconColorClass(cell.status)}`}
@@ -119,6 +137,7 @@ export function TimesheetGrid({
               weekIsPast={weekIsPast}
               pendingKeys={pendingKeys}
               bar={weekBarSegment(weekStart, t.startDate, t.endDate)}
+              dayStatus={dayStatus}
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
               onNoteChange={(day, text) => onNoteChange(t.id, day, text)}

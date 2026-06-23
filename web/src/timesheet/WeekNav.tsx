@@ -10,11 +10,13 @@ type Props = {
   submitStatus?: SubmitStatus;
   submittedAt?: string | null;
   submittable?: boolean;
+  checkedCount?: number;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
   onCopyLastWeek: () => void;
   onSubmit?: () => void;
+  onSubmitDays?: () => void;
 };
 
 const STATUS_TEXT: Record<SaveStatus, string> = {
@@ -26,8 +28,8 @@ const SUBMIT_LABEL: Record<SubmitStatus, string> = {
 };
 
 export function WeekNav({
-  weekStart, status, readOnly = false, submitStatus, submittedAt, submittable = false,
-  onPrev, onNext, onToday, onCopyLastWeek, onSubmit,
+  weekStart, status, readOnly = false, submitStatus, submittedAt, submittable = false, checkedCount,
+  onPrev, onNext, onToday, onCopyLastWeek, onSubmit, onSubmitDays,
 }: Props) {
   return (
     <div className="ts-nav">
@@ -52,6 +54,11 @@ export function WeekNav({
         )}
         {submittable && onSubmit && (
           <button className="btn btn-primary ts-submit-btn" type="button" onClick={onSubmit}>Submit week</button>
+        )}
+        {checkedCount !== undefined && checkedCount > 0 && onSubmitDays && (
+          <button className="btn btn-primary ts-submit-btn" type="button" onClick={onSubmitDays}>
+            Submit for {checkedCount} day{checkedCount > 1 ? 's' : ''}
+          </button>
         )}
       </div>
     </div>

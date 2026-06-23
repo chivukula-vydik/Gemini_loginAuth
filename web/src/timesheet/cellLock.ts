@@ -1,5 +1,5 @@
 import type { Day } from './time';
-import type { Grant, Task } from './timesheetApi';
+import type { DayStatusEntry, Grant, Task } from './timesheetApi';
 
 // Local copy of the weekday order so this module stays import-light and unit-testable.
 const ORDER: Day[] = ['mon', 'tue', 'wed', 'thu', 'fri'];
@@ -11,7 +11,10 @@ export function isCellEditable(
   grants: Grant[],
   columnDate?: string | null,
   startDate?: string | null,
+  dayStatusEntry?: DayStatusEntry | null,
 ): boolean {
+  // A submitted or approved day is locked regardless of where it falls in the week.
+  if (dayStatusEntry && (dayStatusEntry.status === 'submitted' || dayStatusEntry.status === 'approved')) return false;
   // A task is only editable on/after the day it was assigned (its start date).
   if (startDate && columnDate && columnDate < startDate) return false;
   // Current week (todayDay is set): today and any earlier weekday are freely

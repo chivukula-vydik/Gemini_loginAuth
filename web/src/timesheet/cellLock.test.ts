@@ -58,3 +58,24 @@ test('the assignment gate also blocks a granted day before the start date', () =
   const g = [{ day: 'mon', projectId: 'pA' }];
   assert.equal(isCellEditable('mon', 'pA', null, g as never, '2026-06-15', '2026-06-17'), false);
 });
+
+test('a submitted day is locked even in the current week', () => {
+  assert.equal(isCellEditable('mon', 'pA', 'wed', [], '2026-06-15', null, { status: 'submitted', submittedAt: null, reviewedAt: null, rejectionReason: '' }), false);
+});
+
+test('a returned day is editable', () => {
+  assert.equal(isCellEditable('mon', 'pA', 'wed', [], '2026-06-15', null, { status: 'returned', submittedAt: null, reviewedAt: null, rejectionReason: '' }), true);
+});
+
+test('an approved day is locked', () => {
+  assert.equal(isCellEditable('mon', 'pA', 'wed', [], '2026-06-15', null, { status: 'approved', submittedAt: null, reviewedAt: null, rejectionReason: '' }), false);
+});
+
+test('a draft day status entry does not affect editability', () => {
+  assert.equal(isCellEditable('mon', 'pA', 'wed', [], '2026-06-15', null, { status: 'draft', submittedAt: null, reviewedAt: null, rejectionReason: '' }), true);
+});
+
+test('a missing dayStatusEntry does not affect editability', () => {
+  assert.equal(isCellEditable('wed', 'pA', 'wed', []), true);
+  assert.equal(isCellEditable('mon', 'pA', 'wed', [], '2026-06-15', null, null), true);
+});
