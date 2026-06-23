@@ -19,7 +19,6 @@ import { createAttendanceRouter } from './routes/attendance.js';
 import { createLeaveRouter } from './routes/leave.js';
 import { createHolidaysRouter } from './routes/holidays.js';
 import { createReportsRouter } from './routes/reports.js';
-import { createUrlTrackingRouter } from './routes/urlTracking.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 
 export function createApp(config) {
@@ -89,7 +88,6 @@ export function createApp(config) {
   app.use('/leave', createLeaveRouter());
   app.use('/holidays', createHolidaysRouter());
   app.use('/reports', createReportsRouter());
-  app.use('/url-tracking', createUrlTrackingRouter());
   app.use('/dashboard', createDashboardRouter());
 
   app.use((err, req, res, next) => {
