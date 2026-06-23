@@ -70,6 +70,25 @@ export function createTimesheetRouter() {
     res.json({ ok: true, status: doc.status });
   }));
 
+  router.get('/review/:id/notes', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const doc = await Timesheet.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    const rows = [];
+    for (const t of doc.tasks) {
+      for (const d of DAYS) {
+        const note = t.notes?.[d] || '';
+        if (!note) continue;
+        rows.push({
+          taskName: t.name || 'Untitled',
+          day: d,
+          minutes: t.entries?.[d] || 0,
+          note,
+        });
+      }
+    }
+    res.json(rows);
+  }));
+
   router.get('/:weekStart', asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });

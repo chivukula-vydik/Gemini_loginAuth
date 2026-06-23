@@ -1504,3 +1504,9 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .note-pop-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
 .note-pop-text { font-size: 13px; color: var(--text); margin: 0; white-space: pre-wrap; }
 
+/* --- Comment summary (#13) --- */
+.cs-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.cs-table th, .cs-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
+.cs-table thead th { background: var(--surface-2); color: var(--faint); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.cs-note { white-space: pre-wrap; max-width: 300px; }
+
