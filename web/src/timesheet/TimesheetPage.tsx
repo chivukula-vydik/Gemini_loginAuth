@@ -33,6 +33,7 @@ export function TimesheetPage() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('draft');
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [attendanceDocs, setAttendanceDocs] = useState<AttendanceDoc[]>([]);
   const [activatedDate, setActivatedDate] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function TimesheetPage() {
       setSubmitStatus(loaded.status);
       setSubmittedAt(loaded.submittedAt);
       setReviewedAt(loaded.reviewedAt);
+      setRejectionReason(loaded.rejectionReason);
     } catch (e) {
       if (weekStartRef.current !== week) return;
       setLoadError((e as Error).message);
@@ -232,7 +234,9 @@ export function TimesheetPage() {
         </div>
       )}
       {submitStatus === 'returned' && (
-        <div className="ts-returned-banner">Your PM sent this back — review and resubmit.</div>
+        <div className="ts-returned-banner">
+          Your PM sent this back{rejectionReason ? `: ${rejectionReason}` : ''} — review and resubmit.
+        </div>
       )}
 
       <SummaryTiles

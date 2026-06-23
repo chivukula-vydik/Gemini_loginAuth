@@ -41,6 +41,7 @@ const timesheetSchema = new mongoose.Schema({
   submittedAt: { type: Date, default: null },
   reviewedAt: { type: Date, default: null },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  rejectionReason: { type: String, default: '' },
   updatedAt: { type: Date, default: Date.now },
 });
 

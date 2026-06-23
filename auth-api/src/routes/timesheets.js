@@ -63,6 +63,9 @@ export function createTimesheetRouter() {
     doc.status = decision === 'approve' ? 'approved' : 'returned';
     doc.reviewedBy = req.user.sub;
     doc.reviewedAt = new Date();
+    doc.rejectionReason = decision === 'return'
+      ? String(req.body?.reason || '').trim().slice(0, 1000)
+      : '';
     await doc.save();
     res.json({ ok: true, status: doc.status });
   }));
@@ -125,6 +128,7 @@ export function createTimesheetRouter() {
       status,
       submittedAt: doc?.submittedAt || null,
       reviewedAt: doc?.reviewedAt || null,
+      rejectionReason: doc?.rejectionReason || '',
     });
   }));
 
