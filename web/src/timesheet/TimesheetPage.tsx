@@ -13,6 +13,7 @@ import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, dayDates, todayISO } fr
 import { LeaveModal } from '../attendance/LeaveModal';
 import { getRange, getState, AttendanceDoc } from '../attendance/attendanceApi';
 import { resolveAttendanceRow, AttendanceCell } from './attendanceRow';
+import { useAuth } from '../authContext';
 
 function newTask(name = ''): Task {
   const entries = {} as Entries;
@@ -23,6 +24,8 @@ function newTask(name = ''): Task {
 }
 
 export function TimesheetPage() {
+  const { user } = useAuth();
+  const canOverrideBillable = user?.role === 'admin' || user?.role === 'pm';
   const [weekStart, setWeekStart] = useState(() => mondayOf());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignable, setAssignable] = useState<Assignable[]>([]);
@@ -149,6 +152,9 @@ export function TimesheetPage() {
 
   const onDelete = (id: string) => update(tasks.filter((t) => t.id !== id));
 
+  const onBillableChange = (id: string, day: Day, value: boolean | null) =>
+    update(tasks.map((t) => (t.id === id ? { ...t, billable: { ...(t.billable ?? {} as Record<Day, boolean | null>), [day]: value } } : t)));
+
   const onAddAssigned = (a: Assignable) => update([...tasks, rowFromAssignable(a)]);
   const onAddBlank = () => update([...tasks, blankRow('No task assigned')]);
 
@@ -235,6 +241,13 @@ export function TimesheetPage() {
   const weekTotal = dayTotals.reduce((s, x) => s + x.total, 0);
   const busiest = dayTotals.reduce((a, b) => (b.total > a.total ? b : a), dayTotals[0]);
 
+  const billableMinutes = tasks.reduce((sum, t) => sum + DAYS.reduce((s, d) => {
+    const minutes = t.entries[d] || 0;
+    const isBillable = t.effectiveBillable?.[d];
+    return s + (isBillable ? minutes : 0);
+  }, 0), 0);
+  const nonBillableMinutes = weekTotal - billableMinutes;
+
   return (
     <div className="ts-page">
       <header className="ts-header ts-header-row">
@@ -286,6 +299,8 @@ export function TimesheetPage() {
         busiestLabel={DAY_LABELS[busiest.day]}
         busiestMinutes={busiest.total}
         activeTasks={tasks.length}
+        billableMinutes={billableMinutes}
+        nonBillableMinutes={nonBillableMinutes}
       />
 
       {loadError && <p className="ts-error">{loadError} <button className="link-btn" onClick={() => load(weekStart)}>Retry</button></p>}
@@ -312,6 +327,8 @@ export function TimesheetPage() {
         onProgress={onProgress}
         projects={projects}
         onTaskCreated={(a) => onAddAssigned(a)}
+        onBillableChange={onBillableChange}
+        canOverrideBillable={canOverrideBillable}
       />
 
       <AttachmentBar

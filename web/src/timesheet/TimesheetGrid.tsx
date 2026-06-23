@@ -38,13 +38,15 @@ type Props = {
   onProgress: (taskId: string, patch: { percentComplete?: number; status?: string }) => void;
   projects?: ProjectRef[];
   onTaskCreated?: (a: Assignable) => void;
+  onBillableChange: (taskId: string, day: Day, value: boolean | null) => void;
+  canOverrideBillable?: boolean;
 };
 
 export function TimesheetGrid({
   weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,
   checkedDays, onToggleDay, onRequestEdit,
   onRename, onCellChange, onNoteChange, onDelete, onAddAssigned, onAddBlank, onProgress,
-  projects, onTaskCreated,
+  projects, onTaskCreated, onBillableChange, canOverrideBillable = false,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
@@ -161,6 +163,8 @@ export function TimesheetGrid({
               onDelete={() => onDelete(t.id)}
               onRequestEdit={onRequestEdit}
               onProgress={(patch) => onProgress(t.id, patch)}
+              onBillableChange={(day, value) => onBillableChange(t.id, day, value)}
+              canOverrideBillable={canOverrideBillable}
             />
           ))}
         </tbody>

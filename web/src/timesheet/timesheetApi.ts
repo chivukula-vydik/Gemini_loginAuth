@@ -14,6 +14,7 @@ const API = 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
 export type Notes = Record<Day, string>;
+export type BillableMap = Record<Day, boolean | null>;
 export type Task = {
   id: string;
   name: string;
@@ -29,6 +30,8 @@ export type Task = {
   startDate?: string | null;
   endDate?: string | null;
   projectId?: string | null;
+  billable?: BillableMap;
+  effectiveBillable?: Record<Day, boolean>;
 };
 export function authHeaders(): Record<string, string> {
   const token = getAccessToken();

@@ -572,6 +572,21 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-status { padding: 5px 6px; font-size: 12px; width: auto; }
 .ts-req { font-size: 10px; margin-left: 6px; font-weight: 600; }
 .ts-pending { color: var(--muted); font-style: italic; }
+.ts-billable {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: default;
+  line-height: 1;
+  margin-top: 2px;
+}
+.ts-billable.billable { color: var(--success, #22c55e); border-color: var(--success, #22c55e); }
+.ts-billable.non-billable { color: var(--muted, #94a3b8); }
+.ts-billable.overridden { font-style: italic; }
+.ts-billable:not(:disabled) { cursor: pointer; }
 
 /* ---- Project overview / progress ring ---- */
 :root { --ring-track: #ebecf0; }

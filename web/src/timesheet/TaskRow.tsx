@@ -24,11 +24,13 @@ type Props = {
   onDelete: () => void;
   onRequestEdit: (day: Day, projectId: string) => void;
   onProgress: (patch: { percentComplete?: number; status?: string }) => void;
+  onBillableChange: (day: Day, value: boolean | null) => void;
+  canOverrideBillable?: boolean;
 };
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, dayStatus, onRename, onCellChange, onNoteChange, onDelete, onRequestEdit, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, dayStatus, onRename, onCellChange, onNoteChange, onDelete, onRequestEdit, onProgress, onBillableChange, canOverrideBillable = false }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   const urgency = isPm ? dueUrgency(task.endDate, today, task.status) : null;
@@ -89,6 +91,20 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
               pending
                 ? <span className="ts-req ts-pending">pending</span>
                 : <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d, task.projectId as string)}>request</button>
+            )}
+            {task.effectiveBillable && (
+              <button
+                type="button"
+                className={`ts-billable ${task.effectiveBillable[d] ? 'billable' : 'non-billable'}${task.billable?.[d] != null ? ' overridden' : ''}`}
+                title={task.effectiveBillable[d] ? 'Billable' : 'Non-billable'}
+                disabled={!canOverrideBillable}
+                onClick={() => {
+                  const current = task.billable?.[d];
+                  onBillableChange(d, current != null ? null : !task.effectiveBillable![d]);
+                }}
+              >
+                $
+              </button>
             )}
           </td>
         );
