@@ -8,7 +8,6 @@ import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
 import { setTaskProgress } from '../pm/pmApi';
 import { DAYS, DAY_LABELS, mondayOf, prevWeek, nextWeek, dayDates, todayISO } from './time';
-import { getMyLeave, LeaveRequest, LEAVE_TYPE_LABELS } from '../attendance/leaveApi';
 import { LeaveModal } from '../attendance/LeaveModal';
 import { getRange, getState, AttendanceDoc } from '../attendance/attendanceApi';
 import { resolveAttendanceRow, AttendanceCell } from './attendanceRow';
@@ -32,7 +31,6 @@ export function TimesheetPage() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('draft');
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
-  const [myLeave, setMyLeave] = useState<LeaveRequest[]>([]);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [attendanceDocs, setAttendanceDocs] = useState<AttendanceDoc[]>([]);
   const [activatedDate, setActivatedDate] = useState<string | null>(null);
@@ -72,28 +70,17 @@ export function TimesheetPage() {
     load(weekStart);
   }, [weekStart, load]);
 
-  const loadLeave = useCallback(() => {
-    getMyLeave().then(setMyLeave).catch(() => {});
-  }, []);
-  useEffect(() => { loadLeave(); }, [loadLeave]);
-
   useEffect(() => {
     getState().then((s) => setActivatedDate(s.activatedDate)).catch(() => {});
   }, []);
 
-  // Approved leave that overlaps the visible week, mapped day -> type label.
   const dd = dayDates(weekStart);
-  const leaveDays: Partial<Record<Day, string>> = {};
-  for (const d of DAYS) {
-    const lv = myLeave.find((l) => l.status === 'approved' && dd[d] >= l.startDate && dd[d] <= l.endDate);
-    if (lv) leaveDays[d] = LEAVE_TYPE_LABELS[lv.type];
-  }
 
   useEffect(() => {
     getRange(dd.mon, dd.fri).then(setAttendanceDocs).catch(() => setAttendanceDocs([]));
   }, [dd.mon, dd.fri]);
 
-  const attendance = resolveAttendanceRow(dd, attendanceDocs, leaveDays, activatedDate, todayISO());
+  const attendance = resolveAttendanceRow(dd, attendanceDocs, activatedDate, todayISO());
 
   // Listen for PM task deletions and remove matching timesheet rows (by taskId)
   useEffect(() => {
@@ -260,7 +247,6 @@ export function TimesheetPage() {
         todayDay={todayDay}
         grants={grants}
         pendingKeys={new Set(pendingKeys)}
-        leaveDays={leaveDays}
         attendance={attendance}
         onRequestEdit={onRequestEdit}
         onRename={onRename}
@@ -275,7 +261,7 @@ export function TimesheetPage() {
         <LeaveModal
           today={todayISO()}
           onClose={() => setLeaveOpen(false)}
-          onSubmitted={() => { setLeaveOpen(false); loadLeave(); }}
+          onSubmitted={() => setLeaveOpen(false)}
         />
       )}
     </div>
