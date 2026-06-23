@@ -1280,9 +1280,10 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 
 /* Timesheet: read-only attendance row above the task rows */
 .ts-attendance-row { background: var(--surface-2); }
-.ts-attendance-row .ts-task { font-weight: 600; color: var(--text-muted); }
+.ts-attendance-row .ts-task { font-weight: 600; color: var(--muted); }
 .ts-attendance-cell { text-align: center; }
-.ts-attendance-hours { margin-top: 2px; font-size: var(--fs-2xs); color: var(--text-muted); }
+.ts-attendance-hours { margin-top: 2px; font-size: var(--fs-2xs); color: var(--muted); }
+.ts-muted { color: var(--muted); }
 .att-tag-present { background: var(--st-done-bg); color: var(--success); }
 .att-tag-partial { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
 .att-tag-absent { background: var(--danger-soft); color: var(--danger); }
