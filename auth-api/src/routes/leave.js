@@ -5,6 +5,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Leave, LEAVE_TYPES, HALF_DAY_OPTIONS, enumerateDays, workingDays, requestedDaysFor } from '../models/Leave.js';
 import { Attendance } from '../models/Attendance.js';
 import { getOrCreateBalance, remaining, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
+import { User } from '../models/User.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,12 +46,16 @@ export function createLeaveRouter() {
       }
     }
 
+    const requester = await User.findById(req.user.sub).select('reportingManagerId');
+    const assignedApprover = requester?.reportingManagerId || null;
+
     const doc = await Leave.create({
       userId: req.user.sub,
       type, startDate, endDate,
       halfDay: halfDayValue,
       requestedDays,
       reason: String(reason || ''),
+      assignedApprover,
     });
     res.status(201).json(doc);
   }));
@@ -73,16 +78,23 @@ export function createLeaveRouter() {
     res.json(docs.map((d) => ({ ...d.toObject(), days: d.requestedDays || workingDays(d.startDate, d.endDate) })));
   }));
 
-  // GET /leave/pending — pm/admin review queue
-  router.get('/pending', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
-    const docs = await Leave.find({ status: 'pending' })
+  // GET /leave/pending — pm/admin/reporting_manager review queue
+  router.get('/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    let filter = { status: 'pending' };
+    if (req.user.role === 'reporting_manager') {
+      filter.assignedApprover = req.user.sub;
+    } else if (req.user.role === 'pm') {
+      filter.assignedApprover = null;
+    }
+    // admin sees all — no extra filter
+    const docs = await Leave.find(filter)
       .populate('userId', 'displayName email')
       .sort({ requestedAt: -1 });
     res.json(docs.map((d) => ({ ...d.toObject(), days: d.requestedDays || workingDays(d.startDate, d.endDate) })));
   }));
 
-  // PATCH /leave/:id/decide — pm/admin approves or rejects
-  router.patch('/:id/decide', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
+  // PATCH /leave/:id/decide — pm/admin/reporting_manager approves or rejects
+  router.patch('/:id/decide', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -91,6 +103,9 @@ export function createLeaveRouter() {
     const doc = await Leave.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (doc.status !== 'pending') return res.status(409).json({ error: 'already decided' });
+    if (req.user.role === 'reporting_manager' && String(doc.assignedApprover) !== req.user.sub) {
+      return res.status(403).json({ error: 'you are not the assigned approver for this request' });
+    }
 
     doc.status = decision;
     doc.decidedBy = req.user.sub;
