@@ -9,17 +9,8 @@ export type EditReq = {
   _id: string; userId: Person; weekStart: string; day: string; reason: string; status: string; createdAt: string;
   projectId?: { _id: string; name: string } | null;
 };
-export type BillingType = 'hourly' | 'fixed' | 'milestone';
-export type Billing = { type: BillingType; allowExpenses: boolean };
-export type Allocation = { user: string; allocationPct: number; startDate: string | null; endDate: string | null; billingRole: string };
-export type AllocationDetail = { user: Person; allocationPct: number; startDate: string | null; endDate: string | null; billingRole: string };
-export type Client = { _id: string; name: string; contactName: string; contactEmail: string; status: 'active' | 'archived' };
-export type Phase = { _id: string; project: string; name: string; order: number };
-
 export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
-  projectCode?: string | null; clientId?: string | null; billing?: Billing;
-  allocations?: Allocation[];
   members: string[]; requiredSkills?: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
 };
@@ -37,8 +28,6 @@ export type CandidatesResponse = {
 export type Assignee = { user: Person | string; sharePct: number; estimatedHours?: number | null; etaAt?: string | null };
 export type Task = {
   _id: string; project: string | { _id: string; name: string }; title: string;
-  phase?: string | { _id: string; name: string } | null;
-  billingType?: 'billable' | 'non-billable';
   description: string; estimatedHours: number; requiredSkills: string[];
   assignees: Assignee[]; status: string; dueDate: string | null;
   mySharePct?: number;
@@ -71,8 +60,6 @@ export type Task = {
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
-  phase?: { _id: string; name: string; order: number } | null;
-  billingType?: 'billable' | 'non-billable';
   assignees: { user: Person; sharePct: number; estimatedHours?: number | null; etaAt?: string | null }[]; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
@@ -114,35 +101,13 @@ export const updateSkill = (id: string, patch: { name?: string; active?: boolean
 export const setMySkills = (skillIds: string[]) => authed('/me/skills', 'PATCH', { skillIds });
 
 export const listProjects = () => authed('/projects') as Promise<Project[]>;
-export const createProject = (body: Partial<Project> & { clientId?: string | null }) =>
-  authed('/projects', 'POST', body) as Promise<Project>;
-
-export const listClients = () => authed('/clients') as Promise<Client[]>;
-export const createClient = (body: { name: string; contactName?: string; contactEmail?: string }) =>
-  authed('/clients', 'POST', body) as Promise<Client>;
-
-export const listPhases = (projectId: string) => authed(`/projects/${projectId}/phases`) as Promise<Phase[]>;
-export const createPhase = (projectId: string, name: string, order?: number) =>
-  authed(`/projects/${projectId}/phases`, 'POST', { name, order }) as Promise<Phase>;
-export const updatePhase = (phaseId: string, patch: { name?: string; order?: number }) =>
-  authed(`/projects/phases/${phaseId}`, 'PATCH', patch) as Promise<Phase>;
-export const deletePhase = (phaseId: string) => authed(`/projects/phases/${phaseId}`, 'DELETE');
-
-export const updateProjectBilling = (id: string, billing: Partial<Billing>) =>
-  authed(`/projects/${id}`, 'PATCH', { billing }) as Promise<Project>;
-export const updateProjectCode = (id: string, projectCode: string | null) =>
-  authed(`/projects/${id}`, 'PATCH', { projectCode }) as Promise<Project>;
-export const updateProjectClient = (id: string, clientId: string | null) =>
-  authed(`/projects/${id}`, 'PATCH', { clientId }) as Promise<Project>;
-export const updateProjectAllocations = (id: string, allocations: Allocation[]) =>
-  authed(`/projects/${id}`, 'PATCH', { allocations }) as Promise<Project>;
-export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm' | 'requiredSkills' | 'clientId' | 'allocations'> & {
+export const createProject = (body: Partial<Project>) => authed('/projects', 'POST', body) as Promise<Project>;
+export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm' | 'requiredSkills'> & {
   members: Person[]; ownerPm: Person; requiredSkills: { _id: string; name: string }[];
-  clientId: Client | null; allocations: AllocationDetail[];
 };
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
-export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees' | 'phase'> & { requiredSkills?: string[]; assignees?: string[]; phase?: string | null }) =>
+export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[] }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
 export type BulkTaskOp = 'status' | 'assignee' | 'delete';

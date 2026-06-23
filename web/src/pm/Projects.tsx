@@ -3,9 +3,7 @@ import {
   listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
   decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills,
-  listClients, createClient, updateProjectCode, updateProjectClient, updateProjectBilling,
-  updateProjectAllocations, listPhases, createPhase, deletePhase,
-  Project, TaskDetail, Person, Skill, ProjectDetailShape, Client, Phase, BillingType, Allocation,
+  Project, TaskDetail, Person, Skill, ProjectDetailShape,
 } from './pmApi';
 import { StaffMembers } from './StaffMembers';
 import { ProgressRing } from './ProgressRing';
@@ -19,43 +17,16 @@ export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [projectCode, setProjectCode] = useState('');
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientId, setClientId] = useState('');
-  const [newClientName, setNewClientName] = useState('');
-  const [billingType, setBillingType] = useState<BillingType>('hourly');
-  const [allowExpenses, setAllowExpenses] = useState(false);
   const [error, setError] = useState('');
   const today = todayISO();
 
   function reload() { listProjects().then(setProjects).catch((e) => setError(e.message)); }
-  function reloadClients() { listClients().then(setClients).catch(() => {}); }
-  useEffect(() => { reload(); reloadClients(); }, []);
-
-  async function addClientInline() {
-    if (!newClientName.trim()) return;
-    setError('');
-    try {
-      const c = await createClient({ name: newClientName.trim() });
-      setNewClientName('');
-      setClients((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
-      setClientId(c._id);
-    } catch (e) { setError((e as Error).message); }
-  }
+  useEffect(() => { reload(); }, []);
 
   async function add() {
     if (!name.trim()) return;
     setError('');
-    try {
-      await createProject({
-        name: name.trim(),
-        projectCode: projectCode.trim() || undefined,
-        clientId: clientId || null,
-        billing: { type: billingType, allowExpenses },
-      });
-      setName(''); setProjectCode(''); setClientId(''); setBillingType('hourly'); setAllowExpenses(false);
-      reload();
-    }
+    try { await createProject({ name: name.trim() }); setName(''); reload(); }
     catch (e) { setError((e as Error).message); }
   }
 
@@ -68,37 +39,13 @@ export function Projects() {
           <h1 className="ts-h1">Projects</h1>
           <p className="ts-sub">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</p>
         </div>
-      </header>
-      <div className="ts-card card-section">
-        <div className="card-title">New project</div>
-        <div className="ts-nav-left" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <input className="input" placeholder="Project name" value={name}
+        <div className="ts-nav-left">
+          <input className="input" placeholder="New project name" value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <input className="input" placeholder="Project code" value={projectCode}
-            onChange={(e) => setProjectCode(e.target.value)} style={{ width: 120 }} />
-          <select className="input pm-select" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            <option value="">No client</option>
-            {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
-          </select>
-          <select className="input pm-select" value={billingType} onChange={(e) => setBillingType(e.target.value as BillingType)}>
-            <option value="hourly">Hourly</option>
-            <option value="fixed">Fixed fee</option>
-            <option value="milestone">Milestone</option>
-          </select>
-          <label className="ts-sub" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input type="checkbox" checked={allowExpenses} onChange={(e) => setAllowExpenses(e.target.checked)} />
-            Allow expenses
-          </label>
           <button className="btn btn-auto btn-primary" onClick={add}>Create</button>
         </div>
-        <div className="ts-nav-left" style={{ marginTop: 8 }}>
-          <input className="input" placeholder="New client name" value={newClientName}
-            onChange={(e) => setNewClientName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addClientInline(); }} />
-          <button className="btn btn-auto" onClick={addClientInline}>+ Add client</button>
-        </div>
-      </div>
+      </header>
       <div className="ts-tiles">
         <div className="ts-tile ts-tile-accent">
           <span className="ts-tile-label">Total projects</span>
@@ -189,15 +136,10 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const [tasks, setTasks] = useState<TaskDetail[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [directory, setDirectory] = useState<Person[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [phases, setPhases] = useState<Phase[]>([]);
-  const [newPhaseName, setNewPhaseName] = useState('');
   const [title, setTitle] = useState('');
   const [assignees, setAssignees] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState('');
   const [reqSkills, setReqSkills] = useState<Set<string>>(new Set());
-  const [taskPhase, setTaskPhase] = useState('');
-  const [taskBilling, setTaskBilling] = useState<'billable' | 'non-billable'>('billable');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [staffing, setStaffing] = useState(false);
@@ -206,59 +148,11 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
     getProject(id).then(({ project, tasks }) => { setProject(project); setTasks(tasks); })
       .catch((e) => setError(e.message));
   }
-  function reloadPhases() { listPhases(id).then(setPhases).catch(() => {}); }
   useEffect(() => {
     reload();
-    reloadPhases();
     listSkills().then(setSkills).catch(() => {});
     listDirectory().then(setDirectory).catch(() => {});
-    listClients().then(setClients).catch(() => {});
   }, [id]);
-
-  async function saveProjectCode(code: string) {
-    setError('');
-    try { await updateProjectCode(id, code.trim() || null); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
-  async function saveClient(cid: string) {
-    setError('');
-    try { await updateProjectClient(id, cid || null); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
-  async function saveBilling(patch: { type?: BillingType; allowExpenses?: boolean }) {
-    setError('');
-    try { await updateProjectBilling(id, patch); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
-  async function saveAllocation(userId: string, patch: Partial<Allocation>) {
-    if (!project) return;
-    setError('');
-    const next: Allocation[] = project.members.map((m) => {
-      const existing = project.allocations.find((a) => a.user._id === m._id);
-      const base: Allocation = existing
-        ? { user: existing.user._id, allocationPct: existing.allocationPct, startDate: existing.startDate, endDate: existing.endDate, billingRole: existing.billingRole }
-        : { user: m._id, allocationPct: 100, startDate: null, endDate: null, billingRole: '' };
-      return m._id === userId ? { ...base, ...patch } : base;
-    });
-    try { await updateProjectAllocations(id, next); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
-  async function addPhase() {
-    if (!newPhaseName.trim()) return;
-    setError('');
-    try { await createPhase(id, newPhaseName.trim(), phases.length); setNewPhaseName(''); reloadPhases(); }
-    catch (e) { setError((e as Error).message); }
-  }
-
-  async function removePhase(phaseId: string) {
-    setError('');
-    try { await deletePhase(phaseId); reloadPhases(); reload(); }
-    catch (e) { setError((e as Error).message); }
-  }
 
 
   async function addMemberById(uid: string) {

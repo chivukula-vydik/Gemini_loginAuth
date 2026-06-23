@@ -3,7 +3,6 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Task } from '../models/Task.js';
 import { Project } from '../models/Project.js';
-import { Phase } from '../models/Phase.js';
 import { Skill } from '../models/Skill.js';
 import { User } from '../models/User.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
@@ -254,21 +253,6 @@ export function createTasksRouter() {
     if (!project || !canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
     for (const f of ['title', 'description', 'status', 'dueDate', 'startDate']) {
       if (f in (req.body || {})) task[f] = req.body[f];
-    }
-    if ('billingType' in (req.body || {})) {
-      if (!['billable', 'non-billable'].includes(req.body.billingType)) {
-        return res.status(400).json({ error: 'invalid billingType' });
-      }
-      task.billingType = req.body.billingType;
-    }
-    if ('phase' in (req.body || {})) {
-      if (req.body.phase) {
-        const phaseDoc = await Phase.findOne({ _id: req.body.phase, project: project._id });
-        if (!phaseDoc) return res.status(400).json({ error: 'phase not found on this project' });
-        task.phase = phaseDoc._id;
-      } else {
-        task.phase = null;
-      }
     }
     if (Array.isArray(req.body?.requiredSkills)) {
       const validSkills = await Skill.find({ _id: { $in: req.body.requiredSkills }, active: true }).select('_id');
