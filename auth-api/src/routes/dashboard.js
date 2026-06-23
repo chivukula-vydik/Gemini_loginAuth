@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Attendance, todayStr } from '../models/Attendance.js';
@@ -127,7 +128,7 @@ export function createDashboardRouter() {
     // --- tasks ---
     try {
       const agg = await Task.aggregate([
-        { $match: { 'assignees.user': userId } },
+        { $match: { 'assignees.user': new mongoose.Types.ObjectId(userId) } },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]);
       const counts = { todo: 0, inProgress: 0, blocked: 0, done: 0 };
