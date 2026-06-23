@@ -15,6 +15,11 @@ test('blankRow: defaults to an empty name ("No task assigned")', () => {
   assert.equal(blankRow().name, '');
 });
 
+test('blankRow: includes empty notes for each day', () => {
+  const r = blankRow('Standup');
+  assert.deepEqual(r.notes, { mon: '', tue: '', wed: '', thu: '', fri: '' });
+});
+
 test('rowFromAssignable: a locked row linked to the task, named after it', () => {
   const r = rowFromAssignable({ taskId: 't1', title: 'Build API', projectName: 'P', status: 'in_progress', estimatedHours: 8 });
   assert.equal(r.taskId, 't1');
@@ -23,6 +28,11 @@ test('rowFromAssignable: a locked row linked to the task, named after it', () =>
   assert.equal(r.status, 'in_progress');
   assert.equal(r.estimatedHours, 8);
   assert.deepEqual(r.entries, { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0 });
+});
+
+test('rowFromAssignable: includes empty notes for each day', () => {
+  const r = rowFromAssignable({ taskId: 't1', title: 'Build API', projectName: 'P', status: 'in_progress', estimatedHours: 8 });
+  assert.deepEqual(r.notes, { mon: '', tue: '', wed: '', thu: '', fri: '' });
 });
 
 test('addableTasks: hides tasks already present as a row in the week', () => {

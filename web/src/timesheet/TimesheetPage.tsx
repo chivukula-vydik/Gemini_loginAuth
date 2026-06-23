@@ -15,7 +15,9 @@ import { resolveAttendanceRow, AttendanceCell } from './attendanceRow';
 function newTask(name = ''): Task {
   const entries = {} as Entries;
   DAYS.forEach((d) => { entries[d] = 0; });
-  return { id: crypto.randomUUID(), name, entries };
+  const notes = {} as Record<Day, string>;
+  DAYS.forEach((d) => { notes[d] = ''; });
+  return { id: crypto.randomUUID(), name, entries, notes };
 }
 
 export function TimesheetPage() {
@@ -127,6 +129,9 @@ export function TimesheetPage() {
 
   const onCellChange = (id: string, day: keyof Entries, minutes: number) =>
     update(tasks.map((t) => (t.id === id ? { ...t, entries: { ...t.entries, [day]: minutes } } : t)));
+
+  const onNoteChange = (id: string, day: Day, text: string) =>
+    update(tasks.map((t) => (t.id === id ? { ...t, notes: { ...t.notes, [day]: text } } : t)));
 
   const onDelete = (id: string) => update(tasks.filter((t) => t.id !== id));
 
@@ -251,6 +256,7 @@ export function TimesheetPage() {
         onRequestEdit={onRequestEdit}
         onRename={onRename}
         onCellChange={onCellChange}
+        onNoteChange={onNoteChange}
         onDelete={onDelete}
         onAddAssigned={onAddAssigned}
         onAddBlank={onAddBlank}

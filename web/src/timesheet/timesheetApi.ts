@@ -5,11 +5,13 @@ import type { SubmitStatus } from './submit';
 const API = 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
+export type Notes = Record<Day, string>;
 export type Task = {
   id: string;
   name: string;
   description?: string;
   entries: Entries;
+  notes: Notes;
   taskId?: string | null;
   locked?: boolean;
   percentComplete?: number;

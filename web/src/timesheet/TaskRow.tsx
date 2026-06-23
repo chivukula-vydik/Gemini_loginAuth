@@ -18,6 +18,7 @@ type Props = {
   bar?: BarSegment | null;
   onRename: (name: string) => void;
   onCellChange: (day: keyof Entries, minutes: number) => void;
+  onNoteChange: (day: Day, text: string) => void;
   onDelete: () => void;
   onRequestEdit: (day: Day, projectId: string) => void;
   onProgress: (patch: { percentComplete?: number; status?: string }) => void;
@@ -25,7 +26,7 @@ type Props = {
 
 const STATUSES = ['todo', 'in_progress', 'blocked', 'done'];
 
-export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, onRename, onCellChange, onDelete, onRequestEdit, onProgress }: Props) {
+export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today, weekIsPast, pendingKeys, bar = null, onRename, onCellChange, onNoteChange, onDelete, onRequestEdit, onProgress }: Props) {
   const rowTotal = DAYS.reduce((sum, d) => sum + (task.entries[d] || 0), 0);
   const isPm = !!task.taskId;
   const urgency = isPm ? dueUrgency(task.endDate, today, task.status) : null;

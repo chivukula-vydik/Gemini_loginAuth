@@ -1,5 +1,5 @@
 import { DAYS } from './time.ts';
-import type { Task, Entries, Assignable } from './timesheetApi';
+import type { Task, Entries, Assignable, Notes } from './timesheetApi';
 
 function zeroEntries(): Entries {
   const e = {} as Entries;
@@ -7,9 +7,15 @@ function zeroEntries(): Entries {
   return e;
 }
 
+function zeroNotes(): Notes {
+  const n = {} as Notes;
+  DAYS.forEach((d) => { n[d] = ''; });
+  return n;
+}
+
 // "No task assigned": a row the employee names themselves, tied to no task.
 export function blankRow(name = ''): Task {
-  return { id: crypto.randomUUID(), name, entries: zeroEntries() };
+  return { id: crypto.randomUUID(), name, entries: zeroEntries(), notes: zeroNotes() };
 }
 
 // A row linked to one of the employee's assigned tasks; its name is locked to
@@ -24,6 +30,7 @@ export function rowFromAssignable(a: Assignable): Task {
     status: a.status,
     estimatedHours: a.estimatedHours,
     entries: zeroEntries(),
+    notes: zeroNotes(),
   };
 }
 

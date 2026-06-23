@@ -27,6 +27,7 @@ type Props = {
   onRequestEdit: (day: Day, projectId: string) => void;
   onRename: (taskId: string, name: string) => void;
   onCellChange: (taskId: string, day: keyof Entries, minutes: number) => void;
+  onNoteChange: (taskId: string, day: Day, text: string) => void;
   onDelete: (taskId: string) => void;
   onAddAssigned: (a: Assignable) => void;
   onAddBlank: () => void;
@@ -35,7 +36,7 @@ type Props = {
 
 export function TimesheetGrid({
   weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, onRequestEdit,
-  onRename, onCellChange, onDelete, onAddAssigned, onAddBlank, onProgress,
+  onRename, onCellChange, onNoteChange, onDelete, onAddAssigned, onAddBlank, onProgress,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
@@ -120,6 +121,7 @@ export function TimesheetGrid({
               bar={weekBarSegment(weekStart, t.startDate, t.endDate)}
               onRename={(name) => onRename(t.id, name)}
               onCellChange={(day, m) => onCellChange(t.id, day, m)}
+              onNoteChange={(day, text) => onNoteChange(t.id, day, text)}
               onDelete={() => onDelete(t.id)}
               onRequestEdit={onRequestEdit}
               onProgress={(patch) => onProgress(t.id, patch)}
