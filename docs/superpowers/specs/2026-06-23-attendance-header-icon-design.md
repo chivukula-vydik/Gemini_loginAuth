@@ -71,19 +71,59 @@ that design was never invalidated, only its frontend consumer changed:
 - `/attendance/month`, `/attendance/today`, `/attendance/stats`,
   `/attendance/team`, and `AttendancePage`'s own live ticker are untouched.
 
+## Leave folds into the unified icon (removes the old overlay path)
+
+Approving a leave request already stamps the covering `Attendance` docs with
+`status: 'leave'` and a descriptive `note` (e.g. `"casual leave"` or
+`"casual leave (half day, morning)"`) — see `auth-api/src/routes/leave.js:113-136`.
+This happens immediately on approval, for every date in the leave's range
+(including future-dated ones), so the doc is already there for
+`resolveAttendanceRow` to read like any other day.
+
+This means the separate `leaveDays` machinery becomes dead weight once Leave
+is unified into the icon:
+
+- `resolveAttendanceRow` drops the `leaveDays` parameter and the "blank if
+  leave" branch entirely — a leave day just resolves via the normal
+  doc-found branch, status `'leave'`, exactly like present/partial/absent do.
+- `TimesheetGrid`'s `leaveDays` prop, the `ts-leave-badge` element, and the
+  `ts-day-leave` header tint are removed (this was the old, separate "Leave"
+  text pill — now subsumed by the ✦ icon).
+- `TimesheetPage`'s `myLeave` state, `loadLeave()`, and the `getMyLeave`/
+  `LEAVE_TYPE_LABELS` imports are removed *for display purposes* — the
+  "Apply for leave" button and `LeaveModal` are unaffected (they don't read
+  `myLeave`), only the now-redundant leave-day computation goes away. A
+  newly-submitted (not yet approved) leave request still shows nothing on
+  the timesheet, same as before approval — leave only becomes visible once
+  the `Attendance` doc is stamped, which still happens at approval time, not
+  submission time.
+
 ## Frontend changes
 
-- `attendanceRow.ts`: keep `resolveAttendanceRow`, `attendanceLabel`,
-  `attendanceIcon`. Remove `attendanceBadgeClass` (no longer used — there's
-  no badge anymore). Add a new pure function for the tooltip text and a new
-  one for the icon's color class:
+- `attendanceRow.ts`: keep `attendanceLabel`, `attendanceIcon`. Remove
+  `attendanceBadgeClass` (no longer used — there's no badge anymore).
+  `resolveAttendanceRow` drops the `leaveDays` parameter (see above) and its
+  `AttendanceCell` gains the doc's `note` field, since both Leave
+  (`"casual leave"`) and Holiday (`"Founders Day"`) tooltips need it —
+  `AttendanceDoc` already carries `note` for both cases, just unused by the
+  resolver until now:
+  ```ts
+  export type AttendanceCell = { status: AttendanceStatus; effectiveMinutes: number; needsRegularise?: boolean; note?: string } | null;
+  export function resolveAttendanceRow(
+    dayDates: Record<Day, string>,
+    docs: AttendanceDoc[],
+    activatedDate: string | null,
+    today: string,
+  ): Partial<Record<Day, AttendanceCell>>
+  ```
+  Add a new pure function for the tooltip text and a new one for the icon's
+  color class:
   ```ts
   export function attendanceTooltip(
     status: AttendanceStatus,
     effectiveMinutes: number,
     needsRegularise?: boolean,
-    leaveType?: string,
-    holidayNote?: string,
+    note?: string,
   ): string
   export function attendanceIconColorClass(status: AttendanceStatus): string
   ```
