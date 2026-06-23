@@ -45,9 +45,14 @@ export function createTimesheetRouter() {
 
   // PM/admin review queue. Registered before '/:weekStart' so 'review' is not
   // parsed as a weekStart. Not PM-scoped — every pm/admin sees all submissions.
-  router.get('/review', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.get('/review', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
     const status = req.query.status || 'submitted';
-    const docs = await Timesheet.find({ status })
+    const filter = { status };
+    if (req.user.role === 'reporting_manager') {
+      const teamIds = await User.find({ reportingManagerId: req.user.sub }).select('_id');
+      filter.userId = { $in: teamIds.map((u) => u._id) };
+    }
+    const docs = await Timesheet.find(filter)
       .populate('userId', 'displayName email')
       .sort('-submittedAt');
     res.json(docs.map((d) => ({
@@ -64,7 +69,7 @@ export function createTimesheetRouter() {
     })));
   }));
 
-  router.patch('/review/:id', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const doc = await Timesheet.findById(req.params.id);
@@ -116,7 +121,7 @@ export function createTimesheetRouter() {
     res.json({ ok: true, status: update.status, dayStatus: newDs });
   }));
 
-  router.get('/review/:id/notes', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.get('/review/:id/notes', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
     const doc = await Timesheet.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     const rows = [];
@@ -143,7 +148,7 @@ export function createTimesheetRouter() {
     if (files.length === 0) return res.status(404).json({ error: 'file not found' });
     const file = files[0];
     const meta = file.metadata || {};
-    if (String(meta.userId) !== String(req.user.sub) && !['pm', 'admin'].includes(req.user.role)) {
+    if (String(meta.userId) !== String(req.user.sub) && !['pm', 'admin', 'reporting_manager'].includes(req.user.role)) {
       return res.status(403).json({ error: 'forbidden' });
     }
     res.set('Content-Type', file.contentType || 'application/octet-stream');

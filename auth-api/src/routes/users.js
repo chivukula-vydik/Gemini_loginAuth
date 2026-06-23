@@ -16,6 +16,15 @@ export function createUsersRouter() {
     res.json(users);
   }));
 
+  // RM's assigned employees. Registered before '/:id' routes to avoid
+  // 'my-team' being parsed as an id.
+  router.get('/my-team', requireAuth, requireRole('reporting_manager'), asyncHandler(async (req, res) => {
+    const team = await User.find({ reportingManagerId: req.user.sub, active: true })
+      .select('displayName email role reportingManagerId')
+      .sort('displayName');
+    res.json(team);
+  }));
+
   // Aggregate: how many people have ever asked for a re-estimation. PM/admin only.
   // Declared before '/:id/...' so 'reestimations' is never read as an id.
   router.get('/reestimations/summary', requireAuth, requireRole('pm', 'admin'), asyncHandler(async (req, res) => {

@@ -302,7 +302,7 @@ export function createAttendanceRouter(shiftConfig) {
   // GET /attendance/team?year=2026&month=6 — per-member summary for a PM's
   // direct reports (project members across projects they own) or, for an
   // admin, every user.
-  router.get('/team', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
+  router.get('/team', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'year and month required' });
 
@@ -314,6 +314,9 @@ export function createAttendanceRouter(shiftConfig) {
     let memberIds;
     if (req.user.role === 'admin') {
       memberIds = (await User.find({ _id: { $ne: req.user.sub } }).select('_id')).map((u) => u._id);
+    } else if (req.user.role === 'reporting_manager') {
+      const teamUsers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
+      memberIds = teamUsers.map((u) => u._id);
     } else {
       const projects = await Project.find({ ownerPm: req.user.sub }).select('members');
       const set = new Set();
