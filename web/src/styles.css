@@ -1279,7 +1279,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 }
 
 /* Timesheet: read-only attendance row above the task rows */
-.ts-attendance-row { background: var(--surface-2); }
+.ts-attendance-row { background: var(--surface-2); border-bottom: 2px solid var(--border); }
 .ts-attendance-row .ts-task { font-weight: 600; color: var(--muted); }
 .ts-attendance-cell { text-align: center; }
 .ts-attendance-hours { margin-top: 2px; font-size: var(--fs-2xs); color: var(--muted); }

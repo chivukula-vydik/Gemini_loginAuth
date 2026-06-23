@@ -7,8 +7,9 @@ const DAYS: Day[] = ['mon', 'tue', 'wed', 'thu', 'fri'];
 
 // Resolves what the timesheet's read-only attendance row should show for
 // each weekday. Precedence: an already-known leave day wins (the column
-// header already shows it) > a real attendance doc > blank for
-// future/pre-activation days > absent for any other past day with no doc.
+// header already shows it) > a real attendance doc > blank for today (not
+// yet over)/future/pre-activation days > absent for any other past day
+// with no doc.
 export function resolveAttendanceRow(
   dayDates: Record<Day, string>,
   docs: AttendanceDoc[],
@@ -26,7 +27,7 @@ export function resolveAttendanceRow(
     const doc = byDate.get(date);
     if (doc) { out[day] = { status: doc.status, effectiveMinutes: doc.effectiveMinutes }; continue; }
 
-    if (date > today || !activatedDate || date < activatedDate) { out[day] = null; continue; }
+    if (date >= today || !activatedDate || date < activatedDate) { out[day] = null; continue; }
 
     out[day] = { status: 'absent', effectiveMinutes: 0 };
   }
@@ -41,6 +42,15 @@ const LABELS: Record<AttendanceStatus, string> = {
 
 export function attendanceLabel(status: AttendanceStatus): string {
   return LABELS[status];
+}
+
+const ICONS: Record<AttendanceStatus, string> = {
+  present: '✓', partial: '◑', absent: '✕',
+  wfh: '⌂', 'wfh-partial': '⌂', leave: '✦', holiday: '★', weekend: '',
+};
+
+export function attendanceIcon(status: AttendanceStatus): string {
+  return ICONS[status];
 }
 
 const BADGE_CLASS: Record<AttendanceStatus, string> = {

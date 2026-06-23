@@ -7,7 +7,7 @@ import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from '
 import type { Day } from './time';
 import type { Task, Entries, Grant, Assignable } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
-import { attendanceLabel, attendanceBadgeClass } from './attendanceRow';
+import { attendanceLabel, attendanceBadgeClass, attendanceIcon } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
 
 // Rough size of the add-task menu, used to flip it above the trigger when there
@@ -93,13 +93,6 @@ export function TimesheetGrid({
           </tr>
         </thead>
         <tbody>
-          {tasks.length === 0 && (
-            <tr>
-              <td colSpan={8} className="ts-empty">
-                {readOnly ? 'No tasks were logged this week.' : 'No tasks yet — add one to start tracking.'}
-              </td>
-            </tr>
-          )}
           <tr className="ts-attendance-row">
             <td className="ts-task">Attendance</td>
             {DAYS.map((d) => {
@@ -108,7 +101,9 @@ export function TimesheetGrid({
                 <td key={d} className="ts-attendance-cell">
                   {cell ? (
                     <>
-                      <span className={attendanceBadgeClass(cell.status)}>{attendanceLabel(cell.status)}</span>
+                      <span className={attendanceBadgeClass(cell.status)}>
+                        {attendanceIcon(cell.status)} {attendanceLabel(cell.status)}
+                      </span>
                       <div className="ts-attendance-hours">{formatMinutes(cell.effectiveMinutes)}</div>
                     </>
                   ) : (
@@ -119,6 +114,13 @@ export function TimesheetGrid({
             })}
             <td></td><td></td>
           </tr>
+          {tasks.length === 0 && (
+            <tr>
+              <td colSpan={8} className="ts-empty">
+                {readOnly ? 'No tasks were logged this week.' : 'No tasks yet — add one to start tracking.'}
+              </td>
+            </tr>
+          )}
           {tasks.map((t) => (
             <TaskRow
               key={t.id}

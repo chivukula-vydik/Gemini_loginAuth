@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveAttendanceRow, attendanceLabel, attendanceBadgeClass } from './attendanceRow.ts';
+import { resolveAttendanceRow, attendanceLabel, attendanceBadgeClass, attendanceIcon } from './attendanceRow.ts';
 import type { AttendanceDoc } from '../attendance/attendanceApi.ts';
 
 const dayDates = { mon: '2026-06-22', tue: '2026-06-23', wed: '2026-06-24', thu: '2026-06-25', fri: '2026-06-26' };
@@ -30,6 +30,17 @@ test('resolveAttendanceRow: a future day with no doc is blank', () => {
   assert.equal(row.thu, null); // thu = 06-25, today = 06-23
 });
 
+test('resolveAttendanceRow: today with no doc is blank (the day is not over yet)', () => {
+  const row = resolveAttendanceRow(dayDates, [], {}, '2026-01-01', '2026-06-23');
+  assert.equal(row.tue, null); // tue = 06-23 = today
+});
+
+test('resolveAttendanceRow: today WITH a doc still shows its real status', () => {
+  const docs = [doc('2026-06-23', 'partial', 240)];
+  const row = resolveAttendanceRow(dayDates, docs, {}, '2026-01-01', '2026-06-23');
+  assert.deepEqual(row.tue, { status: 'partial', effectiveMinutes: 240 });
+});
+
 test('resolveAttendanceRow: before activation (or no activation yet) is blank, even in the past', () => {
   const row = resolveAttendanceRow(dayDates, [], {}, null, '2026-06-26');
   assert.equal(row.mon, null);
@@ -54,4 +65,14 @@ test('attendanceLabel: maps every status to a display label', () => {
 test('attendanceBadgeClass: maps every status to an att-tag class', () => {
   assert.equal(attendanceBadgeClass('present'), 'att-tag att-tag-present');
   assert.equal(attendanceBadgeClass('absent'), 'att-tag att-tag-absent');
+});
+
+test('attendanceIcon: maps every status to a distinct icon', () => {
+  assert.equal(attendanceIcon('present'), '✓');
+  assert.equal(attendanceIcon('partial'), '◑');
+  assert.equal(attendanceIcon('absent'), '✕');
+  assert.equal(attendanceIcon('wfh'), '⌂');
+  assert.equal(attendanceIcon('wfh-partial'), '⌂');
+  assert.equal(attendanceIcon('leave'), '✦');
+  assert.equal(attendanceIcon('holiday'), '★');
 });
