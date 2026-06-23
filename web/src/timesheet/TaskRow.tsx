@@ -5,6 +5,7 @@ import type { Task, Entries, Grant } from './timesheetApi';
 import type { BarSegment } from './bar';
 import { isCellEditable, canRequestEdit } from './cellLock';
 import { dueUrgency, dueLabel } from './due';
+import { StatusBadge } from '../pm/StatusBadge';
 
 type Props = {
   task: Task;
@@ -38,6 +39,7 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
           <div>
             <span className="ts-name-ro">{task.name || 'Untitled task'}</span>
             <span className="ts-pm-badge">PM</span>
+            {task.status && <StatusBadge status={task.status} />}
             {showDue && task.endDate && (
               <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
             )}
