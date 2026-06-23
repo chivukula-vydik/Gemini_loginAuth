@@ -92,6 +92,9 @@ export const endBreak = () =>
 export const getMonth = (year: number, month: number) =>
   authed(`/attendance/month?year=${year}&month=${month}`) as Promise<AttendanceDoc[]>;
 
+export const getRange = (start: string, end: string) =>
+  authed(`/attendance/range?start=${start}&end=${end}`) as Promise<AttendanceDoc[]>;
+
 export const getStats = (year: number, month: number) =>
   authed(`/attendance/stats?year=${year}&month=${month}`) as Promise<MonthStats>;
 
