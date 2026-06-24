@@ -14,6 +14,7 @@ import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
 import { Utilization } from './pm/Utilization';
 import { HomePage } from './dashboard/HomePage';
+import { RMDashboard } from './dashboard/RMDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 
@@ -82,7 +83,7 @@ export function AppShell() {
       </aside>
       <main className="shell-content">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={user?.role === 'reporting_manager' ? <RMDashboard /> : <HomePage />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/skills" element={<AdminSkills />} />
           <Route path="/company-fit" element={<CompanyFit />} />
