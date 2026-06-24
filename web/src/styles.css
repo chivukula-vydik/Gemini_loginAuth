@@ -1672,3 +1672,9 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .role-check-label { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .role-check-label input[type="checkbox"] { margin: 0; cursor: pointer; }
 
+/* Task identity column — stacked name / project / client */
+.ts-task-identity { display: flex; flex-direction: column; gap: 1px; }
+.ts-task-identity-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ts-task-project { font-size: 12px; color: var(--muted); font-weight: 500; }
+.ts-task-client { font-size: 11px; color: var(--faint); }
+

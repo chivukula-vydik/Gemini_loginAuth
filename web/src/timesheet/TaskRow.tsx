@@ -39,13 +39,17 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
     <tr className={showDue ? `ts-row-${urgency}` : undefined}>
       <td className="ts-task">
         {isPm ? (
-          <div>
-            <span className="ts-name-ro">{task.name || 'Untitled task'}</span>
-            <span className="ts-pm-badge">PM</span>
-            {task.status && <StatusBadge status={task.status} />}
-            {showDue && task.endDate && (
-              <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
-            )}
+          <div className="ts-task-identity">
+            <div className="ts-task-identity-top">
+              <span className="ts-name-ro">{task.name || 'Untitled task'}</span>
+              <span className="ts-pm-badge">PM</span>
+              {task.status && <StatusBadge status={task.status} />}
+              {showDue && task.endDate && (
+                <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
+              )}
+            </div>
+            {task.projectName && <div className="ts-task-project">{task.projectName}</div>}
+            {task.clientName && <div className="ts-task-client">{task.clientName}</div>}
             {task.description && <div className="ts-sub">{task.description}</div>}
             <div className="ts-pm-meta">
               Planned {task.estimatedHours ?? 0}h · Actual {((task.actualMinutes ?? 0) / 60).toFixed(1)}h
