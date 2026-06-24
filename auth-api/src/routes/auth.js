@@ -8,7 +8,7 @@ import {
   signAccessToken,
 } from '../services/tokens.js';
 import { User } from '../models/User.js';
-import { resolveRole } from '../services/authz.js';
+import { resolveRoles } from '../services/authz.js';
 
 const COOKIE_NAME = 'refresh_token';
 
@@ -22,9 +22,11 @@ export function cookieOptions() {
 }
 
 export async function completeLogin(res, user) {
-  const desiredRole = resolveRole(user, process.env);
-  if (desiredRole !== user.role) {
-    user.role = desiredRole;
+  const desiredRoles = resolveRoles(user, process.env);
+  const currentRoles = user.roles || [user.role || 'employee'];
+  if (JSON.stringify(desiredRoles.sort()) !== JSON.stringify(currentRoles.sort())) {
+    user.roles = desiredRoles;
+    user.role = undefined;
     await user.save();
   }
   const refresh = await issueRefreshToken(user);
