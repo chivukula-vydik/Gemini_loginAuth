@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { listUsers, setUserRole, setUserActive, deleteUser, setReportingManager, UserRow } from './pmApi';
+import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, UserRow } from './pmApi';
 import { useAuth } from '../authContext';
 import { personName, initials } from './personName';
 import type { Role } from './nav';
 
 const ROLES: Role[] = ['admin', 'pm', 'employee', 'reporting_manager'];
+const ROLE_LABELS: Record<Role, string> = { admin: 'Admin', pm: 'PM', employee: 'Employee', reporting_manager: 'RM' };
 
 export function AdminUsers() {
   const { user: me } = useAuth();
@@ -13,10 +14,13 @@ export function AdminUsers() {
 
   useEffect(() => { listUsers().then(setUsers).catch((e) => setError(e.message)); }, []);
 
-  async function change(id: string, role: Role) {
+  async function toggleRole(id: string, currentRoles: Role[], role: Role) {
     setError('');
+    const has = currentRoles.includes(role);
+    const next = has ? currentRoles.filter((r) => r !== role) : [...currentRoles, role];
+    if (next.length === 0) return;
     try {
-      const updated = await setUserRole(id, role);
+      const updated = await setUserRoles(id, next);
       setUsers((us) => us.map((u) => (u._id === id ? { ...u, ...updated } : u)));
     } catch (e) {
       setError((e as Error).message);
@@ -56,10 +60,10 @@ export function AdminUsers() {
 
   const total = users.length;
   const activeCount = users.filter((u) => u.active !== false).length;
-  const admins = users.filter((u) => u.role === 'admin').length;
-  const pms = users.filter((u) => u.role === 'pm').length;
-  const employees = users.filter((u) => u.role === 'employee').length;
-  const rms = users.filter((u) => u.role === 'reporting_manager').length;
+  const admins = users.filter((u) => u.roles.includes('admin')).length;
+  const pms = users.filter((u) => u.roles.includes('pm')).length;
+  const employees = users.filter((u) => u.roles.includes('employee')).length;
+  const rms = users.filter((u) => u.roles.includes('reporting_manager')).length;
 
   return (
     <div className="ts-page">
@@ -100,7 +104,7 @@ export function AdminUsers() {
           <thead>
             <tr>
               <th className="ts-task">User</th>
-              <th className="col-left">Role</th>
+              <th className="col-left">Roles</th>
               <th className="col-left">Reporting Manager</th>
               <th className="col-left">Status</th>
               <th className="col-left">Actions</th>
@@ -126,16 +130,22 @@ export function AdminUsers() {
                     </span>
                   </td>
                   <td className="col-left">
-                    <select className="input pm-select" value={u.role} onChange={(e) => change(u._id, e.target.value as Role)}>
-                      {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <div className="role-checkboxes">
+                      {ROLES.map((r) => (
+                        <label key={r} className="role-check-label">
+                          <input type="checkbox" checked={u.roles.includes(r)}
+                            onChange={() => toggleRole(u._id, u.roles, r)} />
+                          {ROLE_LABELS[r]}
+                        </label>
+                      ))}
+                    </div>
                   </td>
                   <td className="col-left">
-                    {(u.role === 'employee') ? (
+                    {u.roles.includes('employee') ? (
                       <select className="input pm-select" value={u.reportingManagerId || ''}
                         onChange={(e) => assignRM(u._id, e.target.value || null)}>
                         <option value="">None</option>
-                        {users.filter((x) => x.role === 'reporting_manager' && x.active !== false).map((rm) => (
+                        {users.filter((x) => x.roles.includes('reporting_manager') && x.active !== false).map((rm) => (
                           <option key={rm._id} value={rm._id}>{personName(rm)}</option>
                         ))}
                       </select>

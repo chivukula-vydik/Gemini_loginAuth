@@ -1667,3 +1667,8 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
   .rm-pending-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ── Role checkboxes ── */
+.role-checkboxes { display: flex; gap: 8px; flex-wrap: wrap; }
+.role-check-label { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.role-check-label input[type="checkbox"] { margin: 0; cursor: pointer; }
+
