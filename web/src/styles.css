@@ -1570,6 +1570,12 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .dash-section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .dash-section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); white-space: nowrap; }
 
+/* Page tabs — My / Review toggle */
+.page-tabs { display: flex; gap: 4px; margin-bottom: 18px; background: var(--surface); border-radius: var(--radius); padding: 3px; width: fit-content; }
+.page-tab { border: none; background: transparent; padding: 7px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.page-tab:hover { color: var(--text); }
+.page-tab-active { background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
+
 .dash-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .dash-card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
 .dash-card-sub { font-size: 11px; color: var(--muted); margin-left: auto; }

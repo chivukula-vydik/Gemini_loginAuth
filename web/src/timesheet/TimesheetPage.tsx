@@ -15,6 +15,9 @@ import { LeaveModal } from '../attendance/LeaveModal';
 import { getRange, getState, AttendanceDoc } from '../attendance/attendanceApi';
 import { resolveAttendanceRow, AttendanceCell } from './attendanceRow';
 import { useAuth } from '../authContext';
+import { TimesheetReview } from './TimesheetReview';
+
+const TEAM_ROLES = ['admin', 'pm', 'reporting_manager'];
 
 function newTask(name = ''): Task {
   const entries = {} as Entries;
@@ -27,6 +30,8 @@ function newTask(name = ''): Task {
 export function TimesheetPage() {
   const { user } = useAuth();
   const canOverrideBillable = user?.roles?.some((r) => ['admin', 'pm'].includes(r)) ?? false;
+  const isManager = user?.roles?.some((r) => TEAM_ROLES.includes(r)) ?? false;
+  const [tab, setTab] = useState<'my' | 'review'>('my');
   const [weekStart, setWeekStart] = useState(() => mondayOf());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignable, setAssignable] = useState<Assignable[]>([]);
@@ -260,11 +265,19 @@ export function TimesheetPage() {
       <header className="ts-header ts-header-row">
         <div>
           <h1 className="ts-h1">Timesheet</h1>
-          <p className="ts-sub">Log hours per task across the week. Totals update as you type.</p>
+          <p className="ts-sub">{tab === 'review' ? 'Review submitted timesheets from your team.' : 'Log hours per task across the week. Totals update as you type.'}</p>
         </div>
-        <button className="att-act att-act-sm ts-leave-btn" onClick={() => setLeaveOpen(true)}>Apply for leave</button>
+        {tab === 'my' && <button className="att-act att-act-sm ts-leave-btn" onClick={() => setLeaveOpen(true)}>Apply for leave</button>}
       </header>
 
+      {isManager && (
+        <div className="page-tabs">
+          <button className={`page-tab${tab === 'my' ? ' page-tab-active' : ''}`} onClick={() => setTab('my')}>My Timesheet</button>
+          <button className={`page-tab${tab === 'review' ? ' page-tab-active' : ''}`} onClick={() => setTab('review')}>Review</button>
+        </div>
+      )}
+
+      {tab === 'review' ? <TimesheetReview /> : <>
       <WeekNav
         weekStart={weekStart}
         status={status}
@@ -359,6 +372,7 @@ export function TimesheetPage() {
           onSubmitted={() => setLeaveOpen(false)}
         />
       )}
+      </>}
     </div>
   );
 }
