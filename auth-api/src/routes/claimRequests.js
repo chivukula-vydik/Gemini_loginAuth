@@ -9,7 +9,7 @@ import { canEditProject } from '../services/authz.js';
 
 export function createClaimRequestsRouter() {
   const router = express.Router();
-  router.use(requireAuth, requireRole('pm', 'admin'));
+  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager'));
 
   router.get('/', asyncHandler(async (req, res) => {
     const status = req.query.status || 'pending';

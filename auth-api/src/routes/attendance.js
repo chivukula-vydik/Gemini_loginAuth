@@ -388,8 +388,13 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/regularise/pending — admin/pm only
-  router.get('/regularise/pending', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
-    const docs = await Attendance.find({ 'regularise.status': 'pending' })
+  router.get('/regularise/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const filter = { 'regularise.status': 'pending' };
+    if (req.user.role === 'reporting_manager') {
+      const teamMembers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
+      filter.userId = { $in: teamMembers.map((u) => u._id) };
+    }
+    const docs = await Attendance.find(filter)
       .populate('userId', 'displayName email')
       .sort({ 'regularise.requestedAt': -1 });
 
@@ -397,7 +402,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/regularise/:id/decide — admin/pm approves or rejects
-  router.patch('/regularise/:id/decide', requireRole('admin', 'pm'), asyncHandler(async (req, res) => {
+  router.patch('/regularise/:id/decide', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -405,6 +410,12 @@ export function createAttendanceRouter(shiftConfig) {
 
     const doc = await Attendance.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
+    if (req.user.role === 'reporting_manager') {
+      const member = await User.findById(doc.userId);
+      if (!member || String(member.reportingManagerId) !== req.user.sub) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+    }
     if (doc.regularise.status !== 'pending') return res.status(409).json({ error: 'already decided' });
 
     doc.regularise.status = decision;

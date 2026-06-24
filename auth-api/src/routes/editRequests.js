@@ -3,14 +3,20 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { EditRequest } from '../models/EditRequest.js';
+import { User } from '../models/User.js';
 
 export function createEditRequestsRouter() {
   const router = express.Router();
-  router.use(requireAuth, requireRole('pm', 'admin'));
+  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager'));
 
   router.get('/', asyncHandler(async (req, res) => {
     const status = req.query.status || 'pending';
-    const reqs = await EditRequest.find({ status, projectId: { $exists: true } })
+    const filter = { status, projectId: { $exists: true } };
+    if (req.user.role === 'reporting_manager') {
+      const teamMembers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
+      filter.userId = { $in: teamMembers.map((u) => u._id) };
+    }
+    const reqs = await EditRequest.find(filter)
       .populate('userId', 'displayName email')
       .populate('projectId', 'name')
       .sort('-createdAt');
