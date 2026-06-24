@@ -25,7 +25,7 @@ function newTask(name = ''): Task {
 
 export function TimesheetPage() {
   const { user } = useAuth();
-  const canOverrideBillable = user?.role === 'admin' || user?.role === 'pm';
+  const canOverrideBillable = user?.roles?.some((r) => ['admin', 'pm'].includes(r)) ?? false;
   const [weekStart, setWeekStart] = useState(() => mondayOf());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignable, setAssignable] = useState<Assignable[]>([]);

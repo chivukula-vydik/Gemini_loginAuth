@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
-import { navForRole, keyForPath, NavKey } from './pm/nav';
+import { navForRoles, keyForPath, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
 import { CompanyFit } from './pm/CompanyFit';
@@ -45,7 +45,7 @@ function NavIcon({ name }: { name: NavKey }) {
 
 export function AppShell() {
   const { user, signOut } = useAuth();
-  const items = navForRole(user?.role ?? 'employee');
+  const items = navForRoles(user?.roles ?? ['employee']);
   const navigate = useNavigate();
   const location = useLocation();
   const active = keyForPath(location.pathname);
@@ -71,7 +71,7 @@ export function AppShell() {
             <div className="shell-avatar">{initial}</div>
             <div className="shell-user-meta">
               <div className="shell-user-email">{name}</div>
-              {user?.role && <div className="shell-user-role">{user.role}</div>}
+              {user?.roles && <div className="shell-user-role">{user.roles.join(', ')}</div>}
             </div>
             <button className="shell-signout" onClick={signOut} title="Sign out" aria-label="Sign out">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"

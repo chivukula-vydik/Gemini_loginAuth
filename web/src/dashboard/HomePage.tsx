@@ -41,7 +41,7 @@ export function HomePage() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  const isTeam = user?.role === 'admin' || user?.role === 'pm' || user?.role === 'reporting_manager';
+  const isTeam = user?.roles?.some((r) => ['admin', 'pm', 'reporting_manager'].includes(r)) ?? false;
 
   return (
     <div className="ts-page dash-page">

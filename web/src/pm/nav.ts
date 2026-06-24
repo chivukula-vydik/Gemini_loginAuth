@@ -14,7 +14,7 @@ export function keyForPath(pathname: string): NavKey {
   return ALL_NAV_KEYS.includes(seg as NavKey) ? (seg as NavKey) : 'home';
 }
 
-export function navForRole(role: Role): NavItem[] {
+function navForRole(role: Role): NavItem[] {
   const home: NavItem = { key: 'home', label: 'Home', path: '/' };
   const timesheet: NavItem = { key: 'timesheet', label: 'Timesheet', path: '/timesheet' };
   const attendance: NavItem = { key: 'attendance', label: 'Attendance', path: '/attendance' };
@@ -51,4 +51,21 @@ export function navForRole(role: Role): NavItem[] {
     timesheet,
     attendance,
   ];
+}
+
+export function navForRoles(roles: Role[]): NavItem[] {
+  const seen = new Set<NavKey>();
+  const result: NavItem[] = [];
+  const priority: Role[] = ['admin', 'pm', 'reporting_manager', 'employee'];
+  const ordered = priority.filter((r) => roles.includes(r));
+  if (ordered.length === 0) ordered.push('employee');
+  for (const role of ordered) {
+    for (const item of navForRole(role)) {
+      if (!seen.has(item.key)) {
+        seen.add(item.key);
+        result.push(item);
+      }
+    }
+  }
+  return result;
 }

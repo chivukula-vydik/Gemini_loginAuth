@@ -151,7 +151,7 @@ export function AttendancePage() {
   const [teamStats, setTeamStats] = useState<TeamMemberStats[] | null>(null);
   const [shift, setShift] = useState<ShiftConfig>(DEFAULT_SHIFT);
   const [decisionNotice, setDecisionNotice] = useState<string[]>([]);
-  const isTeamLead = user?.role === 'pm' || user?.role === 'admin';
+  const isTeamLead = user?.roles?.some((r) => ['pm', 'admin'].includes(r)) ?? false;
   const shiftStartMin = shift.startHour * 60 + shift.startMinute;
 
   const ref = new Date();
