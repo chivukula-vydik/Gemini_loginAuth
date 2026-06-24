@@ -15,13 +15,13 @@ test('employee nav', () => {
 });
 
 test('reporting_manager nav', () => {
-  assert.deepEqual(navForRoles(['reporting_manager']).map((n) => n.key), ['home', 'my-team', 'requests', 'timesheet', 'attendance']);
+  assert.deepEqual(navForRoles(['reporting_manager']).map((n) => n.key), ['home', 'requests', 'timesheet', 'attendance']);
 });
 
 test('multi-role merges nav items', () => {
   const keys = navForRoles(['pm', 'reporting_manager']).map((n) => n.key);
   assert.ok(keys.includes('projects'), 'has PM projects');
-  assert.ok(keys.includes('my-team'), 'has RM my-team');
+  assert.ok(keys.includes('requests'), 'has requests');
   assert.ok(keys.indexOf('home') === 0, 'home is first');
   const unique = new Set(keys);
   assert.equal(keys.length, unique.size, 'no duplicates');

@@ -13,8 +13,7 @@ import { MySkills } from './pm/MySkills';
 import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
 import { Utilization } from './pm/Utilization';
-import { HomePage } from './dashboard/HomePage';
-import { RMDashboard } from './dashboard/RMDashboard';
+import { RoleHome } from './dashboard/RoleHome';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 
@@ -84,8 +83,7 @@ export function AppShell() {
       </aside>
       <main className="shell-content">
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/my-team" element={<RMDashboard />} />
+          <Route path="/" element={<RoleHome />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/skills" element={<AdminSkills />} />
           <Route path="/company-fit" element={<CompanyFit />} />

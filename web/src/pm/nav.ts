@@ -35,13 +35,7 @@ function navForRole(role: Role): NavItem[] {
     return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'requests', label: 'Requests', path: '/requests' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance];
   }
   if (role === 'reporting_manager') {
-    return [
-      home,
-      { key: 'my-team', label: 'My Team', path: '/my-team' },
-      { key: 'requests', label: 'Requests', path: '/requests' },
-      timesheet,
-      attendance,
-    ];
+    return [home, { key: 'requests', label: 'Requests', path: '/requests' }, timesheet, attendance];
   }
   return [
     home,
