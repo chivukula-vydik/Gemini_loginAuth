@@ -311,10 +311,11 @@ export function createAttendanceRouter(shiftConfig) {
     const startDate = `${y}-${m}-01`;
     const endDate = `${y}-${m}-31`;
 
+    const roles = req.user.roles || [req.user.role || 'employee'];
     let memberIds;
-    if (req.user.role === 'admin') {
+    if (roles.includes('admin')) {
       memberIds = (await User.find({ _id: { $ne: req.user.sub } }).select('_id')).map((u) => u._id);
-    } else if (req.user.role === 'reporting_manager') {
+    } else if (roles.includes('reporting_manager')) {
       const teamUsers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
       memberIds = teamUsers.map((u) => u._id);
     } else {
@@ -390,7 +391,7 @@ export function createAttendanceRouter(shiftConfig) {
   // GET /attendance/regularise/pending — admin/pm only
   router.get('/regularise/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     const filter = { 'regularise.status': 'pending' };
-    if (req.user.role === 'reporting_manager') {
+    if ((req.user.roles || [req.user.role]).includes('reporting_manager')) {
       const teamMembers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
       filter.userId = { $in: teamMembers.map((u) => u._id) };
     }
@@ -410,7 +411,7 @@ export function createAttendanceRouter(shiftConfig) {
 
     const doc = await Attendance.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
-    if (req.user.role === 'reporting_manager') {
+    if ((req.user.roles || [req.user.role]).includes('reporting_manager')) {
       const member = await User.findById(doc.userId);
       if (!member || String(member.reportingManagerId) !== req.user.sub) {
         return res.status(403).json({ error: 'forbidden' });

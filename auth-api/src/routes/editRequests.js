@@ -12,7 +12,7 @@ export function createEditRequestsRouter() {
   router.get('/', asyncHandler(async (req, res) => {
     const status = req.query.status || 'pending';
     const filter = { status, projectId: { $exists: true } };
-    if (req.user.role === 'reporting_manager') {
+    if ((req.user.roles || [req.user.role]).includes('reporting_manager')) {
       const teamMembers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
       filter.userId = { $in: teamMembers.map((u) => u._id) };
     }

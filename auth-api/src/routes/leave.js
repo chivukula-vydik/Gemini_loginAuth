@@ -81,9 +81,10 @@ export function createLeaveRouter() {
   // GET /leave/pending — pm/admin/reporting_manager review queue
   router.get('/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     let filter = { status: 'pending' };
-    if (req.user.role === 'reporting_manager') {
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    if (roles.includes('reporting_manager')) {
       filter.assignedApprover = req.user.sub;
-    } else if (req.user.role === 'pm') {
+    } else if (roles.includes('pm')) {
       filter.assignedApprover = null;
     }
     // admin sees all — no extra filter
@@ -103,7 +104,7 @@ export function createLeaveRouter() {
     const doc = await Leave.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (doc.status !== 'pending') return res.status(409).json({ error: 'already decided' });
-    if (req.user.role === 'reporting_manager' && String(doc.assignedApprover) !== req.user.sub) {
+    if ((req.user.roles || [req.user.role]).includes('reporting_manager') && String(doc.assignedApprover) !== req.user.sub) {
       return res.status(403).json({ error: 'you are not the assigned approver for this request' });
     }
 

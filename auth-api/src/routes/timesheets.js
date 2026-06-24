@@ -48,7 +48,7 @@ export function createTimesheetRouter() {
   router.get('/review', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
     const status = req.query.status || 'submitted';
     const filter = { status };
-    if (req.user.role === 'reporting_manager') {
+    if ((req.user.roles || [req.user.role]).includes('reporting_manager')) {
       const teamIds = await User.find({ reportingManagerId: req.user.sub }).select('_id');
       filter.userId = { $in: teamIds.map((u) => u._id) };
     }
@@ -164,7 +164,7 @@ export function createTimesheetRouter() {
     if (files.length === 0) return res.status(404).json({ error: 'file not found' });
     const file = files[0];
     const meta = file.metadata || {};
-    if (String(meta.userId) !== String(req.user.sub) && !['pm', 'admin', 'reporting_manager'].includes(req.user.role)) {
+    if (String(meta.userId) !== String(req.user.sub) && !(req.user.roles || [req.user.role]).some((r) => ['pm', 'admin', 'reporting_manager'].includes(r))) {
       return res.status(403).json({ error: 'forbidden' });
     }
     res.set('Content-Type', file.contentType || 'application/octet-stream');

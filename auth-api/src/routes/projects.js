@@ -50,8 +50,9 @@ export function createProjectsRouter() {
 
   router.get('/', asyncHandler(async (req, res) => {
     let query;
-    if (req.user.role === 'admin') query = {};
-    else if (req.user.role === 'pm') query = { ownerPm: req.user.sub };
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    if (roles.includes('admin')) query = {};
+    else if (roles.includes('pm')) query = { ownerPm: req.user.sub };
     else query = { members: req.user.sub };
     const projects = await Project.find(query).sort('-createdAt');
 
@@ -128,7 +129,7 @@ export function createProjectsRouter() {
       }
     }
 
-    const users = await User.find({ active: true }).select('displayName email role skills');
+    const users = await User.find({ active: true }).select('displayName email role roles skills');
     const candidates = users.map((u) => {
       const uid = String(u._id);
       const entries = entriesByUser.get(uid) || [];
@@ -137,7 +138,7 @@ export function createProjectsRouter() {
       const matchedSkills = requiredSkills.filter((s) => userSkillSet.has(s._id)).map((s) => s.name);
       const missingSkills = requiredSkills.filter((s) => !userSkillSet.has(s._id)).map((s) => s.name);
       return {
-        _id: uid, displayName: u.displayName, email: u.email, role: u.role,
+        _id: uid, displayName: u.displayName, email: u.email, roles: u.roles || [u.role || 'employee'],
         ...avail,
         skillsOk: skillsMatch(requiredIds, [...userSkillSet]),
         matchedSkills, missingSkills,
@@ -162,8 +163,8 @@ export function createProjectsRouter() {
     if (Array.isArray(req.body?.members)) project.members = req.body.members;
     if (Array.isArray(req.body?.requiredSkills)) project.requiredSkills = await validActiveSkillIds(req.body.requiredSkills);
     if ('ownerPm' in (req.body || {}) && req.body.ownerPm) {
-      const owner = await User.findById(req.body.ownerPm).select('role');
-      if (!owner || !['pm', 'admin'].includes(owner.role)) {
+      const owner = await User.findById(req.body.ownerPm).select('role roles');
+      if (!owner || !(owner.roles || [owner.role]).some((r) => ['pm', 'admin'].includes(r))) {
         return res.status(400).json({ error: 'new owner must be a PM or admin' });
       }
       project.ownerPm = owner._id;

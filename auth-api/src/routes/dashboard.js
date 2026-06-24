@@ -52,7 +52,7 @@ export function createDashboardRouter() {
 
   router.get('/', asyncHandler(async (req, res) => {
     const userId = req.user.sub;
-    const role = req.user.role;
+    const roles = req.user.roles || [req.user.role || 'employee'];
     const result = { greeting: greetingText() };
 
     // --- attendance ---
@@ -142,12 +142,12 @@ export function createDashboardRouter() {
     } catch (_) { /* omit section */ }
 
     // --- team-only sections ---
-    if (TEAM_ROLES.includes(role)) {
+    if (roles.some((r) => TEAM_ROLES.includes(r))) {
       // --- pending approvals ---
       try {
         const leaveFilter = { status: 'pending' };
-        if (role === 'reporting_manager') leaveFilter.assignedApprover = userId;
-        else if (role === 'pm') leaveFilter.assignedApprover = null;
+        if (roles.includes('reporting_manager')) leaveFilter.assignedApprover = userId;
+        else if (roles.includes('pm')) leaveFilter.assignedApprover = null;
 
         const [leaveCount, regCount, editCount, claimCount] = await Promise.all([
           Leave.countDocuments(leaveFilter),
@@ -158,7 +158,7 @@ export function createDashboardRouter() {
 
         // Timesheet approvals: count timesheets with at least one submitted day
         let tsFilter = {};
-        if (role === 'reporting_manager') {
+        if (roles.includes('reporting_manager')) {
           const teamIds = await User.find({ reportingManagerId: userId }).select('_id');
           tsFilter.userId = { $in: teamIds.map((u) => u._id) };
         }
@@ -178,7 +178,10 @@ export function createDashboardRouter() {
 
       // --- team summary ---
       try {
-        const memberIds = await teamMemberIds(userId, role);
+        const primaryTeamRole = roles.includes('admin')
+          ? 'admin'
+          : (roles.includes('reporting_manager') ? 'reporting_manager' : 'pm');
+        const memberIds = await teamMemberIds(userId, primaryTeamRole);
         const today = todayStr();
         const presentToday = await Attendance.countDocuments({
           userId: { $in: memberIds },

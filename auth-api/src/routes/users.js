@@ -35,7 +35,7 @@ export function createUsersRouter() {
   // Per-person reputation (company fit). Admin only.
   router.get('/reputation', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const users = await User.find({ active: { $ne: false } })
-      .select('displayName email role reestimations').sort('displayName');
+      .select('displayName email role roles reestimations').sort('displayName');
     const tasks = await Task.find({}).select('status dueDate completedAt assignees');
 
     const byUser = new Map();
@@ -51,7 +51,7 @@ export function createUsersRouter() {
     const people = users.map((u) => {
       const ut = byUser.get(String(u._id)) || [];
       return {
-        _id: String(u._id), displayName: u.displayName, email: u.email, role: u.role,
+        _id: String(u._id), displayName: u.displayName, email: u.email, roles: u.roles || [u.role || 'employee'],
         reestimations: summarize(u.reestimations),
         direction: directionCounts(u.reestimations),
         completion: completionStats(ut),
@@ -66,7 +66,7 @@ export function createUsersRouter() {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: 'invalid id' });
     const isSelf = String(req.user.sub) === String(id);
-    const isPrivileged = req.user.role === 'pm' || req.user.role === 'admin';
+    const isPrivileged = (req.user.roles || [req.user.role]).some((r) => ['pm', 'admin'].includes(r));
     if (!isSelf && !isPrivileged) return res.status(403).json({ error: 'forbidden' });
     const user = await User.findById(id).select('reestimations');
     if (!user) return res.status(404).json({ error: 'not found' });

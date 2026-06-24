@@ -22,15 +22,17 @@ export function createAdminRouter() {
   router.use(requireAuth, requireRole('admin'));
 
   router.get('/users', asyncHandler(async (req, res) => {
-    const users = await User.find().select('email displayName role active reestimationCount reportingManagerId').sort('email');
-    res.json(users);
+    const users = await User.find().select('email displayName roles role active reestimationCount reportingManagerId').sort('email');
+    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles || [u.role || 'employee'] })));
   }));
 
-  router.patch('/users/:id/role', asyncHandler(async (req, res) => {
-    const { role } = req.body || {};
-    if (!ROLES.includes(role)) return res.status(400).json({ error: 'invalid role' });
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true })
-      .select('email displayName role active');
+  router.patch('/users/:id/roles', asyncHandler(async (req, res) => {
+    const { roles } = req.body || {};
+    if (!Array.isArray(roles) || roles.length === 0) return res.status(400).json({ error: 'roles must be a non-empty array' });
+    if (roles.some((r) => !ROLES.includes(r))) return res.status(400).json({ error: 'invalid role in array' });
+    const unique = [...new Set(roles)];
+    const user = await User.findByIdAndUpdate(req.params.id, { roles: unique, $unset: { role: 1 } }, { new: true })
+      .select('email displayName roles active');
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
   }));
@@ -42,15 +44,15 @@ export function createAdminRouter() {
     }
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'not found' });
-    if (!active && target.role === 'admin') {
+    if (!active && (target.roles || [target.role]).includes('admin')) {
       const otherActiveAdmins = await User.countDocuments({
-        _id: { $ne: target._id }, role: 'admin', active: { $ne: false },
+        _id: { $ne: target._id }, roles: 'admin', active: { $ne: false },
       });
       if (otherActiveAdmins === 0) return res.status(400).json({ error: 'cannot deactivate the last admin' });
     }
     target.active = active;
     await target.save();
-    res.json({ _id: target._id, email: target.email, displayName: target.displayName, role: target.role, active: target.active });
+    res.json({ _id: target._id, email: target.email, displayName: target.displayName, roles: target.roles || [target.role || 'employee'], active: target.active });
   }));
 
   router.patch('/users/:id/reporting-manager', asyncHandler(async (req, res) => {
@@ -60,7 +62,7 @@ export function createAdminRouter() {
         return res.status(400).json({ error: 'invalid reportingManagerId' });
       }
       const rm = await User.findById(reportingManagerId);
-      if (!rm || rm.role !== 'reporting_manager') {
+      if (!rm || !(rm.roles || [rm.role]).includes('reporting_manager')) {
         return res.status(400).json({ error: 'target user must have reporting_manager role' });
       }
     }
@@ -68,9 +70,9 @@ export function createAdminRouter() {
       req.params.id,
       { reportingManagerId: reportingManagerId || null },
       { new: true },
-    ).select('email displayName role active reportingManagerId');
+    ).select('email displayName roles role active reportingManagerId');
     if (!user) return res.status(404).json({ error: 'not found' });
-    res.json(user);
+    res.json({ ...user.toObject(), roles: user.roles || [user.role || 'employee'] });
   }));
 
   router.delete('/users/:id', asyncHandler(async (req, res) => {
@@ -80,8 +82,8 @@ export function createAdminRouter() {
     }
     const target = await User.findById(id);
     if (!target) return res.status(404).json({ error: 'not found' });
-    if (target.role === 'admin') {
-      const otherAdmins = await User.countDocuments({ _id: { $ne: target._id }, role: 'admin' });
+    if ((target.roles || [target.role]).includes('admin')) {
+      const otherAdmins = await User.countDocuments({ _id: { $ne: target._id }, roles: 'admin' });
       if (otherAdmins === 0) return res.status(400).json({ error: 'cannot delete the last admin' });
     }
     const ownedCount = await Project.countDocuments({ ownerPm: target._id });
