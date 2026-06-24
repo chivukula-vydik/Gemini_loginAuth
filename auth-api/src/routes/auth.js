@@ -81,9 +81,11 @@ export function createAuthRouter(enabledProviders) {
   }));
 
   router.get('/me', requireAuth, asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.sub).select('email displayName providers role skills');
+    const user = await User.findById(req.user.sub).select('email displayName providers role roles skills');
     if (!user) return res.status(404).json({ error: 'not found' });
-    res.json(user);
+    const obj = user.toObject();
+    obj.roles = user.roles?.length ? user.roles : [user.role || 'employee'];
+    res.json(obj);
   }));
 
   return router;
