@@ -137,6 +137,20 @@ export function TimesheetGrid({
           </tr>
         </thead>
         <tbody>
+          <tr className="ts-attendance-row">
+            <td className="ts-task ts-attendance-label">Attendance</td>
+            {DAYS.map((d) => {
+              const cell = attendance[d];
+              const mins = cell?.effectiveMinutes ?? 0;
+              return (
+                <td key={d} className="ts-attendance-cell">
+                  {mins > 0 ? formatMinutes(mins) : '—'}
+                </td>
+              );
+            })}
+            <td className="ts-rowtotal"></td>
+            <td className="ts-actions"></td>
+          </tr>
           {tasks.length === 0 && (
             <tr>
               <td colSpan={8} className="ts-empty">
