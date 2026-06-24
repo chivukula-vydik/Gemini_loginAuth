@@ -1,8 +1,8 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager';
-export type NavKey = 'home' | 'users' | 'skills' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization';
+export type NavKey = 'home' | 'users' | 'skills' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team';
 export type NavItem = { key: NavKey; label: string; path: string };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team'];
 
 export function pathForKey(key: NavKey): string {
   return key === 'home' ? '/' : `/${key}`;
@@ -37,6 +37,7 @@ export function navForRole(role: Role): NavItem[] {
   if (role === 'reporting_manager') {
     return [
       home,
+      { key: 'my-team', label: 'My Team', path: '/my-team' },
       { key: 'requests', label: 'Requests', path: '/requests' },
       timesheet,
       attendance,

@@ -31,6 +31,7 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   timesheet: <path d="M12 8v4l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
   attendance: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11l-4 4-2-2" />,
   utilization: <path d="M18 20V10M12 20V4M6 20v-6" />,
+  'my-team': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -83,7 +84,8 @@ export function AppShell() {
       </aside>
       <main className="shell-content">
         <Routes>
-          <Route path="/" element={user?.role === 'reporting_manager' ? <RMDashboard /> : <HomePage />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/my-team" element={<RMDashboard />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/skills" element={<AdminSkills />} />
           <Route path="/company-fit" element={<CompanyFit />} />
