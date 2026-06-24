@@ -138,7 +138,7 @@ export function createProjectsRouter() {
       const matchedSkills = requiredSkills.filter((s) => userSkillSet.has(s._id)).map((s) => s.name);
       const missingSkills = requiredSkills.filter((s) => !userSkillSet.has(s._id)).map((s) => s.name);
       return {
-        _id: uid, displayName: u.displayName, email: u.email, roles: u.roles || [u.role || 'employee'],
+        _id: uid, displayName: u.displayName, email: u.email, roles: u.roles?.length ? u.roles : [u.role || 'employee'],
         ...avail,
         skillsOk: skillsMatch(requiredIds, [...userSkillSet]),
         matchedSkills, missingSkills,
@@ -164,7 +164,7 @@ export function createProjectsRouter() {
     if (Array.isArray(req.body?.requiredSkills)) project.requiredSkills = await validActiveSkillIds(req.body.requiredSkills);
     if ('ownerPm' in (req.body || {}) && req.body.ownerPm) {
       const owner = await User.findById(req.body.ownerPm).select('role roles');
-      if (!owner || !(owner.roles || [owner.role]).some((r) => ['pm', 'admin'].includes(r))) {
+      if (!owner || !(owner.roles?.length ? owner.roles : [owner.role]).some((r) => ['pm', 'admin'].includes(r))) {
         return res.status(400).json({ error: 'new owner must be a PM or admin' });
       }
       project.ownerPm = owner._id;

@@ -3,12 +3,12 @@ function userId(user) {
 }
 
 function userRoles(user) {
-  return user.roles || [user.role || 'employee'];
+  return user.roles?.length ? user.roles : [user.role || 'employee'];
 }
 
 export function resolveRoles(user, env = process.env) {
   const adminEmail = String(env.ADMIN_EMAIL || '').toLowerCase().trim();
-  const roles = [...(user.roles || [user.role || 'employee'])];
+  const roles = [...(user.roles?.length ? user.roles : [user.role || 'employee'])];
   if (adminEmail && String(user.email || '').toLowerCase().trim() === adminEmail && !roles.includes('admin')) {
     roles.unshift('admin');
   }

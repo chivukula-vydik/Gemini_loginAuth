@@ -51,7 +51,7 @@ export function createUsersRouter() {
     const people = users.map((u) => {
       const ut = byUser.get(String(u._id)) || [];
       return {
-        _id: String(u._id), displayName: u.displayName, email: u.email, roles: u.roles || [u.role || 'employee'],
+        _id: String(u._id), displayName: u.displayName, email: u.email, roles: u.roles?.length ? u.roles : [u.role || 'employee'],
         reestimations: summarize(u.reestimations),
         direction: directionCounts(u.reestimations),
         completion: completionStats(ut),

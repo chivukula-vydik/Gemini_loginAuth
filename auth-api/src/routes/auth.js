@@ -23,7 +23,7 @@ export function cookieOptions() {
 
 export async function completeLogin(res, user) {
   const desiredRoles = resolveRoles(user, process.env);
-  const currentRoles = user.roles || [user.role || 'employee'];
+  const currentRoles = user.roles?.length ? user.roles : [user.role || 'employee'];
   if (JSON.stringify(desiredRoles.sort()) !== JSON.stringify(currentRoles.sort())) {
     user.roles = desiredRoles;
     user.role = undefined;

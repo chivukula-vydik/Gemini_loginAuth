@@ -23,7 +23,7 @@ export function createAdminRouter() {
 
   router.get('/users', asyncHandler(async (req, res) => {
     const users = await User.find().select('email displayName roles role active reestimationCount reportingManagerId').sort('email');
-    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles || [u.role || 'employee'] })));
+    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
   }));
 
   router.patch('/users/:id/roles', asyncHandler(async (req, res) => {
@@ -44,7 +44,7 @@ export function createAdminRouter() {
     }
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ error: 'not found' });
-    if (!active && (target.roles || [target.role]).includes('admin')) {
+    if (!active && (target.roles?.length ? target.roles : [target.role]).includes('admin')) {
       const otherActiveAdmins = await User.countDocuments({
         _id: { $ne: target._id }, roles: 'admin', active: { $ne: false },
       });
@@ -52,7 +52,7 @@ export function createAdminRouter() {
     }
     target.active = active;
     await target.save();
-    res.json({ _id: target._id, email: target.email, displayName: target.displayName, roles: target.roles || [target.role || 'employee'], active: target.active });
+    res.json({ _id: target._id, email: target.email, displayName: target.displayName, roles: target.roles?.length ? target.roles : [target.role || 'employee'], active: target.active });
   }));
 
   router.patch('/users/:id/reporting-manager', asyncHandler(async (req, res) => {
@@ -62,7 +62,7 @@ export function createAdminRouter() {
         return res.status(400).json({ error: 'invalid reportingManagerId' });
       }
       const rm = await User.findById(reportingManagerId);
-      if (!rm || !(rm.roles || [rm.role]).includes('reporting_manager')) {
+      if (!rm || !(rm.roles?.length ? rm.roles : [rm.role]).includes('reporting_manager')) {
         return res.status(400).json({ error: 'target user must have reporting_manager role' });
       }
     }
@@ -72,7 +72,7 @@ export function createAdminRouter() {
       { new: true },
     ).select('email displayName roles role active reportingManagerId');
     if (!user) return res.status(404).json({ error: 'not found' });
-    res.json({ ...user.toObject(), roles: user.roles || [user.role || 'employee'] });
+    res.json({ ...user.toObject(), roles: user.roles?.length ? user.roles : [user.role || 'employee'] });
   }));
 
   router.delete('/users/:id', asyncHandler(async (req, res) => {
@@ -82,7 +82,7 @@ export function createAdminRouter() {
     }
     const target = await User.findById(id);
     if (!target) return res.status(404).json({ error: 'not found' });
-    if ((target.roles || [target.role]).includes('admin')) {
+    if ((target.roles?.length ? target.roles : [target.role]).includes('admin')) {
       const otherAdmins = await User.countDocuments({ _id: { $ne: target._id }, roles: 'admin' });
       if (otherAdmins === 0) return res.status(400).json({ error: 'cannot delete the last admin' });
     }
