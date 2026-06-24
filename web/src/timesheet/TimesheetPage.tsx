@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { WeekNav, SaveStatus } from './WeekNav';
 import { TimesheetGrid } from './TimesheetGrid';
 import { SummaryTiles } from './SummaryTiles';
+import { BillableBar } from './BillableBar';
 import { getWeek, saveWeek, submitWeek, submitDays, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
 import type { DayStatusMap, ProjectRef, Attachment } from './timesheetApi';
 import { AttachmentBar } from './AttachmentBar';
@@ -100,6 +101,12 @@ export function TimesheetPage() {
   }, [dd.mon, dd.fri]);
 
   const attendance = resolveAttendanceRow(dd, attendanceDocs, activatedDate, todayISO());
+
+  const timeOffMinutes = DAYS.reduce((sum, d) => {
+    const cell = attendance[d];
+    if (cell && (cell.status === 'leave' || cell.status === 'holiday')) return sum + (targetMinutes / 5);
+    return sum;
+  }, 0);
 
   // Listen for PM task deletions and remove matching timesheet rows (by taskId)
   useEffect(() => {
@@ -301,6 +308,13 @@ export function TimesheetPage() {
         activeTasks={tasks.length}
         billableMinutes={billableMinutes}
         nonBillableMinutes={nonBillableMinutes}
+      />
+
+      <BillableBar
+        billableMinutes={billableMinutes}
+        nonBillableMinutes={nonBillableMinutes}
+        timeOffMinutes={timeOffMinutes}
+        targetMinutes={targetMinutes}
       />
 
       {loadError && <p className="ts-error">{loadError} <button className="link-btn" onClick={() => load(weekStart)}>Retry</button></p>}

@@ -1683,3 +1683,19 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-attendance-row:hover { background: var(--surface) !important; }
 .ts-attendance-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .ts-attendance-cell { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Billable bar — segmented progress above grid */
+.bb-wrap { margin-bottom: 16px; }
+.bb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.bb-total { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.bb-legend { display: flex; gap: 14px; }
+.bb-legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.bb-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.bb-dot-billable { background: #22c55e; }
+.bb-dot-nonbillable { background: #3b82f6; }
+.bb-dot-timeoff { background: #f59e0b; }
+.bb-track { height: 10px; background: var(--surface-2); border-radius: 5px; display: flex; overflow: hidden; }
+.bb-seg { height: 100%; transition: width 0.3s ease; }
+.bb-seg-billable { background: #22c55e; }
+.bb-seg-nonbillable { background: #3b82f6; }
+.bb-seg-timeoff { background: #f59e0b; }
