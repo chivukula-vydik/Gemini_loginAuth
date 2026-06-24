@@ -30,6 +30,8 @@ export type Task = {
   startDate?: string | null;
   endDate?: string | null;
   projectId?: string | null;
+  projectName?: string;
+  clientName?: string;
   billable?: BillableMap;
   effectiveBillable?: Record<Day, boolean>;
 };

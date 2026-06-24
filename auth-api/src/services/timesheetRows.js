@@ -64,12 +64,14 @@ export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
         startDate: info.startDate || null,
         endDate: endDateFrom(info.startDate || null, info.estimatedHours || 0),
         projectId: info.projectId || null,
+        projectName: info.projectName || '',
+        clientName: info.clientName || '',
         entries: entriesOf(r),
         notes: savedNotes(r),
       });
       used.add(tid);
     } else {
-      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, entries: entriesOf(r), notes: savedNotes(r) });
+      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, projectName: '', clientName: '', entries: entriesOf(r), notes: savedNotes(r) });
     }
   }
   return out;

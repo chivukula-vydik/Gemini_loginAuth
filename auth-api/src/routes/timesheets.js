@@ -202,18 +202,25 @@ export function createTimesheetRouter() {
     const infoTasks = idList.length
       ? await Task.find({ _id: { $in: idList } }).select('title description percentComplete estimatedHours status startDate project')
       : [];
-    const taskInfoById = new Map(infoTasks.map((t) => [String(t._id), {
-      title: t.title, description: t.description || '', percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
-      status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
-      startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
-      projectId: t.project ? String(t.project) : null,
-    }]));
+    const taskInfoById = new Map(infoTasks.map((t) => {
+      const pid = t.project ? String(t.project) : null;
+      return [String(t._id), {
+        title: t.title, description: t.description || '', percentComplete: t.percentComplete, estimatedHours: t.estimatedHours,
+        status: t.status, actualMinutes: actualMap.get(String(t._id)) || 0,
+        startDate: t.startDate ? t.startDate.toISOString().slice(0, 10) : null,
+        projectId: pid,
+        projectName: pid ? (projectNameById.get(pid) || '') : '',
+        clientName: pid ? (clientNameById.get(pid) || '') : '',
+      }];
+    }));
 
     const projectIds = [...new Set(infoTasks.map((t) => String(t.project)).filter(Boolean))];
-    const billingProjects = projectIds.length
-      ? await Project.find({ _id: { $in: projectIds } }).select('billingType')
+    const projectDocs = projectIds.length
+      ? await Project.find({ _id: { $in: projectIds } }).select('name clientName billingType')
       : [];
-    const billingByProject = new Map(billingProjects.map((p) => [String(p._id), p.billingType === 'billable']));
+    const billingByProject = new Map(projectDocs.map((p) => [String(p._id), p.billingType === 'billable']));
+    const projectNameById = new Map(projectDocs.map((p) => [String(p._id), p.name]));
+    const clientNameById = new Map(projectDocs.map((p) => [String(p._id), p.clientName || '']));
 
     const tasks = mergeWeekRows({ savedRows, taskInfoById });
     const tasksWithBillable = tasks.map((t) => {
