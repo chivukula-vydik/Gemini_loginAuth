@@ -36,7 +36,7 @@ function DueCell({ task, onSave, onDecideExt }: {
   onSave: (dueDate: string | null) => void;
   onDecideExt: (decision: 'approve' | 'reject') => void;
 }) {
-  const value = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? '');
+  const value = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate?.slice(0, 10) ?? '');
   const urgency = dueUrgency(value || null, todayISO(), task.status);
   return (
     <div className="due-stack">
@@ -204,7 +204,8 @@ export function ProjectTasks(props: Props) {
             </td></tr>
           )}
           {pageTasks.map((t) => {
-            const urgency = dueUrgency(t.dueDate ?? t.effectiveDueDate ?? null, todayISO(), t.status);
+            const rawDue = t.dueDate ? t.dueDate.slice(0, 10) : (t.effectiveDueDate ?? null);
+            const urgency = dueUrgency(rawDue, todayISO(), t.status);
             const rowClass = urgency === 'overdue' ? 'ts-row-overdue' : urgency === 'soon' ? 'ts-row-soon' : '';
             const taskDeadline = t.dueDate ? t.dueDate.slice(0, 10) : (t.effectiveDueDate ?? null);
             const anyEtaLate = t.status !== 'done' && t.assignees.some((a) => etaStatus(a.etaAt, taskDeadline) === 'late');

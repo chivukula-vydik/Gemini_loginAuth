@@ -108,8 +108,10 @@ export function TimesheetGrid({
     return () => window.removeEventListener('keydown', onKey);
   }, [pickerOpen]);
 
+  const visibleTasks = tasks.filter((t) => !t.hidden);
+
   const dayTotal = (day: keyof Entries) =>
-    tasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
+    visibleTasks.reduce((sum, t) => sum + (t.entries[day] || 0), 0);
 
   return (
     <div className="ts-card">
@@ -155,14 +157,14 @@ export function TimesheetGrid({
           </tr>
         </thead>
         <tbody>
-          {tasks.length === 0 && (
+          {visibleTasks.length === 0 && (
             <tr>
               <td colSpan={8} className="ts-empty">
                 {readOnly ? 'No tasks were logged this week.' : 'No tasks yet — add one to start tracking.'}
               </td>
             </tr>
           )}
-          {tasks.map((t) => (
+          {visibleTasks.map((t) => (
             <TaskRow
               key={t.id}
               task={t}
@@ -226,7 +228,7 @@ export function TimesheetGrid({
                   >
                     <TaskSearch
                       projects={projects || []}
-                      existingTaskIds={new Set(tasks.filter((t) => t.taskId).map((t) => String(t.taskId)))}
+                      existingTaskIds={new Set(visibleTasks.filter((t) => t.taskId).map((t) => String(t.taskId)))}
                       onSelect={(a) => { onAddAssigned(a); setPickerOpen(false); }}
                       onAddBlank={() => { onAddBlank(); setPickerOpen(false); }}
                       onClose={() => setPickerOpen(false)}

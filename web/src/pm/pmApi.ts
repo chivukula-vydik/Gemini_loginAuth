@@ -224,9 +224,23 @@ export type SubmittedTimesheet = {
 };
 export const listSubmittedTimesheets = () =>
   authed('/timesheets/review?status=submitted') as Promise<SubmittedTimesheet[]>;
-export const decideTimesheet = (id: string, decision: 'approve' | 'return') =>
-  authed(`/timesheets/review/${id}`, 'PATCH', { decision });
+export const decideTimesheet = (id: string, decision: 'approve' | 'return', reason?: string) =>
+  authed(`/timesheets/review/${id}`, 'PATCH', { decision, reason });
 
 export type TimesheetNote = { taskName: string; day: string; minutes: number; note: string };
 export const getTimesheetNotes = (id: string) =>
   authed(`/timesheets/review/${id}/notes`) as Promise<TimesheetNote[]>;
+
+export type ReviewTaskDetail = {
+  id: string; name: string; taskId: string | null;
+  entries: Record<string, number>; notes: Record<string, string>;
+  billable: Record<string, boolean | null>;
+  projectName: string; projectBillingType: string;
+};
+export type TimesheetDetail = {
+  _id: string; user: Person | null; weekStart: string; status: string;
+  submittedAt: string | null; dayStatus: Record<string, { status: string }>;
+  tasks: ReviewTaskDetail[];
+};
+export const getTimesheetDetail = (id: string) =>
+  authed(`/timesheets/review/${id}/detail`) as Promise<TimesheetDetail>;

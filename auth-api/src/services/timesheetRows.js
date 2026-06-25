@@ -68,10 +68,11 @@ export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
         clientName: info.clientName || '',
         entries: entriesOf(r),
         notes: savedNotes(r),
+        hidden: !!r.hidden,
       });
       used.add(tid);
     } else {
-      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, projectName: '', clientName: '', entries: entriesOf(r), notes: savedNotes(r) });
+      out.push({ id: r.id, taskId: null, name: r.name || '', locked: false, projectId: null, projectName: '', clientName: '', entries: entriesOf(r), notes: savedNotes(r), hidden: !!r.hidden });
     }
   }
   return out;
@@ -81,7 +82,7 @@ export function mergeWeekRows({ savedRows = [], taskInfoById = new Map() }) {
 // assigned, non-done tasks minus any already present as a saved row this week.
 export function assignableTasks(assignedTasks = [], savedRows = []) {
   const inWeek = new Set(
-    savedRows.filter((r) => r.taskId).map((r) => String(r.taskId)),
+    savedRows.filter((r) => r.taskId && !r.hidden).map((r) => String(r.taskId)),
   );
   return assignedTasks
     .filter((t) => t.status !== 'done' && !inWeek.has(String(t._id)))
@@ -103,7 +104,7 @@ export function sanitizeRows(rows, allowedTaskIds) {
     for (const day of DAYS) entries[day] = cleanMinutes(t?.entries?.[day]);
     const taskId = t?.taskId && allowed.has(String(t.taskId)) ? String(t.taskId) : null;
     const notes = notesOf(t);
-    return { id: String(t?.id ?? ''), name: String(t?.name ?? ''), entries, taskId, notes };
+    return { id: String(t?.id ?? ''), name: String(t?.name ?? ''), entries, taskId, notes, hidden: !!t?.hidden };
   });
 }
 
@@ -198,6 +199,7 @@ export function derivedStatus(dayStatus, tasks) {
   const dayTotals = {};
   for (const d of DAYS) dayTotals[d] = 0;
   for (const t of (tasks || [])) {
+    if (t.hidden) continue;
     for (const d of DAYS) dayTotals[d] += cleanMinutes(t.entries?.[d]);
   }
   const nonEmpty = DAYS.filter((d) => dayTotals[d] > 0);

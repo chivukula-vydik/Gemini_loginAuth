@@ -162,12 +162,19 @@ export function TimesheetPage() {
   const onNoteChange = (id: string, day: Day, text: string) =>
     update(tasks.map((t) => (t.id === id ? { ...t, notes: { ...t.notes, [day]: text } } : t)));
 
-  const onDelete = (id: string) => update(tasks.filter((t) => t.id !== id));
+  const onDelete = (id: string) => update(tasks.map((t) => (t.id === id ? { ...t, hidden: true } : t)));
 
   const onBillableChange = (id: string, day: Day, value: boolean | null) =>
     update(tasks.map((t) => (t.id === id ? { ...t, billable: { ...(t.billable ?? {} as Record<Day, boolean | null>), [day]: value } } : t)));
 
-  const onAddAssigned = (a: Assignable) => update([...tasks, rowFromAssignable(a)]);
+  const onAddAssigned = (a: Assignable) => {
+    const hidden = tasks.find((t) => t.taskId && String(t.taskId) === String(a.taskId) && t.hidden);
+    if (hidden) {
+      update(tasks.map((t) => (t.id === hidden.id ? { ...t, hidden: false } : t)));
+    } else {
+      update([...tasks, rowFromAssignable(a)]);
+    }
+  };
   const onAddBlank = () => update([...tasks, blankRow('No task assigned')]);
 
   function onProgress(id: string, patch: { percentComplete?: number; status?: string }) {
@@ -246,13 +253,15 @@ export function TimesheetPage() {
     }
   }
 
+  const visibleTasks = tasks.filter((t) => !t.hidden);
+
   const dayTotals = DAYS.map((d) => ({
     day: d,
-    total: tasks.reduce((s, t) => s + (t.entries[d] || 0), 0),
+    total: visibleTasks.reduce((s, t) => s + (t.entries[d] || 0), 0),
   }));
   const weekTotal = dayTotals.reduce((s, x) => s + x.total, 0);
 
-  const billableMinutes = tasks.reduce((sum, t) => sum + DAYS.reduce((s, d) => {
+  const billableMinutes = visibleTasks.reduce((sum, t) => sum + DAYS.reduce((s, d) => {
     const minutes = t.entries[d] || 0;
     const isBillable = t.effectiveBillable?.[d];
     return s + (isBillable ? minutes : 0);
@@ -315,7 +324,7 @@ export function TimesheetPage() {
       <SummaryTiles
         weekTotal={weekTotal}
         targetMinutes={targetMinutes}
-        activeTasks={tasks.length}
+        activeTasks={visibleTasks.length}
         billableMinutes={billableMinutes}
         nonBillableMinutes={nonBillableMinutes}
       />

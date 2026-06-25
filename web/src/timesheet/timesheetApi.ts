@@ -34,6 +34,7 @@ export type Task = {
   clientName?: string;
   billable?: BillableMap;
   effectiveBillable?: Record<Day, boolean>;
+  hidden?: boolean;
 };
 export function authHeaders(): Record<string, string> {
   const token = getAccessToken();

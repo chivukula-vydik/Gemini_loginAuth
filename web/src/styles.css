@@ -535,6 +535,35 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ts-note-item { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: var(--radius); background: var(--hover); }
 .ts-note-meta { font-size: 11px; font-weight: 600; color: var(--muted); }
 .ts-note-text { font-size: 13px; color: var(--fg); }
+
+/* ── Review detail view ── */
+.ts-review-list { display: flex; flex-direction: column; gap: 8px; }
+.ts-review-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: box-shadow 0.15s; }
+.ts-review-card-open { box-shadow: var(--shadow-card); border-color: var(--primary); }
+.ts-review-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px 18px; background: none; border: none; cursor: pointer; font-size: 14px; color: var(--fg); text-align: left; transition: background 0.12s; }
+.ts-review-row:hover { background: var(--surface); }
+.ts-review-name { font-weight: 600; flex: 1; }
+.ts-review-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ts-review-submitted { margin-left: 8px; }
+.ts-review-detail { padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.ts-review-actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ts-review-return-group { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.ts-review-reason { font-size: 13px; padding: 6px 10px; min-width: 220px; }
+.ts-detail-view { margin-top: 14px; }
+.ts-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ts-detail-range { font-weight: 600; font-size: 14px; color: var(--fg); }
+.ts-detail-totals { font-size: 13px; color: var(--muted); }
+.ts-detail-table th.ts-project-col, .ts-detail-table td.ts-project-col { text-align: left; min-width: 120px; max-width: 160px; }
+.ts-detail-table th.ts-day-col, .ts-detail-table td.ts-day-col { min-width: 80px; }
+.ts-detail-table th.ts-total-col, .ts-detail-table td.ts-total-col { min-width: 80px; font-weight: 600; }
+.ts-project-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.ts-billable-cell { background: rgba(34,197,94,0.06); }
+.ts-note-row td { padding: 0 16px 10px !important; border-bottom: 1px solid var(--border); }
+.ts-inline-notes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ts-inline-note { font-size: 12px; color: var(--muted); padding: 3px 8px; background: var(--hover); border-radius: var(--radius-sm); }
+.ts-inline-note strong { color: var(--fg); margin-right: 3px; }
+.ts-totals-row td { background: var(--surface); border-top: 2px solid var(--border); }
+
 .ts-card-foot { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--card); }
 .ts-foot-row { display: flex; align-items: center; justify-content: space-between; }
 .ts-attach-wrap { display: flex; align-items: center; }
@@ -664,7 +693,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .due-chip.soon .due-dot { background: var(--soon); }
 .due-rel { font-size: 11px; font-weight: 600; }
 
-.due-stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.due-stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 150px; }
 .ext-note { font-size: 11px; color: var(--muted); display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; }
 .ext-pending { color: var(--soon); font-weight: 600; }
 .ext-trigger { font-size: 11px; }
@@ -672,8 +701,8 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .ext-prefix { font-size: 11px; color: var(--muted); }
 
 /* My Tasks estimate cell */
-.est-cell { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
-.est-main { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+.est-cell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 180px; }
+.est-main { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; flex-wrap: wrap; }
 .est-pending-tag { font-size: 11px; font-weight: 600; color: var(--soon); }
 .est-approved-sub { margin: 0; }
 .est-trigger { font-size: 12px; }
@@ -687,7 +716,7 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
 .est-cell:hover .est-menu-btn, .est-menu-btn:focus { color: var(--text); }
 .est-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
 .est-menu-pop {
-  position: absolute; top: 100%; right: 0; z-index: 41; margin-top: 4px;
+  position: fixed; z-index: 41;
   background: var(--card); border: 1px solid var(--border-strong); border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.12); padding: 4px; min-width: 140px;
 }

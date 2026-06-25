@@ -59,7 +59,8 @@ export function createTimesheetRouter() {
     res.json(docs.map((d) => {
       let billableMinutes = 0;
       let nonBillableMinutes = 0;
-      for (const t of d.tasks || []) {
+      const visibleTasks = (d.tasks || []).filter((t) => !t.hidden);
+      for (const t of visibleTasks) {
         for (const day of DAYS) {
           const mins = t.entries?.[day] || 0;
           if (mins > 0) {
@@ -76,7 +77,7 @@ export function createTimesheetRouter() {
           : null,
         weekStart: d.weekStart,
         submittedAt: d.submittedAt,
-        totalMinutes: d.tasks.reduce(
+        totalMinutes: visibleTasks.reduce(
           (sum, t) => sum + DAYS.reduce((a, day) => a + (t.entries?.[day] || 0), 0),
           0,
         ),
@@ -126,9 +127,10 @@ export function createTimesheetRouter() {
     // When there are no day entries to derive a status from (e.g. a legacy
     // doc with no tasks), fall back to the decision itself so empty test/seed
     // timesheets still resolve to approved/returned rather than draft.
-    const hasEntries = (doc.tasks || []).some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
+    const visibleDocTasks = (doc.tasks || []).filter((t) => !t.hidden);
+    const hasEntries = visibleDocTasks.some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
     update.status = hasEntries
-      ? derivedStatus(newDs, doc.tasks)
+      ? derivedStatus(newDs, visibleDocTasks)
       : (decision === 'approve' ? 'approved' : 'returned');
     update.reviewedBy = req.user.sub;
     update.reviewedAt = now;
@@ -136,6 +138,41 @@ export function createTimesheetRouter() {
 
     await Timesheet.updateOne({ _id: doc._id }, { $set: update });
     res.json({ ok: true, status: update.status, dayStatus: newDs });
+  }));
+
+  router.get('/review/:id/detail', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const doc = await Timesheet.findById(req.params.id).populate('userId', 'displayName email');
+    if (!doc) return res.status(404).json({ error: 'not found' });
+
+    const taskIds = doc.tasks.filter((t) => t.taskId).map((t) => t.taskId);
+    const taskDocs = taskIds.length
+      ? await Task.find({ _id: { $in: taskIds } }).select('project').populate('project', 'name billingType')
+      : [];
+    const projectByTaskId = new Map(taskDocs.map((t) => [String(t._id), t.project]));
+
+    const tasks = doc.tasks.filter((t) => !t.hidden).map((t) => {
+      const proj = t.taskId ? projectByTaskId.get(String(t.taskId)) : null;
+      return {
+        id: t.id,
+        name: t.name || 'Untitled',
+        taskId: t.taskId ? String(t.taskId) : null,
+        entries: t.entries || {},
+        notes: t.notes || {},
+        billable: t.billable || {},
+        projectName: proj?.name || '',
+        projectBillingType: proj?.billingType || 'non-billable',
+      };
+    });
+
+    res.json({
+      _id: String(doc._id),
+      user: doc.userId ? { _id: String(doc.userId._id), displayName: doc.userId.displayName, email: doc.userId.email } : null,
+      weekStart: doc.weekStart,
+      status: doc.status,
+      submittedAt: doc.submittedAt,
+      dayStatus: doc.dayStatus || {},
+      tasks,
+    });
   }));
 
   router.get('/review/:id/notes', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
@@ -155,6 +192,51 @@ export function createTimesheetRouter() {
       }
     }
     res.json(rows);
+  }));
+
+  router.get('/tasks', asyncHandler(async (req, res) => {
+    const projectId = req.query.projectId;
+    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'projectId required' });
+    const userId = req.user.sub;
+    const tasks = await Task.find({
+      project: projectId,
+      'assignees.user': userId,
+      status: { $ne: 'done' },
+    }).select('title description status estimatedHours');
+    res.json(tasks.map((t) => ({
+      taskId: String(t._id),
+      title: t.title,
+      description: t.description || '',
+      status: t.status,
+      estimatedHours: t.estimatedHours || 0,
+    })));
+  }));
+
+  router.post('/tasks', asyncHandler(async (req, res) => {
+    const { title, projectId } = req.body || {};
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
+    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'invalid projectId' });
+    const userId = req.user.sub;
+    const project = await Project.findById(projectId);
+    if (!project) return res.status(404).json({ error: 'project not found' });
+    if (!project.members.some((m) => String(m) === String(userId))) {
+      return res.status(403).json({ error: 'not a member of this project' });
+    }
+    const task = await Task.create({
+      project: project._id,
+      title: String(title).trim(),
+      assignees: [{ user: userId, sharePct: 100 }],
+      status: 'todo',
+      createdBy: userId,
+    });
+    res.status(201).json({
+      taskId: String(task._id),
+      title: task.title,
+      projectId: String(project._id),
+      projectName: project.name,
+      status: task.status,
+      estimatedHours: 0,
+    });
   }));
 
   router.get('/attachments/:fileId', asyncHandler(async (req, res) => {
@@ -308,7 +390,7 @@ export function createTimesheetRouter() {
     const DAY_OFFSETS = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 };
     const overtimeEntries = [];
     for (const d of DAYS) {
-      const dayTotal = rows.reduce((sum, r) => sum + (r.entries?.[d] || 0), 0);
+      const dayTotal = rows.filter((r) => !r.hidden).reduce((sum, r) => sum + (r.entries?.[d] || 0), 0);
       if (dayTotal > REGULAR_DAY_MINUTES) {
         const excess = dayTotal - REGULAR_DAY_MINUTES;
         const dateObj = new Date(`${weekStart}T00:00:00Z`);
@@ -392,7 +474,7 @@ export function createTimesheetRouter() {
 
     const dayTotals = {};
     for (const d of DAYS) {
-      dayTotals[d] = (doc.tasks || []).reduce((sum, t) => sum + (t.entries?.[d] || 0), 0);
+      dayTotals[d] = (doc.tasks || []).filter((t) => !t.hidden).reduce((sum, t) => sum + (t.entries?.[d] || 0), 0);
     }
     const toSubmit = requestedDays.length > 0
       ? requestedDays
@@ -420,8 +502,9 @@ export function createTimesheetRouter() {
         newDs[d] = { ...(newDs[d] || {}), status: update[`dayStatus.${d}.status`] };
       }
     }
-    const hasEntries = (doc.tasks || []).some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
-    const newStatus = hasEntries ? derivedStatus(newDs, doc.tasks) : 'submitted';
+    const visibleSubmitTasks = (doc.tasks || []).filter((t) => !t.hidden);
+    const hasEntries = visibleSubmitTasks.some((t) => DAYS.some((d) => (t.entries?.[d] || 0) > 0));
+    const newStatus = hasEntries ? derivedStatus(newDs, visibleSubmitTasks) : 'submitted';
     update.status = newStatus;
     if (newStatus === 'submitted') update.submittedAt = now;
 
@@ -452,51 +535,6 @@ export function createTimesheetRouter() {
     if (existing) return res.status(409).json({ error: 'a request for this day already exists' });
     const reqDoc = await EditRequest.create({ userId, weekStart, day, projectId, reason: String(req.body?.reason || '') });
     res.status(201).json(reqDoc);
-  }));
-
-  router.get('/tasks', asyncHandler(async (req, res) => {
-    const projectId = req.query.projectId;
-    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'projectId required' });
-    const userId = req.user.sub;
-    const tasks = await Task.find({
-      project: projectId,
-      'assignees.user': userId,
-      status: { $ne: 'done' },
-    }).select('title description status estimatedHours');
-    res.json(tasks.map((t) => ({
-      taskId: String(t._id),
-      title: t.title,
-      description: t.description || '',
-      status: t.status,
-      estimatedHours: t.estimatedHours || 0,
-    })));
-  }));
-
-  router.post('/tasks', asyncHandler(async (req, res) => {
-    const { title, projectId } = req.body || {};
-    if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
-    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'invalid projectId' });
-    const userId = req.user.sub;
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ error: 'project not found' });
-    if (!project.members.some((m) => String(m) === String(userId))) {
-      return res.status(403).json({ error: 'not a member of this project' });
-    }
-    const task = await Task.create({
-      project: project._id,
-      title: String(title).trim(),
-      assignees: [{ user: userId, sharePct: 100 }],
-      status: 'todo',
-      createdBy: userId,
-    });
-    res.status(201).json({
-      taskId: String(task._id),
-      title: task.title,
-      projectId: String(project._id),
-      projectName: project.name,
-      status: task.status,
-      estimatedHours: 0,
-    });
   }));
 
   router.post('/:weekStart/attachments', upload.single('file'), asyncHandler(async (req, res) => {

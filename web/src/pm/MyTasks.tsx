@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { myTasks, proposeExtension, setMyEstimate, setMyEta, EstimateUnit, Task, listMyOffers, decideOffer, AssignmentOffer } from './pmApi';
 import { dueUrgency, dueLabel } from '../timesheet/due';
 import { todayISO } from '../timesheet/time';
@@ -7,6 +8,7 @@ import { estimateCellState } from './estimateRequest';
 import { EstimateRequestModal } from './EstimateRequestModal';
 import { EtaPicker } from './EtaPicker';
 import { etaStatus } from './eta';
+import { popoverPosition, type Placement } from './popoverPosition';
 
 function deadlineOf(task: Task): string | null {
   return task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
@@ -76,11 +78,26 @@ function EstimatePrimary({ view }: { view: ReturnType<typeof estimateCellState> 
   return <span className="ts-sub">No estimate yet</span>;
 }
 
+const EST_MENU_WIDTH = 160;
+const EST_MENU_HEIGHT = 48;
+
 function EstimateCell({ task, onRequest }: { task: Task; onRequest: (value: number, unit: EstimateUnit, reason: string) => void }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const [place, setPlace] = useState<Placement | null>(null);
   const view = estimateCellState(task);
   const actionLabel = view.state === 'empty' ? 'Add estimate' : view.state === 'approved' ? 'Request change' : 'Edit request';
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !menuBtnRef.current) return;
+    const r = menuBtnRef.current.getBoundingClientRect();
+    setPlace(popoverPosition(
+      { left: r.left, top: r.top, bottom: r.bottom, width: r.width },
+      { width: window.innerWidth, height: window.innerHeight },
+      EST_MENU_HEIGHT, EST_MENU_WIDTH,
+    ));
+  }, [menuOpen]);
 
   return (
     <div className="est-cell">
@@ -91,14 +108,15 @@ function EstimateCell({ task, onRequest }: { task: Task; onRequest: (value: numb
           <EstimatePrimary view={view} />
           {task.myDue && view.state === 'approved' && <span className="ts-sub"> · due {task.myDue}</span>}
           <div className="est-menu">
-            <button className="est-menu-btn" type="button" aria-label="Estimate actions" onClick={() => setMenuOpen((o) => !o)}>⋮</button>
-            {menuOpen && (
+            <button ref={menuBtnRef} className="est-menu-btn" type="button" aria-label="Estimate actions" onClick={() => setMenuOpen((o) => !o)}>⋮</button>
+            {menuOpen && createPortal(
               <>
                 <div className="est-menu-backdrop" onClick={() => setMenuOpen(false)} />
-                <div className="est-menu-pop">
+                <div className="est-menu-pop" style={{ left: place?.left, top: place?.top ?? undefined, bottom: place?.bottom ?? undefined }}>
                   <button className="est-menu-item" type="button" onClick={() => { setMenuOpen(false); setModalOpen(true); }}>{actionLabel}</button>
                 </div>
-              </>
+              </>,
+              document.body,
             )}
           </div>
         </div>

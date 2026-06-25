@@ -36,7 +36,8 @@ function includesAssignee(task: TaskDetail, assigneeIds: string[]): boolean {
 
 function includesUrgency(task: TaskDetail, urgencies: DueUrgency[], today: string): boolean {
   if (!urgencies.length) return true;
-  const urgency = dueUrgency(task.dueDate ?? task.effectiveDueDate ?? null, today, task.status);
+  const raw = task.dueDate ? task.dueDate.slice(0, 10) : (task.effectiveDueDate ?? null);
+  const urgency = dueUrgency(raw, today, task.status);
   return !!urgency && urgencies.includes(urgency);
 }
 

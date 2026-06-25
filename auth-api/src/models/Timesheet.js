@@ -41,6 +41,7 @@ const taskSchema = new mongoose.Schema(
     notes: { type: notesSchema, default: () => ({}) },
     taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task', default: null },
     billable: { type: billableSchema, default: () => ({}) },
+    hidden: { type: Boolean, default: false },
   },
   { _id: false }
 );

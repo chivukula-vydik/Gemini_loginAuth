@@ -14,6 +14,7 @@ import { Leave, workingDays } from '../src/models/Leave.js';
 import { Timesheet } from '../src/models/Timesheet.js';
 import { Overtime } from '../src/models/Overtime.js';
 import { Skill } from '../src/models/Skill.js';
+import { LeaveBalance, DEFAULT_QUOTAS } from '../src/models/LeaveBalance.js';
 
 // Usage:  node scripts/seed-all.js
 
@@ -422,6 +423,34 @@ async function main() {
   }
   console.log(`✓ Leave requests: ${leaveCount}`);
 
+  // ── Leave balances ──
+  const currentYear = today.getFullYear();
+  let balCount = 0;
+  for (const u of Object.values(userMap)) {
+    let balance = await LeaveBalance.findOne({ userId: u._id, year: currentYear });
+    if (!balance) {
+      balance = await LeaveBalance.create({ userId: u._id, year: currentYear });
+    }
+    // Reset used counts and recompute from approved leaves
+    balance.casual.used = 0;
+    balance.sick.used = 0;
+    balance.earned.used = 0;
+
+    const approvedLeaves = await Leave.find({
+      userId: u._id,
+      status: 'approved',
+      startDate: { $gte: `${currentYear}-01-01`, $lte: `${currentYear}-12-31` },
+    });
+    for (const lv of approvedLeaves) {
+      if (['casual', 'sick', 'earned'].includes(lv.type)) {
+        balance[lv.type].used += lv.requestedDays || 0;
+      }
+    }
+    await balance.save();
+    balCount++;
+  }
+  console.log(`✓ Leave balances: ${balCount}`);
+
   // ── Overtime requests ──
   let otCount = 0;
   for (let i = 0; i < 6; i++) {
@@ -471,6 +500,16 @@ async function main() {
   const projBillable = new Map();
   for (const p of allProjects) projBillable.set(String(p._id), p.billingType !== 'non-billable');
 
+  const WORK_NOTES = [
+    'Sprint planning & standup', 'Code review and PR feedback', 'Worked on API endpoints',
+    'Bug fixes from QA', 'Database query optimization', 'Wrote integration tests',
+    'Design discussion with team', 'Client demo preparation', 'Refactored auth module',
+    'Updated documentation', 'Pair programming session', 'Deployed to staging',
+    'Debugging prod issue', 'Feature flag setup', 'Performance profiling',
+    'UI fixes per design review', 'Schema migration', 'Slack/email follow-ups',
+    'Backlog grooming', 'Retro & action items',
+  ];
+
   let tsCount = 0;
   for (const emp of [...employees, ...rms]) {
     const userTasks = await Task.find({ 'assignees.user': emp._id }).limit(3);
@@ -483,42 +522,58 @@ async function main() {
       const existing = await Timesheet.findOne({ userId: emp._id, weekStart });
       if (existing) continue;
 
+      // w=0 current week → draft, w=1 last week → submitted, w=2/3 older → approved
+      const statuses = ['draft', 'submitted', 'approved', 'approved'];
+      const status = statuses[w] || 'approved';
+
       const n = userTasks.length;
+      const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
+      const todayDow = today.getDay();
+      const todayIdx = todayDow === 0 ? -1 : todayDow - 1; // 0=mon..4=fri, -1=sun
       const tsTasks = userTasks.map((t, ti) => {
         const isBillable = projBillable.get(String(t.project)) || false;
-        // ~420-480 min total per day (~7-8h), split across tasks
         const share = ti === 0 ? 0.5 : (0.5 / (n - 1 || 1));
         const dayMin = () => Math.round(rand(420, 480) * share);
-        return {
-          id: `task-${ti}`,
-          name: t.title,
-          taskId: t._id,
-          entries: {
-            mon: dayMin(), tue: dayMin(), wed: dayMin(),
-            thu: dayMin(), fri: dayMin(),
-          },
-          billable: {
-            mon: isBillable, tue: isBillable, wed: isBillable,
-            thu: isBillable, fri: isBillable,
-          },
-          notes: {
-            mon: ti === 0 ? 'Worked on core feature' : '',
-            tue: '', wed: '', thu: '', fri: '',
-          },
-        };
+        const dayNote = () => Math.random() > 0.5 ? pick(WORK_NOTES) : '';
+        const entries = {}, billable = {}, notes = {};
+        for (let di = 0; di < dayKeys.length; di++) {
+          const dk = dayKeys[di];
+          const isFuture = w === 0 && di > todayIdx;
+          entries[dk] = isFuture ? 0 : dayMin();
+          billable[dk] = isBillable;
+          notes[dk] = isFuture ? '' : dayNote();
+        }
+        return { id: `task-${ti}`, name: t.title, taskId: t._id, entries, billable, notes };
       });
 
-      const statuses = ['approved', 'approved', 'submitted', 'draft'];
-      const status = statuses[w] || 'draft';
+      const submittedAt = status !== 'draft' ? addDays(monday, 5) : null;
+      const reviewedAt = status === 'approved' ? addDays(monday, 6) : null;
+      const reviewer = status === 'approved' ? pmUsers[w % pmUsers.length]._id : null;
+
+      const dayStatus = {};
+      for (let di = 0; di < dayKeys.length; di++) {
+        const d = dayKeys[di];
+        const isFuture = w === 0 && di > todayIdx;
+        if (isFuture) {
+          dayStatus[d] = { status: 'draft', submittedAt: null, reviewedAt: null, reviewedBy: null, rejectionReason: '' };
+        } else if (status === 'approved') {
+          dayStatus[d] = { status: 'approved', submittedAt, reviewedAt, reviewedBy: reviewer, rejectionReason: '' };
+        } else if (status === 'submitted') {
+          dayStatus[d] = { status: 'submitted', submittedAt, reviewedAt: null, reviewedBy: null, rejectionReason: '' };
+        } else {
+          dayStatus[d] = { status: 'draft', submittedAt: null, reviewedAt: null, reviewedBy: null, rejectionReason: '' };
+        }
+      }
 
       await Timesheet.create({
         userId: emp._id,
         weekStart,
         tasks: tsTasks,
         status,
-        submittedAt: status !== 'draft' ? addDays(monday, 5) : null,
-        reviewedAt: status === 'approved' ? addDays(monday, 6) : null,
-        reviewedBy: status === 'approved' ? pmUsers[0]._id : null,
+        submittedAt,
+        reviewedAt,
+        reviewedBy: reviewer,
+        dayStatus,
       });
       tsCount++;
     }
