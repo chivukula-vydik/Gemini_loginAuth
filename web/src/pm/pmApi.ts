@@ -97,6 +97,14 @@ export const createShift = (body: Partial<ShiftDef>) => authed('/admin/shifts', 
 export const updateShift = (id: string, patch: Partial<ShiftDef>) => authed(`/admin/shifts/${id}`, 'PATCH', patch) as Promise<ShiftDef>;
 export const deleteShift = (id: string) => authed(`/admin/shifts/${id}`, 'DELETE');
 
+export type LeaveBalanceCounter = { total: number; used: number };
+export type LeaveBalanceRecord = { _id: string; userId: string; year: number; casual: LeaveBalanceCounter; sick: LeaveBalanceCounter; earned: LeaveBalanceCounter };
+
+export const getUserLeaveBalance = (id: string, year?: number) =>
+  authed(`/admin/users/${id}/leave-balance${year ? `?year=${year}` : ''}`) as Promise<LeaveBalanceRecord>;
+export const updateUserLeaveBalance = (id: string, body: Record<string, unknown>) =>
+  authed(`/admin/users/${id}/leave-balance`, 'PATCH', body) as Promise<LeaveBalanceRecord>;
+
 export const setUserDepartment = (id: string, departmentId: string | null) => authed(`/admin/users/${id}/department`, 'PATCH', { departmentId });
 export const setUserShift = (id: string, shiftId: string | null) => authed(`/admin/users/${id}/shift`, 'PATCH', { shiftId });
 
@@ -173,6 +181,9 @@ export const listReputation = () =>
 export const setProjectOwner = (id: string, ownerPm: string) =>
   authed(`/projects/${id}`, 'PATCH', { ownerPm });
 export const deleteProject = (id: string) => authed(`/projects/${id}`, 'DELETE');
+
+export const updateMilestone = (projectId: string, milestoneId: string, patch: Partial<Milestone>) =>
+  authed(`/projects/${projectId}/milestones/${milestoneId}`, 'PATCH', patch) as Promise<Milestone[]>;
 
 export const addPhase = (projectId: string, name: string, description?: string) =>
   authed(`/projects/${projectId}/phases`, 'POST', { name, description }) as Promise<Phase[]>;

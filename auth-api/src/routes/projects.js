@@ -250,6 +250,23 @@ export function createProjectsRouter() {
     res.json(project.phases);
   }));
 
+  // --- Milestone management ---
+  router.patch('/:id/milestones/:milestoneId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const ms = project.milestones.id(req.params.milestoneId);
+    if (!ms) return res.status(404).json({ error: 'milestone not found' });
+    if (req.body?.name != null) ms.name = String(req.body.name).trim();
+    if (req.body?.amount != null) ms.amount = Number(req.body.amount);
+    if (req.body?.description != null) ms.description = String(req.body.description);
+    if (req.body?.status && ['pending', 'in_progress', 'completed', 'paid'].includes(req.body.status)) {
+      ms.status = req.body.status;
+    }
+    await project.save();
+    res.json(project.milestones);
+  }));
+
   router.post('/:id/tasks', asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });

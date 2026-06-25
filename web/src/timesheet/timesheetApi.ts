@@ -1,4 +1,4 @@
-import { getAccessToken } from '../api';
+import { authed, authedRaw } from '../fetchHelper';
 import type { Day } from './time';
 import type { SubmitStatus } from './submit';
 
@@ -9,8 +9,6 @@ export type DayStatusEntry = {
   rejectionReason: string;
 };
 export type DayStatusMap = Record<Day, DayStatusEntry>;
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
 export type Notes = Record<Day, string>;
@@ -36,10 +34,6 @@ export type Task = {
   effectiveBillable?: Record<Day, boolean>;
   hidden?: boolean;
 };
-export function authHeaders(): Record<string, string> {
-  const token = getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 export type Grant = { day: Day; projectId: string };
 
@@ -62,9 +56,7 @@ export type WeekData = {
 };
 
 export async function getWeek(weekStart: string): Promise<WeekData> {
-  const r = await fetch(`${API}/timesheets/${weekStart}`, { headers: authHeaders(), credentials: 'include' });
-  if (!r.ok) throw new Error(`load failed (${r.status})`);
-  const data = await r.json();
+  const data = await authed(`/timesheets/${weekStart}`);
   return {
     weekStart: data.weekStart,
     tasks: data.tasks as Task[],
@@ -85,102 +77,45 @@ export async function getWeek(weekStart: string): Promise<WeekData> {
 }
 
 export async function createEditRequest(weekStart: string, day: Day, projectId: string, reason: string): Promise<void> {
-  const r = await fetch(`${API}/timesheets/${weekStart}/edit-requests`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    credentials: 'include',
-    body: JSON.stringify({ day, projectId, reason }),
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `request failed (${r.status})`);
-  }
+  await authed(`/timesheets/${weekStart}/edit-requests`, 'POST', { day, projectId, reason });
 }
 
 export async function saveWeek(weekStart: string, tasks: Task[]): Promise<void> {
-  const r = await fetch(`${API}/timesheets/${weekStart}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    credentials: 'include',
-    body: JSON.stringify({ tasks }),
-  });
-  if (!r.ok) throw new Error(`save failed (${r.status})`);
+  await authed(`/timesheets/${weekStart}`, 'PUT', { tasks });
 }
 
 export async function submitWeek(weekStart: string): Promise<void> {
-  const r = await fetch(`${API}/timesheets/${weekStart}/submit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    credentials: 'include',
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `submit failed (${r.status})`);
-  }
+  await authed(`/timesheets/${weekStart}/submit`, 'POST');
 }
 
 export async function getProjectTasks(projectId: string): Promise<Assignable[]> {
-  const r = await fetch(`${API}/timesheets/tasks?projectId=${projectId}`, { headers: authHeaders(), credentials: 'include' });
-  if (!r.ok) throw new Error(`load failed (${r.status})`);
-  const data: Array<{ taskId: string; title: string; description?: string; status: string; estimatedHours: number }> = await r.json();
+  const data: Array<{ taskId: string; title: string; description?: string; status: string; estimatedHours: number }> =
+    await authed(`/timesheets/tasks?projectId=${projectId}`);
   return data.map((t) => ({ ...t, projectName: null }));
 }
 
 export async function createTimesheetTask(title: string, projectId: string): Promise<Assignable> {
-  const r = await fetch(`${API}/timesheets/tasks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    credentials: 'include',
-    body: JSON.stringify({ title, projectId }),
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `create failed (${r.status})`);
-  }
-  return r.json();
+  return authed(`/timesheets/tasks`, 'POST', { title, projectId });
 }
 
 export async function submitDays(weekStart: string, days: Day[]): Promise<void> {
-  const r = await fetch(`${API}/timesheets/${weekStart}/submit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    credentials: 'include',
-    body: JSON.stringify({ days }),
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `submit failed (${r.status})`);
-  }
+  await authed(`/timesheets/${weekStart}/submit`, 'POST', { days });
 }
 
 export async function uploadAttachment(weekStart: string, file: File): Promise<Attachment> {
   const form = new FormData();
   form.append('file', file);
-  const r = await fetch(`${API}/timesheets/${weekStart}/attachments`, {
-    method: 'POST',
-    headers: authHeaders(),
-    credentials: 'include',
-    body: form,
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `upload failed (${r.status})`);
-  }
-  return r.json();
+  const r = await authedRaw(`/timesheets/${weekStart}/attachments`, 'POST', form);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((data && data.error) || `upload failed (${r.status})`);
+  return data;
 }
 
 export async function deleteAttachment(weekStart: string, fileId: string): Promise<void> {
-  const r = await fetch(`${API}/timesheets/${weekStart}/attachments/${fileId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-    credentials: 'include',
-  });
-  if (!r.ok) {
-    const d = await r.json().catch(() => ({}));
-    throw new Error(d.error || `delete failed (${r.status})`);
-  }
+  await authed(`/timesheets/${weekStart}/attachments/${fileId}`, 'DELETE');
 }
 
 export function attachmentUrl(fileId: string): string {
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
   return `${API}/timesheets/attachments/${fileId}`;
 }

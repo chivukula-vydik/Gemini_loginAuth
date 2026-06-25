@@ -12,6 +12,7 @@ import { RefreshToken } from '../models/RefreshToken.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import { Department } from '../models/Department.js';
 import { Shift } from '../models/Shift.js';
+import { LeaveBalance, QUOTA_LEAVE_TYPES, getOrCreateBalance } from '../models/LeaveBalance.js';
 
 const ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
 
@@ -186,6 +187,36 @@ export function createAdminRouter() {
     if (count > 0) return res.status(409).json({ error: `${count} user(s) still on this shift` });
     await Shift.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
+  }));
+
+  // --- Leave balance ---
+  router.get('/users/:id/leave-balance', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id).select('_id');
+    if (!user) return res.status(404).json({ error: 'not found' });
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const balance = await getOrCreateBalance(user._id, year);
+    res.json(balance);
+  }));
+
+  router.patch('/users/:id/leave-balance', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id).select('_id');
+    if (!user) return res.status(404).json({ error: 'not found' });
+    const year = Number(req.body?.year) || new Date().getFullYear();
+    const balance = await getOrCreateBalance(user._id, year);
+    for (const type of QUOTA_LEAVE_TYPES) {
+      if (req.body?.[type]?.total != null) {
+        const total = Number(req.body[type].total);
+        if (total < 0) return res.status(400).json({ error: `${type} total cannot be negative` });
+        balance[type].total = total;
+      }
+      if (req.body?.[type]?.used != null) {
+        const used = Number(req.body[type].used);
+        if (used < 0) return res.status(400).json({ error: `${type} used cannot be negative` });
+        balance[type].used = used;
+      }
+    }
+    await balance.save();
+    res.json(balance);
   }));
 
   // --- Assign department/shift to user ---

@@ -3,6 +3,7 @@ import {
   listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
   decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills, updateProjectDescription,
+  updateMilestone,
   Project, TaskDetail, Person, Skill, ProjectDetailShape, Milestone, Phase,
   addPhase, advancePhase, deletePhase,
 } from './pmApi';
@@ -483,6 +484,10 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         )}
       </div>
 
+      {(project.milestones?.length ?? 0) > 0 && (
+        <MilestoneTracker projectId={id} milestones={project.milestones!} currency={project.currency ?? 'USD'} onReload={reload} onError={setError} />
+      )}
+
       {(project.phases?.length ?? 0) > 0 && (
         <PhaseTimeline projectId={id} phases={project.phases!} activePhase={project.activePhase ?? null} onReload={reload} onError={setError} tasks={tasks} />
       )}
@@ -705,6 +710,58 @@ function PhaseTimeline({ projectId, phases, activePhase, onReload, onError, task
         <button className="btn btn-auto" onClick={handleAdd}>Add phase</button>
         {canAdvance && <button className="btn btn-auto btn-primary" onClick={handleAdvance}>Advance to next phase</button>}
       </div>
+    </div>
+  );
+}
+
+const MS_STATUSES = ['pending', 'in_progress', 'completed', 'paid'] as const;
+const MS_LABELS: Record<string, string> = { pending: 'Pending', in_progress: 'In Progress', completed: 'Completed', paid: 'Paid' };
+const MS_BADGE: Record<string, string> = { pending: 'status-todo', in_progress: 'status-progress', completed: 'status-done', paid: 'status-done' };
+
+function MilestoneTracker({ projectId, milestones, currency, onReload, onError }: {
+  projectId: string; milestones: Milestone[]; currency: string;
+  onReload: () => void; onError: (msg: string) => void;
+}) {
+  const total = milestones.reduce((s, m) => s + (m.amount || 0), 0);
+  const paid = milestones.filter((m) => m.status === 'paid').reduce((s, m) => s + (m.amount || 0), 0);
+  const completed = milestones.filter((m) => m.status === 'completed' || m.status === 'paid').reduce((s, m) => s + (m.amount || 0), 0);
+
+  async function setStatus(msId: string, status: string) {
+    try { await updateMilestone(projectId, msId, { status }); onReload(); }
+    catch (e) { onError((e as Error).message); }
+  }
+
+  return (
+    <div className="ts-card card-section">
+      <div className="card-title">Milestones</div>
+      <div className="ts-sub" style={{ marginBottom: 12 }}>
+        {currency} {paid.toLocaleString()} paid of {currency} {total.toLocaleString()} total
+        {completed > paid ? ` · ${currency} ${(completed - paid).toLocaleString()} awaiting payment` : ''}
+      </div>
+      <table className="ts-table">
+        <thead>
+          <tr>
+            <th className="ts-task">Milestone</th>
+            <th className="col-left">Amount</th>
+            <th className="col-left">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {milestones.map((ms) => (
+            <tr key={ms._id}>
+              <td className="ts-task">{ms.name}{ms.description ? <span className="ts-sub" style={{ marginLeft: 8 }}>{ms.description}</span> : null}</td>
+              <td className="col-left">{currency} {(ms.amount || 0).toLocaleString()}</td>
+              <td className="col-left">
+                <select className="input" style={{ minWidth: 130 }}
+                  value={ms.status || 'pending'}
+                  onChange={(e) => setStatus(ms._id!, e.target.value)}>
+                  {MS_STATUSES.map((s) => <option key={s} value={s}>{MS_LABELS[s]}</option>)}
+                </select>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

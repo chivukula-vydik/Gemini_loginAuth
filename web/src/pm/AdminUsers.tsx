@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, setUserDepartment, setUserShift, listDepartments, listShifts, UserRow, Department, ShiftDef } from './pmApi';
+import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, setUserDepartment, setUserShift, listDepartments, listShifts, getUserLeaveBalance, updateUserLeaveBalance, UserRow, Department, ShiftDef, LeaveBalanceRecord } from './pmApi';
 import { useAuth } from '../authContext';
 import { personName, initials } from './personName';
 import type { Role } from './nav';
@@ -119,6 +119,10 @@ export function AdminUsers() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [shifts, setShifts] = useState<ShiftDef[]>([]);
   const [error, setError] = useState('');
+  const [leaveEditId, setLeaveEditId] = useState<string | null>(null);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalanceRecord | null>(null);
+  const [leaveDraft, setLeaveDraft] = useState<Record<string, { total: string; used: string }>>({});
+  const [leaveSaving, setLeaveSaving] = useState(false);
 
   useEffect(() => {
     listUsers().then(setUsers).catch((e) => setError(e.message));
@@ -185,6 +189,41 @@ export function AdminUsers() {
       setUsers((us) => us.map((u) => (u._id === userId ? { ...u, shiftId } : u)));
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+
+  async function openLeaveEdit(userId: string) {
+    setError('');
+    try {
+      const bal = await getUserLeaveBalance(userId);
+      setLeaveBalance(bal);
+      setLeaveDraft({
+        casual: { total: String(bal.casual.total), used: String(bal.casual.used) },
+        sick: { total: String(bal.sick.total), used: String(bal.sick.used) },
+        earned: { total: String(bal.earned.total), used: String(bal.earned.used) },
+      });
+      setLeaveEditId(userId);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function saveLeaveBalance() {
+    if (!leaveEditId) return;
+    setLeaveSaving(true);
+    setError('');
+    try {
+      const body: Record<string, unknown> = {};
+      for (const type of ['casual', 'sick', 'earned']) {
+        body[type] = { total: Number(leaveDraft[type].total), used: Number(leaveDraft[type].used) };
+      }
+      await updateUserLeaveBalance(leaveEditId, body);
+      setLeaveEditId(null);
+      setLeaveBalance(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLeaveSaving(false);
     }
   }
 
@@ -301,16 +340,21 @@ export function AdminUsers() {
                     </span>
                   </td>
                   <td className="col-left">
-                    {!isSelf && (
-                      <div className="row-actions">
-                        <button className="table-action" onClick={() => toggleActive(u)}>
-                          {inactive ? 'Activate' : 'Deactivate'}
-                        </button>
-                        <button className="table-action danger" onClick={() => remove(u)}>
-                          Delete
-                        </button>
-                      </div>
-                    )}
+                    <div className="row-actions">
+                      <button className="table-action" onClick={() => openLeaveEdit(u._id)}>
+                        Leave
+                      </button>
+                      {!isSelf && (
+                        <>
+                          <button className="table-action" onClick={() => toggleActive(u)}>
+                            {inactive ? 'Activate' : 'Deactivate'}
+                          </button>
+                          <button className="table-action danger" onClick={() => remove(u)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -318,6 +362,47 @@ export function AdminUsers() {
           </tbody>
         </table>
       </div>
+
+      {leaveEditId && leaveBalance && (() => {
+        const u = users.find((x) => x._id === leaveEditId);
+        return (
+          <div className="ts-card card-section" style={{ marginTop: 16 }}>
+            <div className="card-title">Leave Quota — {u ? (u.displayName || u.email) : leaveEditId}</div>
+            <div className="ts-sub" style={{ marginBottom: 12 }}>Year {leaveBalance.year}. Adjust totals for prorated or custom entitlements.</div>
+            <table className="ts-table" style={{ maxWidth: 500 }}>
+              <thead>
+                <tr><th className="col-left">Type</th><th className="col-left">Total</th><th className="col-left">Used</th><th className="col-left">Remaining</th></tr>
+              </thead>
+              <tbody>
+                {(['casual', 'sick', 'earned'] as const).map((type) => (
+                  <tr key={type}>
+                    <td className="col-left" style={{ textTransform: 'capitalize' }}>{type}</td>
+                    <td className="col-left">
+                      <input className="input" type="number" min="0" style={{ width: 70 }}
+                        value={leaveDraft[type]?.total ?? ''}
+                        onChange={(e) => setLeaveDraft((d) => ({ ...d, [type]: { ...d[type], total: e.target.value } }))} />
+                    </td>
+                    <td className="col-left">
+                      <input className="input" type="number" min="0" style={{ width: 70 }}
+                        value={leaveDraft[type]?.used ?? ''}
+                        onChange={(e) => setLeaveDraft((d) => ({ ...d, [type]: { ...d[type], used: e.target.value } }))} />
+                    </td>
+                    <td className="col-left">
+                      {Math.max(0, Number(leaveDraft[type]?.total || 0) - Number(leaveDraft[type]?.used || 0))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+              <button className="btn btn-auto btn-primary" disabled={leaveSaving} onClick={saveLeaveBalance}>
+                {leaveSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="btn btn-auto" onClick={() => { setLeaveEditId(null); setLeaveBalance(null); }}>Cancel</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
