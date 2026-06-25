@@ -29,3 +29,27 @@ test('popoverPosition: clamps left so the popover never goes off the left edge',
   const p = popoverPosition({ left: 2, top: 200, bottom: 220, width: 120 }, viewport, 260, 200);
   assert.equal(p.left, 8);
 });
+
+test('popoverPosition: stays below when space below is tight but trigger.top is smaller', () => {
+  const p = popoverPosition({ left: 100, top: 50, bottom: 70, width: 120 }, viewport, 260, 200);
+  assert.equal(p.placement, 'below');
+  assert.equal(p.top, 74);
+});
+
+test('popoverPosition: uses custom gap when provided', () => {
+  const p = popoverPosition({ left: 100, top: 200, bottom: 220, width: 120 }, viewport, 260, 200, 10);
+  assert.equal(p.top, 230); // bottom + gap(10)
+  assert.equal(p.placement, 'below');
+});
+
+test('popoverPosition: uses custom gap when flipped above', () => {
+  const tight = { width: 1000, height: 600 };
+  const p = popoverPosition({ left: 100, top: 560, bottom: 580, width: 120 }, tight, 260, 200, 10);
+  assert.equal(p.placement, 'above');
+  assert.equal(p.bottom, 50); // 600 - 560 + 10
+});
+
+test('popoverPosition: trigger exactly at left margin stays at margin', () => {
+  const p = popoverPosition({ left: 8, top: 200, bottom: 220, width: 120 }, viewport, 260, 200);
+  assert.equal(p.left, 8);
+});
