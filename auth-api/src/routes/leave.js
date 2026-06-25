@@ -6,6 +6,7 @@ import { Leave, LEAVE_TYPES, HALF_DAY_OPTIONS, enumerateDays, workingDays, reque
 import { Attendance } from '../models/Attendance.js';
 import { getOrCreateBalance, remaining, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
 import { User } from '../models/User.js';
+import { sendLeaveDecision, sendLeaveRequest } from '../services/mailer.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -57,19 +58,57 @@ export function createLeaveRouter() {
       reason: String(reason || ''),
       assignedApprover,
     });
+
+    if (assignedApprover) {
+      const manager = await User.findById(assignedApprover).select('email');
+      const employee = await User.findById(req.user.sub).select('displayName');
+      if (manager?.email) {
+        sendLeaveRequest(manager.email, {
+          employeeName: employee?.displayName || 'An employee',
+          type, startDate, endDate,
+        }).catch((e) => console.error('[mailer] sendLeaveRequest error:', e.message));
+      }
+    }
+
     res.status(201).json(doc);
   }));
 
-  // DELETE /leave/:id — the requester can cancel their own request while it's
-  // still pending; once a PM/admin has decided it, it's no longer cancellable.
+  // DELETE /leave/:id — cancel a pending request (just delete) or an approved
+  // future leave (refund balance + clean up attendance records).
   router.delete('/:id', asyncHandler(async (req, res) => {
     const doc = await Leave.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (String(doc.userId) !== req.user.sub) return res.status(403).json({ error: 'forbidden' });
-    if (doc.status !== 'pending') return res.status(409).json({ error: 'only a pending request can be cancelled' });
 
-    await doc.deleteOne();
-    res.json({ ok: true });
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (doc.status === 'pending') {
+      await doc.deleteOne();
+      return res.json({ ok: true });
+    }
+
+    if (doc.status === 'approved' && doc.startDate > today) {
+      if (QUOTA_LEAVE_TYPES.includes(doc.type)) {
+        const year = Number(doc.startDate.slice(0, 4));
+        const balance = await getOrCreateBalance(doc.userId, year);
+        balance[doc.type].used = Math.max(0, balance[doc.type].used - (doc.requestedDays || 0));
+        await balance.save();
+      }
+      const days = enumerateDays(doc.startDate, doc.endDate)
+        .filter((s) => { const dow = new Date(s + 'T00:00:00').getDay(); return dow !== 0 && dow !== 6; });
+      for (const date of days) {
+        const att = await Attendance.findOne({ userId: doc.userId, date });
+        if (att && att.status === 'leave' && !att.checkIn) {
+          await att.deleteOne();
+        }
+      }
+      doc.status = 'cancelled';
+      doc.decidedAt = new Date();
+      await doc.save();
+      return res.json({ ok: true });
+    }
+
+    return res.status(409).json({ error: 'leave cannot be cancelled after it has started or been rejected' });
   }));
 
   // GET /leave/mine — the caller's own requests, newest first
@@ -112,6 +151,13 @@ export function createLeaveRouter() {
     doc.decidedBy = req.user.sub;
     doc.decidedAt = new Date();
     await doc.save();
+
+    const requester = await User.findById(doc.userId).select('email');
+    if (requester?.email) {
+      sendLeaveDecision(requester.email, {
+        type: doc.type, startDate: doc.startDate, endDate: doc.endDate, decision,
+      }).catch((e) => console.error('[mailer] sendLeaveDecision error:', e.message));
+    }
 
     if (decision === 'approved') {
       // Charge the balance now that the request is confirmed (quota types only).

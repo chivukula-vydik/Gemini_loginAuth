@@ -1,7 +1,7 @@
 import { authed } from '../fetchHelper';
 
 export type LeaveType = 'casual' | 'sick' | 'earned' | 'unpaid';
-export type LeaveStatus = 'pending' | 'approved' | 'rejected';
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type HalfDay = 'none' | 'first' | 'second';
 
 export const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {

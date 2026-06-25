@@ -84,10 +84,17 @@ export const createDesignation = (body: Partial<Designation>) => authed('/org/de
 export const updateDesignation = (id: string, body: Partial<Designation>) => authed(`/org/designations/${id}`, 'PATCH', body) as Promise<Designation>;
 export const deleteDesignation = (id: string) => authed(`/org/designations/${id}`, 'DELETE');
 
+export type DirectoryPage = {
+  users: DirectoryUser[];
+  total: number;
+  page: number;
+  pages: number;
+};
+
 // Directory & Tree
 export const getDirectory = (params?: Record<string, string>) => {
   const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-  return authed(`/org/directory${qs}`) as Promise<DirectoryUser[]>;
+  return authed(`/org/directory${qs}`) as Promise<DirectoryPage>;
 };
 export const getOrgTree = () => authed('/org/tree') as Promise<TreeUser[]>;
 

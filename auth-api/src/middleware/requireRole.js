@@ -5,7 +5,7 @@ const ROLE_INHERITS = {
   director:     ['admin', 'pm', 'reporting_manager'],
   hr:           ['admin', 'reporting_manager'],
   team_lead:    ['reporting_manager'],
-  finance:      [],
+  finance:      ['pm'],
 };
 
 function expandRoles(roles) {

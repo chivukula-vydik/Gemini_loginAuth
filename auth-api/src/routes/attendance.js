@@ -16,6 +16,7 @@ import { User } from '../models/User.js';
 import { Holiday } from '../models/Holiday.js';
 import { Project } from '../models/Project.js';
 import { Overtime } from '../models/Overtime.js';
+import { Shift } from '../models/Shift.js';
 
 // Synthetic, unsaved "holiday" entries for dates in range that have no real
 // attendance doc — lets the calendar render a HOLIDAY badge without ever
@@ -54,6 +55,16 @@ async function fetchRange(userId, startDate, endDate) {
     .map((h) => holidayPlaceholder(userId, h));
 
   return [...docs.map((d) => d.toObject()), ...synthetic].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function shiftForUser(userDoc, fallbackShift) {
+  if (userDoc?.shiftId) {
+    const s = await Shift.findById(userDoc.shiftId).lean();
+    if (s) return { startHour: s.startHour, startMinute: s.startMinute,
+                    endHour: s.endHour, endMinute: s.endMinute,
+                    durationMinutes: s.durationMinutes || 540 };
+  }
+  return fallbackShift;
 }
 
 export function createAttendanceRouter(shiftConfig) {
@@ -271,6 +282,9 @@ export function createAttendanceRouter(shiftConfig) {
       (await Holiday.find({ date: { $gte: startDate, $lte: endDate } })).map((h) => h.date),
     );
 
+    const userDoc = await User.findById(req.user.sub).select('shiftId').lean();
+    const userShift = await shiftForUser(userDoc, shift);
+
     let present = 0, partial = 0, absent = 0, wfh = 0, lateCount = 0, totalMinutes = 0;
     const workedDays = docs.filter(d => d.checkIn);
 
@@ -282,11 +296,10 @@ export function createAttendanceRouter(shiftConfig) {
 
       totalMinutes += d.effectiveMinutes || 0;
 
-      // Late = checkIn after shift start (9:30 AM)
       if (d.checkIn) {
         const ci = new Date(d.checkIn);
-        if (ci.getHours() > shift.startHour ||
-            (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute)) {
+        if (ci.getHours() > userShift.startHour ||
+            (ci.getHours() === userShift.startHour && ci.getMinutes() > userShift.startMinute)) {
           lateCount++;
         }
       }
@@ -326,11 +339,22 @@ export function createAttendanceRouter(shiftConfig) {
       memberIds = Array.from(set);
     }
 
-    const users = await User.find({ _id: { $in: memberIds } }).select('displayName email').sort('displayName');
+    const users = await User.find({ _id: { $in: memberIds } }).select('displayName email shiftId').sort('displayName');
     const docs = await Attendance.find({
       userId: { $in: memberIds },
       date: { $gte: startDate, $lte: endDate },
     });
+
+    const shiftCache = new Map();
+    async function getShiftCached(shiftId) {
+      if (!shiftId) return shift;
+      const key = String(shiftId);
+      if (shiftCache.has(key)) return shiftCache.get(key);
+      const s = await Shift.findById(shiftId).lean();
+      const result = s ? { startHour: s.startHour, startMinute: s.startMinute } : shift;
+      shiftCache.set(key, result);
+      return result;
+    }
 
     const byUser = new Map();
     for (const id of memberIds) byUser.set(String(id), []);
@@ -339,23 +363,25 @@ export function createAttendanceRouter(shiftConfig) {
       if (byUser.has(key)) byUser.get(key).push(d);
     }
 
-    const team = users.map((u) => {
+    const team = [];
+    for (const u of users) {
+      const userShift = await getShiftCached(u.shiftId);
       const userDocs = byUser.get(String(u._id)) || [];
       const worked = userDocs.filter((d) => d.checkIn);
       const presentCount = userDocs.filter((d) => d.status === 'present' || d.status === 'wfh').length;
       const lateCount = worked.filter((d) => {
         const ci = new Date(d.checkIn);
-        return ci.getHours() > shift.startHour ||
-          (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute);
+        return ci.getHours() > userShift.startHour ||
+          (ci.getHours() === userShift.startHour && ci.getMinutes() > userShift.startMinute);
       }).length;
       const totalMinutes = worked.reduce((s, d) => s + (d.effectiveMinutes || 0), 0);
       const avgMinutesPerDay = worked.length ? Math.round(totalMinutes / worked.length) : 0;
-      return {
+      team.push({
         userId: u._id, displayName: u.displayName, email: u.email,
         presentCount, lateCount, avgMinutesPerDay,
         onTimePct: worked.length ? Math.round(((worked.length - lateCount) / worked.length) * 100) : 0,
-      };
-    });
+      });
+    }
 
     res.json(team);
   }));

@@ -71,14 +71,24 @@ export function createOrgRouter() {
       const re = new RegExp(req.query.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ displayName: re }, { email: re }, { employeeCode: re }];
     }
-    const users = await User.find(filter)
-      .select('displayName email employeeCode roles departmentId businessUnitId designationId locationId reportingManagerId dottedLineManagerId dateOfJoining employmentType phone')
-      .populate('departmentId', 'name')
-      .populate('designationId', 'title')
-      .populate('locationId', 'name city')
-      .populate('reportingManagerId', 'displayName email')
-      .sort('displayName');
-    res.json(users);
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('displayName email employeeCode roles departmentId businessUnitId designationId locationId reportingManagerId dottedLineManagerId dateOfJoining employmentType phone')
+        .populate('departmentId', 'name')
+        .populate('designationId', 'title')
+        .populate('locationId', 'name city')
+        .populate('reportingManagerId', 'displayName email')
+        .sort('displayName')
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(filter),
+    ]);
+    res.json({ users, total, page, pages: Math.ceil(total / limit) });
   }));
 
   router.get('/tree', asyncHandler(async (_req, res) => {

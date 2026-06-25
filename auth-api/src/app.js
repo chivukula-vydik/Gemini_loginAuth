@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
+import rateLimit from 'express-rate-limit';
 import { createAuthRouter } from './routes/auth.js';
 import { mountProviders } from './providers/index.js';
 import { createTimesheetRouter } from './routes/timesheets.js';
@@ -72,9 +73,17 @@ export function createApp(config) {
 
   app.get('/health', (req, res) => res.json({ ok: true }));
 
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: 'too many requests, try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   const authRouter = createAuthRouter(config.enabled);
   mountProviders(authRouter, config.enabled, {});
-  app.use('/auth', authRouter);
+  app.use('/auth', authLimiter, authRouter);
   app.use('/timesheets', createTimesheetRouter());
   app.use('/admin', createAdminRouter());
   app.use('/skills', createSkillsRouter());

@@ -11,6 +11,7 @@ import { EditRequest } from '../models/EditRequest.js';
 import { Overtime } from '../models/Overtime.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
+import { sendTimesheetReturned } from '../services/mailer.js';
 import {
   mergeWeekRows, assignableTasks, sanitizeRows, computeRowLock, currentMonday, todayDayFor, todayISO, DAYS,
   weekLocked, derivedStatus,
@@ -137,6 +138,15 @@ export function createTimesheetRouter() {
     update.rejectionReason = reason;
 
     await Timesheet.updateOne({ _id: doc._id }, { $set: update });
+
+    if (decision === 'return') {
+      const owner = await User.findById(doc.userId).select('email');
+      if (owner?.email) {
+        sendTimesheetReturned(owner.email, { weekStart: doc.weekStart, reason })
+          .catch((e) => console.error('[mailer] sendTimesheetReturned error:', e.message));
+      }
+    }
+
     res.json({ ok: true, status: update.status, dayStatus: newDs });
   }));
 

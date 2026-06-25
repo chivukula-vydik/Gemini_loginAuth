@@ -10,7 +10,7 @@ export type DayStatusEntry = {
 };
 export type DayStatusMap = Record<Day, DayStatusEntry>;
 
-const API = 'http://localhost:4000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 export type Entries = Record<Day, number>;
 export type Notes = Record<Day, string>;

@@ -24,6 +24,10 @@ export function LoginWidget() {
   async function submitLocal(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (mode === 'register' && password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
     setBusy(true);
     try {
       const path = mode === 'register' ? '/auth/local/register' : '/auth/local/login';

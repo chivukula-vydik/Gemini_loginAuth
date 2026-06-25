@@ -33,6 +33,7 @@ export default {
     router.post('/local/register', asyncHandler(async (req, res) => {
       const { email, password, displayName } = req.body || {};
       if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+      if (String(password).length < 8) return res.status(400).json({ error: 'password must be at least 8 characters' });
       const normalized = String(email).toLowerCase().trim();
       if (await User.findOne({ email: normalized })) {
         return res.status(409).json({ error: 'email already registered' });
@@ -81,6 +82,7 @@ export default {
     router.post('/local/reset-password', asyncHandler(async (req, res) => {
       const { token, password } = req.body || {};
       if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+      if (String(password).length < 8) return res.status(400).json({ error: 'password must be at least 8 characters' });
       const record = await PasswordResetToken.findOne({ tokenHash: sha256(token) });
       if (!record || record.usedAt || record.expiresAt < new Date()) {
         return res.status(400).json({ error: 'invalid or expired token' });

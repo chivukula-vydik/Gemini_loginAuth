@@ -15,7 +15,7 @@ const leaveSchema = new mongoose.Schema({
   // recompute it from the date range.
   requestedDays: { type: Number, default: 0 },
   reason:    { type: String, default: '' },
-  status:    { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  status:    { type: String, enum: ['pending', 'approved', 'rejected', 'cancelled'], default: 'pending' },
   requestedAt: { type: Date, default: Date.now },
   decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   decidedAt: { type: Date, default: null },

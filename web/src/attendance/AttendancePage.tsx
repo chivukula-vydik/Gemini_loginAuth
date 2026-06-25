@@ -10,6 +10,7 @@ import {
 import { getMyLeave, getBalance, cancelLeave, LeaveBalance, LeaveRequest, LEAVE_TYPE_LABELS } from './leaveApi';
 import { LeaveModal } from './LeaveModal';
 import { TeamAttendance } from './TeamAttendance';
+import { HolidayAdmin } from './HolidayAdmin';
 
 const DEFAULT_SHIFT: ShiftConfig = { startHour: 9, startMinute: 30, endHour: 18, endMinute: 30, durationMinutes: 540 };
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -154,7 +155,8 @@ export function AttendancePage() {
   const [shift, setShift] = useState<ShiftConfig>(DEFAULT_SHIFT);
   const [decisionNotice, setDecisionNotice] = useState<string[]>([]);
   const isTeamLead = user?.roles?.some((r) => ['pm', 'admin', 'reporting_manager'].includes(r)) ?? false;
-  const [attTab, setAttTab] = useState<'my' | 'team'>('my');
+  const isAdminUser = user?.roles?.some((r: string) => ['admin', 'hr'].includes(r)) ?? false;
+  const [attTab, setAttTab] = useState<'my' | 'team' | 'holidays'>('my');
   const shiftStartMin = shift.startHour * 60 + shift.startMinute;
 
   const ref = new Date();
@@ -386,16 +388,19 @@ export function AttendancePage() {
         <p className="ts-sub">Clock in, track breaks, and review your attendance log.</p>
       </header>
 
-      {isTeamLead && (
+      {(isTeamLead || isAdminUser) && (
         <div className="att-tabs att-top-tabs">
           <button className={`att-tab${attTab === 'my' ? ' active' : ''}`} onClick={() => setAttTab('my')}>My Attendance</button>
-          <button className={`att-tab${attTab === 'team' ? ' active' : ''}`} onClick={() => setAttTab('team')}>Team</button>
+          {isTeamLead && <button className={`att-tab${attTab === 'team' ? ' active' : ''}`} onClick={() => setAttTab('team')}>Team</button>}
+          {isAdminUser && <button className={`att-tab${attTab === 'holidays' ? ' active' : ''}`} onClick={() => setAttTab('holidays')}>Holidays</button>}
         </div>
       )}
 
       {error && <p className="ts-error">{error}</p>}
 
-      {attTab === 'team' && isTeamLead ? (
+      {attTab === 'holidays' && isAdminUser ? (
+        <HolidayAdmin />
+      ) : attTab === 'team' && isTeamLead ? (
         <TeamAttendance />
       ) : (
       <>
@@ -592,7 +597,7 @@ export function AttendancePage() {
                     </span>
                     {lv.reason && <span className="att-leave-reason">{lv.reason}</span>}
                     <span className={`att-leave-status att-leave-${lv.status}`}>{lv.status}</span>
-                    {lv.status === 'pending' && (
+                    {(lv.status === 'pending' || (lv.status === 'approved' && lv.startDate > new Date().toISOString().slice(0, 10))) && (
                       <button className="link-btn att-leave-cancel" disabled={busy} onClick={() => cancelLeaveRequest(lv._id)}>
                         Cancel
                       </button>

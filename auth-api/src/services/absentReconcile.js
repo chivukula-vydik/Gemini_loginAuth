@@ -2,7 +2,6 @@ import { User } from '../models/User.js';
 import { Attendance } from '../models/Attendance.js';
 import { Leave } from '../models/Leave.js';
 import { Holiday } from '../models/Holiday.js';
-import { LeaveBalance, getOrCreateBalance, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
 
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -17,7 +16,6 @@ function addDays(d, n) {
 export async function reconcileAbsentDays() {
   const today = new Date();
   const todayDate = ymd(today);
-  const year = today.getFullYear();
 
   const users = await User.find({ active: true, attendanceActivatedDate: { $ne: null } })
     .select('_id attendanceActivatedDate');
@@ -87,39 +85,18 @@ export async function reconcileAbsentDays() {
       });
       if (existingLeave) continue;
 
-      const balance = await getOrCreateBalance(user._id, year);
-      const casualRemaining = balance.casual.total - balance.casual.used;
-
-      const leaveType = casualRemaining > 0 ? 'casual' : 'unpaid';
-
-      await Leave.create({
-        userId: user._id,
-        type: leaveType,
-        startDate: date,
-        endDate: date,
-        halfDay: 'none',
-        requestedDays: 1,
-        reason: 'Auto-marked: no check-in recorded',
-        status: 'approved',
-        requestedAt: new Date(),
-        decidedAt: new Date(),
-      });
-
-      if (leaveType === 'casual') {
-        balance.casual.used += 1;
-        await balance.save();
-      }
-
       if (att) {
-        att.status = 'leave';
-        att.note = `Auto: ${leaveType} leave (no check-in)`;
-        await att.save();
+        if (att.status !== 'absent') {
+          att.status = 'absent';
+          att.note = 'Auto-marked: no check-in recorded';
+          await att.save();
+        }
       } else {
         await Attendance.create({
           userId: user._id,
           date,
-          status: 'leave',
-          note: `Auto: ${leaveType} leave (no check-in)`,
+          status: 'absent',
+          note: 'Auto-marked: no check-in recorded',
         });
       }
 
@@ -128,6 +105,6 @@ export async function reconcileAbsentDays() {
   }
 
   if (created > 0) {
-    console.log(`[reconcile] Auto-marked ${created} absent day(s) as leave`);
+    console.log(`[reconcile] Auto-marked ${created} absent day(s)`);
   }
 }
