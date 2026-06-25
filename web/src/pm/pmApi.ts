@@ -3,7 +3,7 @@ import type { Role } from './nav';
 import type { Reputation } from './reputation';
 
 export type Skill = { _id: string; name: string; active: boolean };
-export type UserRow = { _id: string; email: string; displayName: string; roles: Role[]; active?: boolean; reestimationCount?: number; reportingManagerId?: string | null };
+export type UserRow = { _id: string; email: string; displayName: string; roles: Role[]; active?: boolean; reestimationCount?: number; reportingManagerId?: string | null; departmentId?: string | null; shiftId?: string | null };
 export type Person = { _id: string; displayName: string; email: string; role?: Role };
 export type EditReq = {
   _id: string; userId: Person; weekStart: string; day: string; reason: string; status: string; createdAt: string;
@@ -13,8 +13,13 @@ export type Project = {
   _id: string; name: string; description: string; ownerPm: string;
   members: string[]; requiredSkills?: string[]; status: string; startDate: string | null; targetDate: string | null;
   progress?: number; taskCount?: number; doneCount?: number;
-  clientName?: string; billingType?: 'billable' | 'non-billable'; billingRate?: number | null; currency?: string | null;
+  clientName?: string; billingType?: 'billable' | 'non-billable' | 'milestone' | 'hourly' | 'fixed-price'; billingRate?: number | null; currency?: string | null;
+  milestones?: Milestone[];
+  phases?: Phase[];
+  activePhase?: string | null;
 };
+export type Milestone = { _id?: string; name: string; amount: number; description?: string; status?: string };
+export type Phase = { _id: string; name: string; description: string; order: number; status: 'upcoming' | 'active' | 'completed' };
 export type Availability = 'available' | 'standby' | 'busy';
 export type PastRecord = { total: number; approved: number; rejected: number; pending: number };
 export type Candidate = {
@@ -61,6 +66,7 @@ export type Task = {
 };
 export type TaskDetail = {
   _id: string; title: string; description: string; estimatedHours: number;
+  phaseId?: string | null;
   assignees: { user: Person; sharePct: number; estimatedHours?: number | null; etaAt?: string | null }[]; status: string; percentComplete: number; actualMinutes: number;
   proposedHours?: number;
   estimateStatus?: string;
@@ -77,6 +83,25 @@ export type TaskDetail = {
   proposedValue?: number;
   proposedUnit?: 'hours' | 'days' | 'weeks';
 };
+
+export type Department = { _id: string; name: string; description: string; active: boolean };
+export type ShiftDef = { _id: string; name: string; startHour: number; startMinute: number; endHour: number; endMinute: number; isDefault: boolean; active: boolean };
+
+export const listDepartments = () => authed('/admin/departments') as Promise<Department[]>;
+export const createDepartment = (name: string, description?: string) => authed('/admin/departments', 'POST', { name, description }) as Promise<Department>;
+export const updateDepartment = (id: string, patch: Partial<Department>) => authed(`/admin/departments/${id}`, 'PATCH', patch) as Promise<Department>;
+export const deleteDepartment = (id: string) => authed(`/admin/departments/${id}`, 'DELETE');
+
+export const listShifts = () => authed('/admin/shifts') as Promise<ShiftDef[]>;
+export const createShift = (body: Partial<ShiftDef>) => authed('/admin/shifts', 'POST', body) as Promise<ShiftDef>;
+export const updateShift = (id: string, patch: Partial<ShiftDef>) => authed(`/admin/shifts/${id}`, 'PATCH', patch) as Promise<ShiftDef>;
+export const deleteShift = (id: string) => authed(`/admin/shifts/${id}`, 'DELETE');
+
+export const setUserDepartment = (id: string, departmentId: string | null) => authed(`/admin/users/${id}/department`, 'PATCH', { departmentId });
+export const setUserShift = (id: string, shiftId: string | null) => authed(`/admin/users/${id}/shift`, 'PATCH', { shiftId });
+
+export const listPublicDepartments = () => authed('/org/departments') as Promise<{ _id: string; name: string; description: string }[]>;
+export const listPublicShifts = () => authed('/org/shifts') as Promise<ShiftDef[]>;
 
 export const listUsers = () => authed('/admin/users') as Promise<UserRow[]>;
 export const setUserRoles = (id: string, roles: Role[]) => authed(`/admin/users/${id}/roles`, 'PATCH', { roles });
@@ -110,7 +135,7 @@ export type ProjectDetailShape = Omit<Project, 'members' | 'ownerPm' | 'required
 };
 export const getProject = (id: string) =>
   authed(`/projects/${id}`) as Promise<{ project: ProjectDetailShape; tasks: TaskDetail[] }>;
-export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[] }) =>
+export const createTask = (projectId: string, body: Omit<Partial<Task>, 'assignees'> & { requiredSkills?: string[]; assignees?: string[]; phaseId?: string | null }) =>
   authed(`/projects/${projectId}/tasks`, 'POST', body) as Promise<Task>;
 
 export type BulkTaskOp = 'status' | 'assignee' | 'delete';
@@ -148,6 +173,15 @@ export const listReputation = () =>
 export const setProjectOwner = (id: string, ownerPm: string) =>
   authed(`/projects/${id}`, 'PATCH', { ownerPm });
 export const deleteProject = (id: string) => authed(`/projects/${id}`, 'DELETE');
+
+export const addPhase = (projectId: string, name: string, description?: string) =>
+  authed(`/projects/${projectId}/phases`, 'POST', { name, description }) as Promise<Phase[]>;
+export const updatePhase = (projectId: string, phaseId: string, patch: Partial<Phase>) =>
+  authed(`/projects/${projectId}/phases/${phaseId}`, 'PATCH', patch) as Promise<Phase[]>;
+export const advancePhase = (projectId: string) =>
+  authed(`/projects/${projectId}/phases/advance`, 'POST') as Promise<Phase[]>;
+export const deletePhase = (projectId: string, phaseId: string) =>
+  authed(`/projects/${projectId}/phases/${phaseId}`, 'DELETE') as Promise<Phase[]>;
 
 export const myTasks = () => authed('/tasks/mine') as Promise<Task[]>;
 export const listDirectory = () => authed('/users') as Promise<Person[]>;
@@ -192,3 +226,7 @@ export const listSubmittedTimesheets = () =>
   authed('/timesheets/review?status=submitted') as Promise<SubmittedTimesheet[]>;
 export const decideTimesheet = (id: string, decision: 'approve' | 'return') =>
   authed(`/timesheets/review/${id}`, 'PATCH', { decision });
+
+export type TimesheetNote = { taskName: string; day: string; minutes: number; note: string };
+export const getTimesheetNotes = (id: string) =>
+  authed(`/timesheets/review/${id}/notes`) as Promise<TimesheetNote[]>;

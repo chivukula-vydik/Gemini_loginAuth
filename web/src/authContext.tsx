@@ -5,7 +5,7 @@ type User = {
   email: string;
   displayName: string;
   providers: { provider: string }[];
-  roles: ('admin' | 'pm' | 'employee' | 'reporting_manager')[];
+  roles: ('admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp')[];
   skills: string[];
 };
 type AuthState = { user: User | null; loading: boolean; reload: () => Promise<void>; signOut: () => Promise<void> };

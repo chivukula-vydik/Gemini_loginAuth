@@ -1,8 +1,8 @@
-export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager';
-export type NavKey = 'home' | 'users' | 'skills' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team';
+export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation';
 export type NavItem = { key: NavKey; label: string; path: string };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team', 'team-attendance', 'organisation'];
 
 export function pathForKey(key: NavKey): string {
   return key === 'home' ? '/' : `/${key}`;
@@ -18,24 +18,56 @@ function navForRole(role: Role): NavItem[] {
   const home: NavItem = { key: 'home', label: 'Home', path: '/' };
   const timesheet: NavItem = { key: 'timesheet', label: 'Timesheet', path: '/timesheet' };
   const attendance: NavItem = { key: 'attendance', label: 'Attendance', path: '/attendance' };
+  const teamAtt: NavItem = { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' };
+  const org: NavItem = { key: 'organisation', label: 'Organisation', path: '/organisation' };
   if (role === 'admin') {
     return [
       home,
       { key: 'users', label: 'Users', path: '/users' },
       { key: 'skills', label: 'Skills', path: '/skills' },
+      { key: 'departments', label: 'Departments', path: '/departments' },
+      { key: 'shifts', label: 'Shifts', path: '/shifts' },
       { key: 'company-fit', label: 'Company fit', path: '/company-fit' },
       { key: 'projects', label: 'Projects', path: '/projects' },
       { key: 'requests', label: 'Requests', path: '/requests' },
       { key: 'utilization', label: 'Utilization', path: '/utilization' },
       timesheet,
       attendance,
+      org,
     ];
   }
   if (role === 'pm') {
-    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'requests', label: 'Requests', path: '/requests' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance];
+    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'requests', label: 'Requests', path: '/requests' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org];
   }
-  if (role === 'reporting_manager') {
-    return [home, { key: 'requests', label: 'Requests', path: '/requests' }, timesheet, attendance];
+  if (role === 'reporting_manager' || role === 'team_lead') {
+    return [home, { key: 'my-team', label: 'My Team', path: '/my-team' }, { key: 'requests', label: 'Requests', path: '/requests' }, timesheet, attendance, teamAtt, org];
+  }
+  if (role === 'director' || role === 'vp') {
+    return [
+      home,
+      { key: 'users', label: 'Users', path: '/users' },
+      { key: 'projects', label: 'Projects', path: '/projects' },
+      { key: 'requests', label: 'Requests', path: '/requests' },
+      { key: 'utilization', label: 'Utilization', path: '/utilization' },
+      timesheet,
+      attendance,
+      teamAtt,
+      org,
+    ];
+  }
+  if (role === 'hr') {
+    return [
+      home,
+      { key: 'users', label: 'Users', path: '/users' },
+      { key: 'requests', label: 'Requests', path: '/requests' },
+      timesheet,
+      attendance,
+      teamAtt,
+      org,
+    ];
+  }
+  if (role === 'finance') {
+    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org];
   }
   return [
     home,
@@ -44,13 +76,14 @@ function navForRole(role: Role): NavItem[] {
     { key: 'marketplace', label: 'Marketplace', path: '/marketplace' },
     timesheet,
     attendance,
+    org,
   ];
 }
 
 export function navForRoles(roles: Role[]): NavItem[] {
   const seen = new Set<NavKey>();
   const result: NavItem[] = [];
-  const priority: Role[] = ['admin', 'pm', 'reporting_manager', 'employee'];
+  const priority: Role[] = ['admin', 'vp', 'director', 'pm', 'hr', 'finance', 'reporting_manager', 'team_lead', 'employee'];
   const ordered = priority.filter((r) => roles.includes(r));
   if (ordered.length === 0) ordered.push('employee');
   for (const role of ordered) {

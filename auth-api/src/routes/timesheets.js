@@ -8,6 +8,7 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
+import { Overtime } from '../models/Overtime.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
 import {
@@ -303,6 +304,20 @@ export function createTimesheetRouter() {
     const ds = doc?.dayStatus || {};
     const { rows, consumed } = computeRowLock({ submittedRows: sanitized, savedRows, taskProjectById, taskStartById, weekStart, todayDay, grants, dayStatus: ds });
 
+    const REGULAR_DAY_MINUTES = 600; // 10 hours
+    const DAY_OFFSETS = { mon: 0, tue: 1, wed: 2, thu: 3, fri: 4 };
+    const overtimeEntries = [];
+    for (const d of DAYS) {
+      const dayTotal = rows.reduce((sum, r) => sum + (r.entries?.[d] || 0), 0);
+      if (dayTotal > REGULAR_DAY_MINUTES) {
+        const excess = dayTotal - REGULAR_DAY_MINUTES;
+        const dateObj = new Date(`${weekStart}T00:00:00Z`);
+        dateObj.setUTCDate(dateObj.getUTCDate() + DAY_OFFSETS[d]);
+        const date = dateObj.toISOString().slice(0, 10);
+        overtimeEntries.push({ day: d, date, minutes: excess });
+      }
+    }
+
     const billableByRowId = new Map(
       (Array.isArray(req.body?.tasks) ? req.body.tasks : [])
         .filter((t) => t?.id && t?.billable)
@@ -325,7 +340,42 @@ export function createTimesheetRouter() {
         { $set: { status: 'used' } },
       );
     }
-    res.json({ ok: true, updatedAt });
+
+    const createdOT = [];
+    for (const ot of overtimeEntries) {
+      const existing = await Overtime.findOne({ userId, date: ot.date, source: 'timesheet' });
+      if (existing) {
+        existing.minutes = ot.minutes;
+        existing.endTime = `${18 + Math.floor(ot.minutes / 60)}:${String(ot.minutes % 60).padStart(2, '0')}`;
+        await existing.save();
+        createdOT.push(existing);
+      } else {
+        const doc = await Overtime.create({
+          userId, date: ot.date, minutes: ot.minutes,
+          startTime: '18:00',
+          endTime: `${18 + Math.floor(ot.minutes / 60)}:${String(ot.minutes % 60).padStart(2, '0')}`,
+          reason: 'work-overload',
+          note: 'Auto-created from timesheet (exceeded 10h)',
+          source: 'timesheet',
+          status: 'pending',
+        });
+        createdOT.push(doc);
+      }
+    }
+    // Clean up overtime entries for days that no longer exceed 10h
+    const otDates = overtimeEntries.map((o) => o.date);
+    const allWeekDates = DAYS.map((_, i) => {
+      const d = new Date(`${weekStart}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+    for (const date of allWeekDates) {
+      if (!otDates.includes(date)) {
+        await Overtime.deleteOne({ userId, date, source: 'timesheet' });
+      }
+    }
+
+    res.json({ ok: true, updatedAt, overtime: createdOT.length > 0 ? createdOT : undefined });
   }));
 
   router.post('/:weekStart/submit', asyncHandler(async (req, res) => {
@@ -340,7 +390,6 @@ export function createTimesheetRouter() {
     const ds = doc.dayStatus || {};
     const now = new Date();
 
-    // If no days specified, submit all draft/returned non-empty days.
     const dayTotals = {};
     for (const d of DAYS) {
       dayTotals[d] = (doc.tasks || []).reduce((sum, t) => sum + (t.entries?.[d] || 0), 0);
@@ -403,6 +452,24 @@ export function createTimesheetRouter() {
     if (existing) return res.status(409).json({ error: 'a request for this day already exists' });
     const reqDoc = await EditRequest.create({ userId, weekStart, day, projectId, reason: String(req.body?.reason || '') });
     res.status(201).json(reqDoc);
+  }));
+
+  router.get('/tasks', asyncHandler(async (req, res) => {
+    const projectId = req.query.projectId;
+    if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'projectId required' });
+    const userId = req.user.sub;
+    const tasks = await Task.find({
+      project: projectId,
+      'assignees.user': userId,
+      status: { $ne: 'done' },
+    }).select('title description status estimatedHours');
+    res.json(tasks.map((t) => ({
+      taskId: String(t._id),
+      title: t.title,
+      description: t.description || '',
+      status: t.status,
+      estimatedHours: t.estimatedHours || 0,
+    })));
   }));
 
   router.post('/tasks', asyncHandler(async (req, res) => {

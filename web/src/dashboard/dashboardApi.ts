@@ -35,6 +35,7 @@ export type PendingApprovalsWidget = {
   regularise: number;
   editRequests: number;
   claimRequests: number;
+  overtime: number;
 };
 
 export type TeamSummaryWidget = {

@@ -11,9 +11,15 @@ import { directionCounts, completionStats, onTimeStats } from '../services/reput
 export function createUsersRouter() {
   const router = express.Router();
 
-  router.get('/', requireAuth, requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
-    const users = await User.find({ active: { $ne: false } }).select('displayName email role').sort('displayName');
-    res.json(users);
+  router.get('/', requireAuth, asyncHandler(async (req, res) => {
+    const isPm = (req.user.roles || [req.user.role]).some((r) => ['pm', 'admin'].includes(r));
+    const fields = req.query.fields;
+    let select = 'displayName email role';
+    if (isPm || (fields && typeof fields === 'string' && fields.includes('reportingManagerId'))) {
+      select = 'displayName email role roles reportingManagerId departmentId';
+    }
+    const users = await User.find({ active: { $ne: false } }).select(select).sort('displayName');
+    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
   }));
 
   // RM's assigned employees. Registered before '/:id' routes to avoid

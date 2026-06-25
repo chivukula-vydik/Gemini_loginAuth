@@ -165,5 +165,57 @@ export function createManagerRouter() {
     });
   }));
 
+  router.get('/team', asyncHandler(async (req, res) => {
+    const userId = req.user.sub;
+    const today = todayStr();
+
+    const members = await User.find({ reportingManagerId: userId, active: { $ne: false } })
+      .select('displayName email employeeCode phone employmentType dateOfJoining departmentId designationId locationId')
+      .populate('departmentId', 'name')
+      .populate('designationId', 'title')
+      .populate('locationId', 'name city');
+
+    const memberIds = members.map((m) => m._id);
+
+    const todayAttendance = await Attendance.find({ userId: { $in: memberIds }, date: today });
+    const attMap = {};
+    for (const a of todayAttendance) {
+      attMap[String(a.userId)] = { status: a.status, punchType: a.punchType, checkIn: a.checkIn };
+    }
+
+    const activeLeaves = await Leave.find({
+      userId: { $in: memberIds },
+      status: 'approved',
+      startDate: { $lte: today },
+      endDate: { $gte: today },
+    });
+    const leaveMap = {};
+    for (const l of activeLeaves) leaveMap[String(l.userId)] = l.type;
+
+    const result = members.map((m) => {
+      const att = attMap[String(m._id)];
+      const leave = leaveMap[String(m._id)];
+      let todayStatus = 'absent';
+      if (att?.checkIn) todayStatus = att.punchType === 'wfh' ? 'wfh' : 'present';
+      else if (leave) todayStatus = `leave-${leave}`;
+      return {
+        _id: m._id,
+        displayName: m.displayName,
+        email: m.email,
+        employeeCode: m.employeeCode,
+        phone: m.phone,
+        employmentType: m.employmentType,
+        dateOfJoining: m.dateOfJoining,
+        department: m.departmentId?.name,
+        designation: m.designationId?.title,
+        location: m.locationId?.name,
+        locationCity: m.locationId?.city,
+        todayStatus,
+      };
+    });
+
+    res.json(result);
+  }));
+
   return router;
 }

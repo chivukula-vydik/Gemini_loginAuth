@@ -5,7 +5,6 @@ import { SummaryTiles } from './SummaryTiles';
 import { BillableBar } from './BillableBar';
 import { getWeek, saveWeek, submitWeek, submitDays, createEditRequest, Task, Entries, Grant, Assignable } from './timesheetApi';
 import type { DayStatusMap, ProjectRef, Attachment } from './timesheetApi';
-import { AttachmentBar } from './AttachmentBar';
 import { blankRow, rowFromAssignable } from './addRow';
 import { canSubmit, SubmitStatus } from './submit';
 import type { Day } from './time';
@@ -16,6 +15,7 @@ import { getRange, getState, AttendanceDoc } from '../attendance/attendanceApi';
 import { resolveAttendanceRow, AttendanceCell } from './attendanceRow';
 import { useAuth } from '../authContext';
 import { TimesheetReview } from './TimesheetReview';
+import { CommentSummary } from './CommentSummary';
 
 const TEAM_ROLES = ['admin', 'pm', 'reporting_manager'];
 
@@ -251,7 +251,6 @@ export function TimesheetPage() {
     total: tasks.reduce((s, t) => s + (t.entries[d] || 0), 0),
   }));
   const weekTotal = dayTotals.reduce((s, x) => s + x.total, 0);
-  const busiest = dayTotals.reduce((a, b) => (b.total > a.total ? b : a), dayTotals[0]);
 
   const billableMinutes = tasks.reduce((sum, t) => sum + DAYS.reduce((s, d) => {
     const minutes = t.entries[d] || 0;
@@ -316,8 +315,6 @@ export function TimesheetPage() {
       <SummaryTiles
         weekTotal={weekTotal}
         targetMinutes={targetMinutes}
-        busiestLabel={DAY_LABELS[busiest.day]}
-        busiestMinutes={busiest.total}
         activeTasks={tasks.length}
         billableMinutes={billableMinutes}
         nonBillableMinutes={nonBillableMinutes}
@@ -335,7 +332,6 @@ export function TimesheetPage() {
       <TimesheetGrid
         weekStart={weekStart}
         tasks={tasks}
-        assignable={assignable}
         readOnly={readOnly}
         todayDay={todayDay}
         grants={grants}
@@ -353,17 +349,13 @@ export function TimesheetPage() {
         onAddBlank={onAddBlank}
         onProgress={onProgress}
         projects={projects}
-        onTaskCreated={(a) => onAddAssigned(a)}
         onBillableChange={onBillableChange}
         canOverrideBillable={canOverrideBillable}
+        attachments={attachments}
+        onAttachmentsChange={setAttachments}
       />
 
-      <AttachmentBar
-        weekStart={weekStart}
-        attachments={attachments}
-        readOnly={readOnly}
-        onUpdate={setAttachments}
-      />
+      <CommentSummary tasks={tasks} />
 
       {leaveOpen && (
         <LeaveModal

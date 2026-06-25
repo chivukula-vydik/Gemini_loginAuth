@@ -15,6 +15,7 @@ const DEFAULT_SHIFT = {
 import { User } from '../models/User.js';
 import { Holiday } from '../models/Holiday.js';
 import { Project } from '../models/Project.js';
+import { Overtime } from '../models/Overtime.js';
 
 // Synthetic, unsaved "holiday" entries for dates in range that have no real
 // attendance doc — lets the calendar render a HOLIDAY badge without ever
@@ -388,6 +389,147 @@ export function createAttendanceRouter(shiftConfig) {
     res.json(doc);
   }));
 
+  // GET /attendance/team/today — live daily stats for the manager's team
+  router.get('/team/today', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const today = todayStr();
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    let memberIds;
+    if (roles.includes('admin')) {
+      memberIds = (await User.find({ _id: { $ne: req.user.sub } }).select('_id')).map((u) => u._id);
+    } else if (roles.includes('reporting_manager')) {
+      memberIds = (await User.find({ reportingManagerId: req.user.sub }).select('_id')).map((u) => u._id);
+    } else {
+      const projects = await Project.find({ ownerPm: req.user.sub }).select('members');
+      const set = new Set();
+      for (const p of projects) for (const member of p.members) set.add(String(member));
+      memberIds = Array.from(set);
+    }
+
+    const total = memberIds.length;
+    const docs = await Attendance.find({ userId: { $in: memberIds }, date: today });
+
+    let present = 0, late = 0, wfh = 0, remoteClockIns = 0;
+    const members = [];
+    const checkedIn = new Set();
+
+    for (const d of docs) {
+      checkedIn.add(String(d.userId));
+      if (!d.checkIn) continue;
+      present++;
+      const ci = new Date(d.checkIn);
+      if (ci.getHours() > shift.startHour || (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute)) late++;
+      if (d.punchType === 'wfh') wfh++;
+      if (d.punchType === 'remote') remoteClockIns++;
+      members.push({ userId: String(d.userId), status: d.status, punchType: d.punchType, checkIn: d.checkIn, checkOut: d.checkOut, lateMinutes: ci.getHours() > shift.startHour || (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute) ? (ci.getHours() - shift.startHour) * 60 + (ci.getMinutes() - shift.startMinute) : 0 });
+    }
+
+    // Approved leave today
+    const Leave = (await import('../models/Leave.js')).Leave;
+    const onLeave = await Leave.countDocuments({
+      userId: { $in: memberIds },
+      status: 'approved',
+      startDate: { $lte: today },
+      endDate: { $gte: today },
+    });
+
+    res.json({
+      total,
+      present,
+      late,
+      onTime: present - late,
+      wfh,
+      remoteClockIns,
+      onLeave,
+      absent: total - present - onLeave,
+      members,
+    });
+  }));
+
+  // GET /attendance/team/calendar?year=2026&month=6 — per-day-per-member attendance
+  router.get('/team/calendar', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const { year, month } = req.query;
+    if (!year || !month) return res.status(400).json({ error: 'year and month required' });
+
+    const y = Number(year);
+    const m = String(month).padStart(2, '0');
+    const startDate = `${y}-${m}-01`;
+    const lastDay = new Date(y, Number(m), 0).getDate();
+    const endDate = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    let memberIds;
+    if (roles.includes('admin')) {
+      memberIds = (await User.find({ _id: { $ne: req.user.sub } }).select('_id')).map((u) => u._id);
+    } else if (roles.includes('reporting_manager')) {
+      memberIds = (await User.find({ reportingManagerId: req.user.sub }).select('_id')).map((u) => u._id);
+    } else {
+      const projects = await Project.find({ ownerPm: req.user.sub }).select('members');
+      const set = new Set();
+      for (const p of projects) for (const member of p.members) set.add(String(member));
+      memberIds = Array.from(set);
+    }
+
+    const users = await User.find({ _id: { $in: memberIds } }).select('displayName email departmentId').populate('departmentId', 'name').sort('displayName');
+    const docs = await Attendance.find({ userId: { $in: memberIds }, date: { $gte: startDate, $lte: endDate } });
+
+    const Leave = (await import('../models/Leave.js')).Leave;
+    const leaves = await Leave.find({
+      userId: { $in: memberIds },
+      status: 'approved',
+      startDate: { $lte: endDate },
+      endDate: { $gte: startDate },
+    });
+
+    const holidays = await Holiday.find({ date: { $gte: startDate, $lte: endDate } });
+    const holidaySet = new Set(holidays.map((h) => h.date));
+
+    const attMap = {};
+    for (const d of docs) {
+      const key = `${d.userId}_${d.date}`;
+      attMap[key] = { status: d.status, punchType: d.punchType, checkIn: d.checkIn, checkOut: d.checkOut, totalMinutes: d.totalMinutes, effectiveMinutes: d.effectiveMinutes, lateMinutes: 0 };
+      if (d.checkIn) {
+        const ci = new Date(d.checkIn);
+        if (ci.getHours() > shift.startHour || (ci.getHours() === shift.startHour && ci.getMinutes() > shift.startMinute)) {
+          attMap[key].lateMinutes = (ci.getHours() - shift.startHour) * 60 + (ci.getMinutes() - shift.startMinute);
+        }
+      }
+    }
+
+    const allDates = [];
+    for (let d = 1; d <= lastDay; d++) allDates.push(`${y}-${m}-${String(d).padStart(2, '0')}`);
+
+    const members = users.map((u) => {
+      const cells = {};
+      for (const date of allDates) {
+        const key = `${u._id}_${date}`;
+        const day = new Date(date + 'T00:00:00').getDay();
+        if (day === 0 || day === 6) {
+          cells[date] = { status: 'weekend' };
+        } else if (holidaySet.has(date)) {
+          cells[date] = { status: 'holiday' };
+        } else if (attMap[key]) {
+          cells[date] = attMap[key];
+        } else {
+          const leave = leaves.find((l) => String(l.userId) === String(u._id) && l.startDate <= date && l.endDate >= date);
+          if (leave) {
+            cells[date] = { status: 'leave', leaveType: leave.type };
+          } else {
+            cells[date] = { status: date < todayStr() ? 'absent' : null };
+          }
+        }
+      }
+      return {
+        _id: u._id,
+        displayName: u.displayName,
+        email: u.email,
+        department: u.departmentId?.name || null,
+        cells,
+      };
+    });
+
+    res.json({ year: y, month: Number(m), days: allDates, members });
+  }));
+
   // GET /attendance/regularise/pending — admin/pm only
   router.get('/regularise/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
     const filter = { 'regularise.status': 'pending' };
@@ -447,6 +589,74 @@ export function createAttendanceRouter(shiftConfig) {
       doc.status = deriveStatus(doc);
     }
 
+    await doc.save();
+    res.json(doc);
+  }));
+
+  // ─── Overtime ───
+
+  // POST /attendance/overtime — employee submits overtime request
+  router.post('/overtime', asyncHandler(async (req, res) => {
+    const { date, startTime, endTime, reason, note } = req.body;
+    if (!date || !startTime || !endTime) return res.status(400).json({ error: 'date, startTime and endTime required' });
+
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const minutes = (eh * 60 + em) - (sh * 60 + sm);
+    if (minutes <= 0) return res.status(400).json({ error: 'endTime must be after startTime' });
+
+    const existing = await Overtime.findOne({ userId: req.user.sub, date, status: 'pending' });
+    if (existing) return res.status(409).json({ error: 'overtime request already pending for this date' });
+
+    const doc = await Overtime.create({
+      userId: req.user.sub,
+      date, startTime, endTime, minutes,
+      reason: reason || 'other',
+      note: note || '',
+    });
+    res.status(201).json(doc);
+  }));
+
+  // GET /attendance/overtime/mine — employee's own overtime requests
+  router.get('/overtime/mine', asyncHandler(async (req, res) => {
+    const docs = await Overtime.find({ userId: req.user.sub }).sort({ requestedAt: -1 });
+    res.json(docs);
+  }));
+
+  // GET /attendance/overtime/pending — RM sees pending overtime from direct reports
+  router.get('/overtime/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    let filter = { status: 'pending' };
+    if (roles.includes('reporting_manager') && !roles.includes('admin')) {
+      const teamMembers = await User.find({ reportingManagerId: req.user.sub }).select('_id');
+      filter.userId = { $in: teamMembers.map((u) => u._id) };
+    }
+    const docs = await Overtime.find(filter)
+      .populate('userId', 'displayName email')
+      .sort({ requestedAt: -1 });
+    res.json(docs);
+  }));
+
+  // PATCH /attendance/overtime/:id/decide — RM approves or rejects
+  router.patch('/overtime/:id/decide', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const { decision } = req.body;
+    if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
+
+    const doc = await Overtime.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.status !== 'pending') return res.status(409).json({ error: 'already decided' });
+
+    const roles = req.user.roles || [req.user.role || 'employee'];
+    if (roles.includes('reporting_manager') && !roles.includes('admin')) {
+      const member = await User.findById(doc.userId);
+      if (!member || String(member.reportingManagerId) !== req.user.sub) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+    }
+
+    doc.status = decision;
+    doc.decidedBy = req.user.sub;
+    doc.decidedAt = new Date();
     await doc.save();
     res.json(doc);
   }));

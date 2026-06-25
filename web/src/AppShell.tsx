@@ -6,6 +6,9 @@ import { AttendancePage } from './attendance/AttendancePage';
 import { navForRoles, keyForPath, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
+import { AdminDepartments } from './pm/AdminDepartments';
+import { AdminShifts } from './pm/AdminShifts';
+import { OrgModule } from './org/OrgModule';
 import { CompanyFit } from './pm/CompanyFit';
 import { Projects } from './pm/Projects';
 import { MyTasks } from './pm/MyTasks';
@@ -14,6 +17,8 @@ import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
 import { Utilization } from './pm/Utilization';
 import { RoleHome } from './dashboard/RoleHome';
+import { MyTeam } from './dashboard/MyTeam';
+import { TeamAttendanceDashboard } from './attendance/TeamAttendanceDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 
@@ -21,6 +26,8 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
   users: <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
   skills: <path d="M12 2l2.4 7.4H22l-6 4.5 2.3 7.1L12 16.6 5.7 21l2.3-7.1-6-4.5h7.6z" />,
+  departments: <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11" />,
+  shifts: <path d="M12 2v10l4.5 2.6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
   'company-fit': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3M9 11l3 3L22 4" />,
   projects: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
   requests: <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" />,
@@ -31,6 +38,8 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   attendance: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11l-4 4-2-2" />,
   utilization: <path d="M18 20V10M12 20V4M6 20v-6" />,
   'my-team': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
+  'team-attendance': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 14v4l2-1 2 1v-4" />,
+  organisation: <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 8v4M12 12H6M12 12h6M6 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -86,6 +95,8 @@ export function AppShell() {
           <Route path="/" element={<RoleHome />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/skills" element={<AdminSkills />} />
+          <Route path="/departments" element={<AdminDepartments />} />
+          <Route path="/shifts" element={<AdminShifts />} />
           <Route path="/company-fit" element={<CompanyFit />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/requests" element={<Requests />} />
@@ -95,6 +106,9 @@ export function AppShell() {
           <Route path="/timesheet" element={<TimesheetPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/utilization" element={<Utilization />} />
+          <Route path="/my-team" element={<MyTeam />} />
+          <Route path="/team-attendance" element={<TeamAttendanceDashboard />} />
+          <Route path="/organisation" element={<OrgModule />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

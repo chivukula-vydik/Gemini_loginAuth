@@ -43,6 +43,11 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
             <div className="ts-task-identity-top">
               <span className="ts-name-ro">{task.name || 'Untitled task'}</span>
               <span className="ts-pm-badge">PM</span>
+              {task.effectiveBillable && (
+                <span className={`ts-billable-tag ${Object.values(task.effectiveBillable).some(Boolean) ? 'billable' : 'non-billable'}`}>
+                  {Object.values(task.effectiveBillable).some(Boolean) ? 'Billable' : 'Non-billable'}
+                </span>
+              )}
               {task.status && <StatusBadge status={task.status} />}
               {showDue && task.endDate && (
                 <span className={`due-pill ${urgency}`}>{dueLabel(task.endDate, today)}</span>
@@ -95,20 +100,6 @@ export function TaskRow({ task, readOnly = false, todayDay, grants, dates, today
               pending
                 ? <span className="ts-req ts-pending">pending</span>
                 : <button className="link-btn ts-req" type="button" onClick={() => onRequestEdit(d, task.projectId as string)}>request</button>
-            )}
-            {task.effectiveBillable && (
-              <button
-                type="button"
-                className={`ts-billable ${task.effectiveBillable[d] ? 'billable' : 'non-billable'}${task.billable?.[d] != null ? ' overridden' : ''}`}
-                title={task.effectiveBillable[d] ? 'Billable' : 'Non-billable'}
-                disabled={!canOverrideBillable}
-                onClick={() => {
-                  const current = task.billable?.[d];
-                  onBillableChange(d, current != null ? null : !task.effectiveBillable![d]);
-                }}
-              >
-                $
-              </button>
             )}
           </td>
         );

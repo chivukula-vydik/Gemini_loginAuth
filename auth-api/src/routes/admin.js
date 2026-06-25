@@ -10,8 +10,10 @@ import { Task } from '../models/Task.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { RefreshToken } from '../models/RefreshToken.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
+import { Department } from '../models/Department.js';
+import { Shift } from '../models/Shift.js';
 
-const ROLES = ['admin', 'pm', 'employee', 'reporting_manager'];
+const ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -22,7 +24,7 @@ export function createAdminRouter() {
   router.use(requireAuth, requireRole('admin'));
 
   router.get('/users', asyncHandler(async (req, res) => {
-    const users = await User.find().select('email displayName roles role active reestimationCount reportingManagerId').sort('email');
+    const users = await User.find().select('email displayName roles role active reestimationCount reportingManagerId departmentId shiftId').sort('email');
     res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
   }));
 
@@ -115,6 +117,92 @@ export function createAdminRouter() {
     const skill = await Skill.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!skill) return res.status(404).json({ error: 'not found' });
     res.json(skill);
+  }));
+
+  // --- Departments ---
+  router.get('/departments', asyncHandler(async (_req, res) => {
+    const deps = await Department.find().sort('name');
+    res.json(deps);
+  }));
+
+  router.post('/departments', asyncHandler(async (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const dep = await Department.create({ name, description: req.body?.description || '' });
+    res.status(201).json(dep);
+  }));
+
+  router.patch('/departments/:id', asyncHandler(async (req, res) => {
+    const update = {};
+    if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
+    if (typeof req.body?.description === 'string') update.description = req.body.description;
+    if (typeof req.body?.active === 'boolean') update.active = req.body.active;
+    const dep = await Department.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!dep) return res.status(404).json({ error: 'not found' });
+    res.json(dep);
+  }));
+
+  router.delete('/departments/:id', asyncHandler(async (req, res) => {
+    const count = await User.countDocuments({ departmentId: req.params.id });
+    if (count > 0) return res.status(409).json({ error: `${count} user(s) still in this department` });
+    await Department.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  }));
+
+  // --- Shifts ---
+  router.get('/shifts', asyncHandler(async (_req, res) => {
+    const shifts = await Shift.find().sort('name');
+    res.json(shifts);
+  }));
+
+  router.post('/shifts', asyncHandler(async (req, res) => {
+    const { name, startHour, startMinute, endHour, endMinute, isDefault } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    if (startHour == null || endHour == null) return res.status(400).json({ error: 'start/end hours required' });
+    if (isDefault) await Shift.updateMany({ isDefault: true }, { isDefault: false });
+    const shift = await Shift.create({ name: name.trim(), startHour, startMinute: startMinute || 0, endHour, endMinute: endMinute || 0, isDefault: !!isDefault });
+    res.status(201).json(shift);
+  }));
+
+  router.patch('/shifts/:id', asyncHandler(async (req, res) => {
+    const update = {};
+    if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
+    if (req.body?.startHour != null) update.startHour = req.body.startHour;
+    if (req.body?.startMinute != null) update.startMinute = req.body.startMinute;
+    if (req.body?.endHour != null) update.endHour = req.body.endHour;
+    if (req.body?.endMinute != null) update.endMinute = req.body.endMinute;
+    if (typeof req.body?.active === 'boolean') update.active = req.body.active;
+    if (typeof req.body?.isDefault === 'boolean') {
+      if (req.body.isDefault) await Shift.updateMany({ isDefault: true }, { isDefault: false });
+      update.isDefault = req.body.isDefault;
+    }
+    const shift = await Shift.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!shift) return res.status(404).json({ error: 'not found' });
+    res.json(shift);
+  }));
+
+  router.delete('/shifts/:id', asyncHandler(async (req, res) => {
+    const count = await User.countDocuments({ shiftId: req.params.id });
+    if (count > 0) return res.status(409).json({ error: `${count} user(s) still on this shift` });
+    await Shift.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
+  }));
+
+  // --- Assign department/shift to user ---
+  router.patch('/users/:id/department', asyncHandler(async (req, res) => {
+    const { departmentId } = req.body || {};
+    const user = await User.findByIdAndUpdate(req.params.id, { departmentId: departmentId || null }, { new: true })
+      .select('email displayName roles active departmentId shiftId');
+    if (!user) return res.status(404).json({ error: 'not found' });
+    res.json(user);
+  }));
+
+  router.patch('/users/:id/shift', asyncHandler(async (req, res) => {
+    const { shiftId } = req.body || {};
+    const user = await User.findByIdAndUpdate(req.params.id, { shiftId: shiftId || null }, { new: true })
+      .select('email displayName roles active departmentId shiftId');
+    if (!user) return res.status(404).json({ error: 'not found' });
+    res.json(user);
   }));
 
   return router;

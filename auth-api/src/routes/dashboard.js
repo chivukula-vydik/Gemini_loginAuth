@@ -9,6 +9,7 @@ import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
+import { Overtime } from '../models/Overtime.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
 import { currentMonday, DAYS } from '../services/timesheetRows.js';
@@ -149,11 +150,18 @@ export function createDashboardRouter() {
         if (roles.includes('reporting_manager')) leaveFilter.assignedApprover = userId;
         else if (roles.includes('pm')) leaveFilter.assignedApprover = null;
 
-        const [leaveCount, regCount, editCount, claimCount] = await Promise.all([
+        let otFilter = { status: 'pending' };
+        if (roles.includes('reporting_manager') && !roles.includes('admin')) {
+          const teamIds = await User.find({ reportingManagerId: userId }).select('_id');
+          otFilter.userId = { $in: teamIds.map((u) => u._id) };
+        }
+
+        const [leaveCount, regCount, editCount, claimCount, overtimeCount] = await Promise.all([
           Leave.countDocuments(leaveFilter),
           Attendance.countDocuments({ 'regularise.status': 'pending' }),
           EditRequest.countDocuments({ status: 'pending' }),
           ClaimRequest.countDocuments({ status: 'pending' }),
+          Overtime.countDocuments(otFilter),
         ]);
 
         // Timesheet approvals: count timesheets with at least one submitted day
@@ -173,6 +181,7 @@ export function createDashboardRouter() {
           regularise: regCount,
           editRequests: editCount,
           claimRequests: claimCount,
+          overtime: overtimeCount,
         };
       } catch (_) { /* omit section */ }
 

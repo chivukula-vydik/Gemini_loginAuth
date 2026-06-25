@@ -57,3 +57,20 @@ export type RMDashboardData = {
 
 export const getRMDashboard = (week?: string): Promise<RMDashboardData> =>
   authed(`/manager/dashboard${week ? `?week=${week}` : ''}`);
+
+export type TeamMember = {
+  _id: string;
+  displayName: string;
+  email: string;
+  employeeCode?: string;
+  phone?: string;
+  employmentType?: string;
+  dateOfJoining?: string;
+  department?: string;
+  designation?: string;
+  location?: string;
+  locationCity?: string;
+  todayStatus: string;
+};
+
+export const getMyTeam = (): Promise<TeamMember[]> => authed('/manager/team');

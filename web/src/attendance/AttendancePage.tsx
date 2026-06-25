@@ -4,11 +4,12 @@ import { personName } from '../pm/personName';
 import {
   getState, getToday, checkIn as apiCheckIn, checkOut as apiCheckOut,
   startBreak as apiStartBreak, endBreak as apiEndBreak,
-  getMonth, requestRegularise, getTeamStats, getShiftConfig,
+  getMonth, requestRegularise, getTeamStats, getShiftConfig, submitOvertime,
   AttendanceDoc, AttendanceStatus, AttendanceState, PunchType, TeamMemberStats, ShiftConfig,
 } from './attendanceApi';
 import { getMyLeave, getBalance, cancelLeave, LeaveBalance, LeaveRequest, LEAVE_TYPE_LABELS } from './leaveApi';
 import { LeaveModal } from './LeaveModal';
+import { TeamAttendance } from './TeamAttendance';
 
 const DEFAULT_SHIFT: ShiftConfig = { startHour: 9, startMinute: 30, endHour: 18, endMinute: 30, durationMinutes: 540 };
 const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -146,12 +147,14 @@ export function AttendancePage() {
   const [regulariseDate, setRegulariseDate] = useState<string | null>(null);
   const [myLeave, setMyLeave] = useState<LeaveRequest[]>([]);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [overtimeOpen, setOvertimeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);   // "More options" disclosure on the clock card
   const [balance, setBalance] = useState<LeaveBalance | null>(null);
   const [teamStats, setTeamStats] = useState<TeamMemberStats[] | null>(null);
   const [shift, setShift] = useState<ShiftConfig>(DEFAULT_SHIFT);
   const [decisionNotice, setDecisionNotice] = useState<string[]>([]);
-  const isTeamLead = user?.roles?.some((r) => ['pm', 'admin'].includes(r)) ?? false;
+  const isTeamLead = user?.roles?.some((r) => ['pm', 'admin', 'reporting_manager'].includes(r)) ?? false;
+  const [attTab, setAttTab] = useState<'my' | 'team'>('my');
   const shiftStartMin = shift.startHour * 60 + shift.startMinute;
 
   const ref = new Date();
@@ -383,8 +386,19 @@ export function AttendancePage() {
         <p className="ts-sub">Clock in, track breaks, and review your attendance log.</p>
       </header>
 
+      {isTeamLead && (
+        <div className="att-tabs att-top-tabs">
+          <button className={`att-tab${attTab === 'my' ? ' active' : ''}`} onClick={() => setAttTab('my')}>My Attendance</button>
+          <button className={`att-tab${attTab === 'team' ? ' active' : ''}`} onClick={() => setAttTab('team')}>Team</button>
+        </div>
+      )}
+
       {error && <p className="ts-error">{error}</p>}
 
+      {attTab === 'team' && isTeamLead ? (
+        <TeamAttendance />
+      ) : (
+      <>
       {decisionNotice.length > 0 && (
         <div className="att-notice">
           <ul className="att-notice-list">
@@ -563,7 +577,10 @@ export function AttendancePage() {
             <div className="ts-card att-leave-card">
               <div className="att-leave-head">
                 <h2 className="att-card-title">My leave</h2>
-                <button className="att-act att-act-sm" disabled={busy} onClick={() => setLeaveOpen(true)}>Apply for leave</button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="att-act att-act-sm" disabled={busy} onClick={() => setOvertimeOpen(true)}>Request overtime</button>
+                  <button className="att-act att-act-sm" disabled={busy} onClick={() => setLeaveOpen(true)}>Apply for leave</button>
+                </div>
               </div>
               <ul className="att-leave-list">
                 {myLeave.map((lv) => (
@@ -695,6 +712,9 @@ export function AttendancePage() {
         </>
       )}
 
+      </>
+      )}
+
       {regulariseDate && (
         <RegulariseModal
           date={regulariseDate}
@@ -708,6 +728,14 @@ export function AttendancePage() {
           today={ts}
           onClose={() => setLeaveOpen(false)}
           onSubmitted={() => { setLeaveOpen(false); loadLeave(); loadBalance(); loadDocs(); }}
+        />
+      )}
+
+      {overtimeOpen && (
+        <OvertimeModal
+          date={ts}
+          onClose={() => setOvertimeOpen(false)}
+          onSubmitted={() => setOvertimeOpen(false)}
         />
       )}
     </div>
@@ -759,6 +787,77 @@ function RegulariseModal({ date, onClose, onSubmitted }: {
             <input type="time" value={co} onChange={(e) => setCo(e.target.value)} />
           </label>
         </div>
+        {err && <p className="ts-error">{err}</p>}
+        <div className="att-modal-actions">
+          <button className="att-act" disabled={busy} onClick={onClose}>Cancel</button>
+          <button className="att-act att-act-primary" disabled={busy} onClick={submit}>Submit request</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Overtime modal ---
+
+const OT_REASONS = [
+  { value: 'work-overload', label: 'Work Overload' },
+  { value: 'deadline', label: 'Deadline' },
+  { value: 'client-request', label: 'Client Request' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'other', label: 'Other' },
+];
+
+function OvertimeModal({ date, onClose, onSubmitted }: {
+  date: string; onClose: () => void; onSubmitted: () => void;
+}) {
+  const [otDate, setOtDate] = useState(date);
+  const [startTime, setStartTime] = useState('18:30');
+  const [endTime, setEndTime] = useState('20:30');
+  const [reason, setReason] = useState('work-overload');
+  const [note, setNote] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!startTime || !endTime) { setErr('Start and end time required.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await submitOvertime({ date: otDate, startTime, endTime, reason, note: note.trim() });
+      onSubmitted();
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="att-modal-backdrop" onClick={onClose}>
+      <div className="att-modal ts-card" onClick={(e) => e.stopPropagation()}>
+        <h2 className="section-title">Request Overtime</h2>
+        <label className="att-field">
+          <span>Date</span>
+          <input type="date" value={otDate} onChange={(e) => setOtDate(e.target.value)} />
+        </label>
+        <div className="att-field-row">
+          <label className="att-field">
+            <span>Start time</span>
+            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          </label>
+          <label className="att-field">
+            <span>End time</span>
+            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          </label>
+        </div>
+        <label className="att-field">
+          <span>Reason</span>
+          <select value={reason} onChange={(e) => setReason(e.target.value)}>
+            {OT_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </label>
+        <label className="att-field">
+          <span>Note (optional)</span>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Additional details…" />
+        </label>
         {err && <p className="ts-error">{err}</p>}
         <div className="att-modal-actions">
           <button className="att-act" disabled={busy} onClick={onClose}>Cancel</button>

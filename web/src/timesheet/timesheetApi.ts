@@ -118,6 +118,13 @@ export async function submitWeek(weekStart: string): Promise<void> {
   }
 }
 
+export async function getProjectTasks(projectId: string): Promise<Assignable[]> {
+  const r = await fetch(`${API}/timesheets/tasks?projectId=${projectId}`, { headers: authHeaders(), credentials: 'include' });
+  if (!r.ok) throw new Error(`load failed (${r.status})`);
+  const data: Array<{ taskId: string; title: string; description?: string; status: string; estimatedHours: number }> = await r.json();
+  return data.map((t) => ({ ...t, projectName: null }));
+}
+
 export async function createTimesheetTask(title: string, projectId: string): Promise<Assignable> {
   const r = await fetch(`${API}/timesheets/tasks`, {
     method: 'POST',

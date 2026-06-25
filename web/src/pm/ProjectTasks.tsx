@@ -28,6 +28,7 @@ type Props = {
   onDecideExt: (taskId: string, decision: 'approve' | 'reject') => Promise<void>;
   onSaveAssignees: (taskId: string, next: { user: string; sharePct: number }[]) => Promise<void>;
   onSaveDescription: (taskId: string, description: string) => Promise<void>;
+  phases?: { _id: string; name: string; status: string }[];
 };
 
 function DueCell({ task, onSave, onDecideExt }: {
@@ -178,6 +179,7 @@ export function ProjectTasks(props: Props) {
               </th>
             )}
             <th className="ts-task">Task</th>
+            {props.phases && props.phases.length > 0 && <th className="col-left">Phase</th>}
             <th className="col-left">Assignee</th>
             <th>Planned</th>
             <th>Actual</th>
@@ -244,6 +246,11 @@ export function ProjectTasks(props: Props) {
                     </div>
                   )}
                 </td>
+                {props.phases && props.phases.length > 0 && (
+                  <td className="col-left">
+                    <span className="ts-sub">{props.phases.find((p) => p._id === t.phaseId)?.name || '—'}</span>
+                  </td>
+                )}
                 <td className="col-left">
                   {editingAssignees === t._id ? (
                     <AssigneesEditor

@@ -123,3 +123,80 @@ export type TeamMemberStats = {
 
 export const getTeamStats = (year: number, month: number) =>
   authed(`/attendance/team?year=${year}&month=${month}`) as Promise<TeamMemberStats[]>;
+
+export type TodayStats = {
+  total: number;
+  present: number;
+  late: number;
+  onTime: number;
+  wfh: number;
+  remoteClockIns: number;
+  onLeave: number;
+  absent: number;
+};
+
+export const getTeamToday = () =>
+  authed('/attendance/team/today') as Promise<TodayStats>;
+
+export type CalendarCell = {
+  status: string;
+  punchType?: string;
+  checkIn?: string;
+  checkOut?: string;
+  totalMinutes?: number;
+  effectiveMinutes?: number;
+  lateMinutes?: number;
+  leaveType?: string;
+} | null;
+
+export type CalendarMember = {
+  _id: string;
+  displayName: string;
+  email: string;
+  department: string | null;
+  cells: Record<string, CalendarCell>;
+};
+
+export type TeamCalendar = {
+  year: number;
+  month: number;
+  days: string[];
+  members: CalendarMember[];
+};
+
+export const getTeamCalendar = (year: number, month: number) =>
+  authed(`/attendance/team/calendar?year=${year}&month=${month}`) as Promise<TeamCalendar>;
+
+// ─── Overtime ───
+
+export type OvertimeReason = 'work-overload' | 'deadline' | 'client-request' | 'maintenance' | 'other';
+export type OvertimeStatus = 'pending' | 'approved' | 'rejected';
+
+export type OvertimeRequest = {
+  _id: string;
+  userId: string | Person;
+  date: string;
+  startTime: string;
+  endTime: string;
+  minutes: number;
+  reason: OvertimeReason;
+  note: string;
+  status: OvertimeStatus;
+  requestedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+};
+
+export type OvertimePending = Omit<OvertimeRequest, 'userId'> & { userId: Person };
+
+export const submitOvertime = (data: { date: string; startTime: string; endTime: string; reason?: string; note?: string }) =>
+  authed('/attendance/overtime', 'POST', data) as Promise<OvertimeRequest>;
+
+export const getMyOvertime = () =>
+  authed('/attendance/overtime/mine') as Promise<OvertimeRequest[]>;
+
+export const getPendingOvertime = () =>
+  authed('/attendance/overtime/pending') as Promise<OvertimePending[]>;
+
+export const decideOvertime = (id: string, decision: 'approved' | 'rejected') =>
+  authed(`/attendance/overtime/${id}/decide`, 'PATCH', { decision }) as Promise<OvertimeRequest>;

@@ -2,24 +2,21 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TaskRow } from './TaskRow';
 import { weekBarSegment } from './bar';
-import { addableTasks } from './addRow';
 import { DAYS, formatMinutes, columnDates, dayDates, todayISO, mondayOf } from './time';
 import type { Day } from './time';
-import type { Task, Entries, Grant, Assignable, DayStatusMap, ProjectRef } from './timesheetApi';
-import { createTimesheetTask } from './timesheetApi';
+import type { Task, Entries, Grant, DayStatusMap, ProjectRef, Assignable, Attachment } from './timesheetApi';
+import { uploadAttachment, deleteAttachment, attachmentUrl } from './timesheetApi';
 import { popoverPosition, type Placement } from '../pm/popoverPosition';
 import { attendanceIcon, attendanceIconColorClass, attendanceTooltip } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
+import { TaskSearch } from './TaskSearch';
 
-// Rough size of the add-task menu, used to flip it above the trigger when there
-// isn't room below. Real height is capped by max-height in CSS.
-const ADD_MENU_WIDTH = 260;
-const ADD_MENU_HEIGHT = 320;
+const ADD_MENU_WIDTH = 300;
+const ADD_MENU_HEIGHT = 340;
 
 type Props = {
   weekStart: string;
   tasks: Task[];
-  assignable: Assignable[];
   readOnly?: boolean;
   todayDay: Day | null;
   grants: Grant[];
@@ -37,16 +34,24 @@ type Props = {
   onAddBlank: () => void;
   onProgress: (taskId: string, patch: { percentComplete?: number; status?: string }) => void;
   projects?: ProjectRef[];
-  onTaskCreated?: (a: Assignable) => void;
   onBillableChange: (taskId: string, day: Day, value: boolean | null) => void;
   canOverrideBillable?: boolean;
+  attachments?: Attachment[];
+  onAttachmentsChange?: (attachments: Attachment[]) => void;
 };
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function TimesheetGrid({
-  weekStart, tasks, assignable, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,
+  weekStart, tasks, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,
   checkedDays, onToggleDay, onRequestEdit,
   onRename, onCellChange, onNoteChange, onDelete, onAddAssigned, onAddBlank, onProgress,
-  projects, onTaskCreated, onBillableChange, canOverrideBillable = false,
+  projects, onBillableChange, canOverrideBillable = false,
+  attachments = [], onAttachmentsChange,
 }: Props) {
   const cols = columnDates(weekStart);
   const dates = dayDates(weekStart);
@@ -56,11 +61,33 @@ export function TimesheetGrid({
   const [pickerOpen, setPickerOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [place, setPlace] = useState<Placement | null>(null);
-  const addable = addableTasks(assignable, tasks);
-  const [createMode, setCreateMode] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newProjectId, setNewProjectId] = useState('');
-  const [creating, setCreating] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !onAttachmentsChange) return;
+    setUploading(true);
+    try {
+      const att = await uploadAttachment(weekStart, file);
+      onAttachmentsChange([...attachments, att]);
+    } catch (err) {
+      window.alert((err as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function handleDeleteAtt(fileId: string) {
+    if (!window.confirm('Delete this attachment?') || !onAttachmentsChange) return;
+    try {
+      await deleteAttachment(weekStart, fileId);
+      onAttachmentsChange(attachments.filter((a) => a.fileId !== fileId));
+    } catch (err) {
+      window.alert((err as Error).message);
+    }
+  }
 
   // The menu is portaled to <body> so the card's `overflow: hidden` can't clip
   // it. Anchor it to the trigger, flipping above when there's no room below.
@@ -79,15 +106,6 @@ export function TimesheetGrid({
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [pickerOpen]);
-
-  // Reset the inline create form whenever the menu closes so reopening it
-  // starts fresh rather than showing a half-filled form from last time.
-  useEffect(() => {
-    if (pickerOpen) return;
-    setCreateMode(false);
-    setNewTitle('');
-    setNewProjectId('');
   }, [pickerOpen]);
 
   const dayTotal = (day: keyof Entries) =>
@@ -137,20 +155,6 @@ export function TimesheetGrid({
           </tr>
         </thead>
         <tbody>
-          <tr className="ts-attendance-row">
-            <td className="ts-task ts-attendance-label">Attendance</td>
-            {DAYS.map((d) => {
-              const cell = attendance[d];
-              const mins = cell?.effectiveMinutes ?? 0;
-              return (
-                <td key={d} className="ts-attendance-cell">
-                  {mins > 0 ? formatMinutes(mins) : '—'}
-                </td>
-              );
-            })}
-            <td className="ts-rowtotal"></td>
-            <td className="ts-actions"></td>
-          </tr>
           {tasks.length === 0 && (
             <tr>
               <td colSpan={8} className="ts-empty">
@@ -185,111 +189,76 @@ export function TimesheetGrid({
         <tfoot>
           <tr>
             <td className="ts-task">Daily total</td>
-            {DAYS.map((d) => <td key={d} className={`ts-coltotal${todayDay === d ? ' ts-coltoday' : ''}`}>{formatMinutes(dayTotal(d))}</td>)}
-            <td></td><td></td>
+            {DAYS.map((d) => {
+              const total = dayTotal(d);
+              const ot = total > 600 ? total - 600 : 0;
+              return (
+                <td key={d} className={`ts-coltotal${todayDay === d ? ' ts-coltoday' : ''}${ot > 0 ? ' ts-ot-day' : ''}`}>
+                  {formatMinutes(total)}
+                  {ot > 0 && <span className="ts-ot-tag" title={`${formatMinutes(ot)} overtime (pending approval)`}>+{formatMinutes(ot)} OT</span>}
+                </td>
+              );
+            })}
+            <td className="ts-rowtotal">{formatMinutes(DAYS.reduce((sum, d) => sum + dayTotal(d), 0))}</td><td></td>
           </tr>
         </tfoot>
       </table>
-      {!readOnly && (
-        <div className="ts-card-foot">
-          <div className="ts-add-wrap">
-            <button
-              ref={triggerRef}
-              className="ts-add"
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={pickerOpen}
-              onClick={() => setPickerOpen((o) => !o)}
-            >
-              + Add a task
-            </button>
-            {pickerOpen && place && createPortal(
-              <>
-                <div className="ts-add-backdrop" onClick={() => setPickerOpen(false)} />
-                <div
-                  className="ts-add-menu"
-                  role="menu"
-                  style={{ left: place.left, top: place.top ?? undefined, bottom: place.bottom ?? undefined }}
-                >
-                  {addable.length > 0 && (
-                    <div className="ts-add-group">
-                      <div className="ts-add-group-label">My assigned tasks</div>
-                      {addable.map((a) => (
-                        <button
-                          key={a.taskId}
-                          className="ts-add-item"
-                          type="button"
-                          role="menuitem"
-                          title={a.description || undefined}
-                          onClick={() => { onAddAssigned(a); setPickerOpen(false); }}
-                        >
-                          <span className="ts-add-item-title">{a.title}</span>
-                          {a.projectName && <span className="ts-add-item-meta">{a.projectName}</span>}
-                          {a.description && <span className="ts-add-item-meta">{a.description}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {addable.length === 0 && (
-                    <div className="ts-add-empty">No assigned tasks left to add.</div>
-                  )}
-                  <div className="ts-add-group">
-                    <button
-                      className="ts-add-item"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => { onAddBlank(); setPickerOpen(false); }}
-                    >
-                      <span className="ts-add-item-title">No task assigned</span>
-                      <span className="ts-add-item-meta">Meetings, admin, training…</span>
-                    </button>
+      <div className="ts-card-foot">
+        {!readOnly && (
+          <div className="ts-foot-row">
+            <div className="ts-add-wrap">
+              <button
+                ref={triggerRef}
+                className="ts-add"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={pickerOpen}
+                onClick={() => setPickerOpen((o) => !o)}
+              >
+                + Add a task
+              </button>
+              {pickerOpen && place && createPortal(
+                <>
+                  <div className="ts-add-backdrop" onClick={() => setPickerOpen(false)} />
+                  <div
+                    className="ts-add-menu tsk-search-menu"
+                    style={{ left: place.left, top: place.top ?? undefined, bottom: place.bottom ?? undefined }}
+                  >
+                    <TaskSearch
+                      projects={projects || []}
+                      existingTaskIds={new Set(tasks.filter((t) => t.taskId).map((t) => String(t.taskId)))}
+                      onSelect={(a) => { onAddAssigned(a); setPickerOpen(false); }}
+                      onAddBlank={() => { onAddBlank(); setPickerOpen(false); }}
+                      onClose={() => setPickerOpen(false)}
+                    />
                   </div>
-                  <div className="ts-add-group">
-                    <div className="ts-add-group-label">Create new task</div>
-                    {!createMode ? (
-                      <button className="ts-add-item" type="button" role="menuitem" onClick={() => setCreateMode(true)}>
-                        <span className="ts-add-item-title">+ New task</span>
-                        <span className="ts-add-item-meta">Create a task under a project</span>
-                      </button>
-                    ) : (
-                      <div className="ts-create-form">
-                        <select className="input ts-create-select" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)}>
-                          <option value="">Select project…</option>
-                          {(projects || []).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-                        </select>
-                        <input className="input ts-create-input" placeholder="Task name" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-                        <button
-                          className="btn btn-primary ts-create-btn"
-                          type="button"
-                          disabled={!newTitle.trim() || !newProjectId || creating}
-                          onClick={async () => {
-                            setCreating(true);
-                            try {
-                              const result = await createTimesheetTask(newTitle.trim(), newProjectId);
-                              onTaskCreated?.(result);
-                              setPickerOpen(false);
-                              setCreateMode(false);
-                              setNewTitle('');
-                              setNewProjectId('');
-                            } catch (e) {
-                              window.alert((e as Error).message);
-                            } finally {
-                              setCreating(false);
-                            }
-                          }}
-                        >
-                          {creating ? 'Creating…' : 'Create & add'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>,
-              document.body,
+                </>,
+                document.body,
+              )}
+            </div>
+            {onAttachmentsChange && (
+              <div className="ts-attach-wrap">
+                <button className="ts-attach-btn" type="button" disabled={uploading || attachments.length >= 5} onClick={() => fileRef.current?.click()}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                  {uploading ? 'Uploading…' : 'Attach file'}
+                </button>
+                <input ref={fileRef} type="file" hidden onChange={handleUpload} />
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+        {attachments.length > 0 && (
+          <ul className="ts-att-list">
+            {attachments.map((a) => (
+              <li key={a.fileId} className="ts-att-item">
+                <a href={attachmentUrl(a.fileId)} target="_blank" rel="noopener noreferrer" className="ts-att-link">{a.filename}</a>
+                <span className="ts-att-size">{formatSize(a.size)}</span>
+                {!readOnly && <button className="ts-att-del" type="button" onClick={() => handleDeleteAtt(a.fileId)}>&times;</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

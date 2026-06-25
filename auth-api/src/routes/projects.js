@@ -29,9 +29,11 @@ export function createProjectsRouter() {
   router.use(requireAuth);
 
   router.post('/', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
-    const { name, description, members, startDate, targetDate, requiredSkills, clientName, billingType, billingRate, currency } = req.body || {};
+    const { name, description, members, startDate, targetDate, requiredSkills, clientName, billingType, billingRate, currency, milestones, phases } = req.body || {};
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
     if (!clientName || !String(clientName).trim()) return res.status(400).json({ error: 'clientName required' });
+    const validBilling = ['billable', 'non-billable', 'milestone', 'hourly', 'fixed-price'];
+    const cleanPhases = Array.isArray(phases) ? phases.map((p, i) => ({ name: String(p.name || '').trim() || `Phase ${i + 1}`, description: p.description || '', order: i, status: i === 0 ? 'active' : 'upcoming' })) : [];
     const project = await Project.create({
       name: String(name).trim(),
       description: String(description || ''),
@@ -41,10 +43,17 @@ export function createProjectsRouter() {
       startDate: startDate || null,
       targetDate: targetDate || null,
       clientName: String(clientName).trim(),
-      billingType: ['billable', 'non-billable'].includes(billingType) ? billingType : 'non-billable',
-      billingRate: billingType === 'billable' && billingRate != null ? Number(billingRate) : null,
-      currency: billingType === 'billable' && currency ? String(currency) : null,
+      billingType: validBilling.includes(billingType) ? billingType : 'non-billable',
+      billingRate: billingRate != null ? Number(billingRate) : null,
+      currency: currency ? String(currency) : null,
+      milestones: Array.isArray(milestones) ? milestones : [],
+      phases: cleanPhases,
+      activePhase: null,
     });
+    if (project.phases.length > 0) {
+      project.activePhase = project.phases[0]._id;
+      await project.save();
+    }
     res.status(201).json(project);
   }));
 
@@ -182,11 +191,70 @@ export function createProjectsRouter() {
     res.json({ ok: true });
   }));
 
+  // --- Phase management ---
+  router.post('/:id/phases', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const { name, description } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const order = project.phases.length;
+    project.phases.push({ name: name.trim(), description: description || '', order, status: project.phases.length === 0 ? 'active' : 'upcoming' });
+    if (!project.activePhase && project.phases.length === 1) project.activePhase = project.phases[0]._id;
+    await project.save();
+    res.status(201).json(project.phases);
+  }));
+
+  router.patch('/:id/phases/:phaseId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const phase = project.phases.id(req.params.phaseId);
+    if (!phase) return res.status(404).json({ error: 'phase not found' });
+    if (req.body?.name) phase.name = req.body.name.trim();
+    if (req.body?.description != null) phase.description = req.body.description;
+    if (req.body?.status && ['upcoming', 'active', 'completed'].includes(req.body.status)) {
+      phase.status = req.body.status;
+      if (req.body.status === 'active') project.activePhase = phase._id;
+    }
+    await project.save();
+    res.json(project.phases);
+  }));
+
+  router.post('/:id/phases/advance', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const sorted = [...project.phases].sort((a, b) => a.order - b.order);
+    const activeIdx = sorted.findIndex((p) => String(p._id) === String(project.activePhase));
+    if (activeIdx === -1 || activeIdx >= sorted.length - 1) return res.status(400).json({ error: 'no next phase' });
+    sorted[activeIdx].status = 'completed';
+    sorted[activeIdx + 1].status = 'active';
+    project.activePhase = sorted[activeIdx + 1]._id;
+    await project.save();
+    res.json(project.phases);
+  }));
+
+  router.delete('/:id/phases/:phaseId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'not found' });
+    if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
+    const taskCount = await Task.countDocuments({ project: project._id, phaseId: req.params.phaseId });
+    if (taskCount > 0) return res.status(409).json({ error: `${taskCount} task(s) still in this phase — reassign them first` });
+    project.phases.pull({ _id: req.params.phaseId });
+    if (String(project.activePhase) === req.params.phaseId) {
+      const first = project.phases.sort((a, b) => a.order - b.order)[0];
+      project.activePhase = first ? first._id : null;
+    }
+    await project.save();
+    res.json(project.phases);
+  }));
+
   router.post('/:id/tasks', asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canCreateTask(req.user, project)) return res.status(403).json({ error: 'forbidden' });
-    const { title, description, requiredSkills, assignees, assignee, dueDate, startDate, dependsOn } = req.body || {};
+    const { title, description, requiredSkills, assignees, assignee, dueDate, startDate, dependsOn, phaseId } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
 
     // Accept `assignees: [userId]` (preferred) or legacy single `assignee`.
@@ -209,6 +277,7 @@ export function createProjectsRouter() {
       dueDate: dueDate || null,
       startDate: startDate || null,
       dependsOn: Array.isArray(dependsOn) ? dependsOn : [],
+      phaseId: phaseId || (project.activePhase || null),
       createdBy: req.user.sub,
     });
     res.status(201).json(task);

@@ -5,7 +5,7 @@ import {
   listSubmittedTimesheets, decideTimesheet, SubmittedTimesheet,
 } from './pmApi';
 import { personName } from './personName';
-import { getPendingRegularise, decideRegularise, RegularisePending } from '../attendance/attendanceApi';
+import { getPendingRegularise, decideRegularise, RegularisePending, getPendingOvertime, decideOvertime, OvertimePending } from '../attendance/attendanceApi';
 import { getPendingLeave, decideLeave, LeavePending, LEAVE_TYPE_LABELS } from '../attendance/leaveApi';
 
 const DAY_LABEL: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri' };
@@ -16,6 +16,7 @@ export function Requests() {
   const [sheets, setSheets] = useState<SubmittedTimesheet[]>([]);
   const [regs, setRegs] = useState<RegularisePending[]>([]);
   const [leaves, setLeaves] = useState<LeavePending[]>([]);
+  const [overtimes, setOvertimes] = useState<OvertimePending[]>([]);
   const [error, setError] = useState('');
 
   function reload() {
@@ -24,6 +25,7 @@ export function Requests() {
     listSubmittedTimesheets().then(setSheets).catch((e) => setError(e.message));
     getPendingRegularise().then(setRegs).catch((e) => setError(e.message));
     getPendingLeave().then(setLeaves).catch((e) => setError(e.message));
+    getPendingOvertime().then(setOvertimes).catch((e) => setError(e.message));
   }
   useEffect(() => { reload(); }, []);
 
@@ -57,7 +59,13 @@ export function Requests() {
     catch (e) { setError((e as Error).message); }
   }
 
-  const totalPending = sheets.length + reqs.length + claims.length + regs.length + leaves.length;
+  async function decideOT(id: string, decision: 'approved' | 'rejected') {
+    setError('');
+    try { await decideOvertime(id, decision); reload(); }
+    catch (e) { setError((e as Error).message); }
+  }
+
+  const totalPending = sheets.length + reqs.length + claims.length + regs.length + leaves.length + overtimes.length;
 
   return (
     <div className="ts-page">
@@ -88,6 +96,10 @@ export function Requests() {
         <div className="ts-tile">
           <span className="ts-tile-label">Leave</span>
           <span className="ts-tile-value">{leaves.length}</span>
+        </div>
+        <div className="ts-tile">
+          <span className="ts-tile-label">Overtime</span>
+          <span className="ts-tile-value">{overtimes.length}</span>
         </div>
       </div>
 
@@ -210,6 +222,32 @@ export function Requests() {
                   <div className="row-actions">
                     <button className="table-action approve" onClick={() => decideLeaveReq(lv._id, 'approved')}>Approve</button>
                     <button className="table-action danger" onClick={() => decideLeaveReq(lv._id, 'rejected')}>Reject</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 className="section-title">Overtime requests</h2>
+      <div className="ts-card">
+        <table className="ts-table">
+          <thead><tr><th className="ts-task">Employee</th><th className="col-left">Date</th><th className="col-left">Time</th><th>Minutes</th><th className="col-left">Reason</th><th className="col-left">Note</th><th className="col-left">Actions</th></tr></thead>
+          <tbody>
+            {overtimes.length === 0 && <tr><td colSpan={7} className="ts-empty">No pending overtime requests.</td></tr>}
+            {overtimes.map((ot) => (
+              <tr key={ot._id}>
+                <td className="ts-task">{personName(ot.userId)}</td>
+                <td className="col-left">{ot.date}</td>
+                <td className="col-left">{ot.startTime} → {ot.endTime}</td>
+                <td>{ot.minutes}m</td>
+                <td className="col-left">{ot.reason.replace(/-/g, ' ')}</td>
+                <td className="col-left">{ot.note || '—'}</td>
+                <td className="col-left">
+                  <div className="row-actions">
+                    <button className="table-action approve" onClick={() => decideOT(ot._id, 'approved')}>Approve</button>
+                    <button className="table-action danger" onClick={() => decideOT(ot._id, 'rejected')}>Reject</button>
                   </div>
                 </td>
               </tr>

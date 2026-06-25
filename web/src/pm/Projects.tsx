@@ -3,7 +3,8 @@ import {
   listProjects, createProject, getProject, createTask, setTaskAssignees,
   listSkills, listDirectory, updateProjectMembers, setProjectOwner, deleteProject,
   decideEstimate, updateTask, decideExtension, updateProjectRequiredSkills, updateProjectDescription,
-  Project, TaskDetail, Person, Skill, ProjectDetailShape,
+  Project, TaskDetail, Person, Skill, ProjectDetailShape, Milestone, Phase,
+  addPhase, advancePhase, deletePhase,
 } from './pmApi';
 import { StaffMembers } from './StaffMembers';
 import { ProgressRing } from './ProgressRing';
@@ -19,9 +20,13 @@ export function Projects() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [clientName, setClientName] = useState('');
-  const [billingType, setBillingType] = useState<'billable' | 'non-billable'>('non-billable');
+  const [isBillable, setIsBillable] = useState(false);
+  const [billingMethod, setBillingMethod] = useState<'hourly' | 'fixed-price' | 'milestone'>('hourly');
   const [billingRate, setBillingRate] = useState('');
   const [currency, setCurrency] = useState('USD');
+  const [milestones, setMilestones] = useState<Milestone[]>([{ name: '', amount: 0 }]);
+  const [phases, setPhases] = useState<{ name: string; description: string }[]>([]);
+  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const today = todayISO();
 
@@ -33,13 +38,19 @@ export function Projects() {
     if (!clientName.trim()) { setError('Client name is required'); return; }
     setError('');
     try {
+      const billingType = isBillable ? billingMethod : 'non-billable';
+      const needsRate = billingMethod === 'hourly' && isBillable;
+      const validMilestones = milestones.filter((m) => m.name.trim());
       await createProject({
         name: name.trim(), description: description.trim(),
         clientName: clientName.trim(), billingType,
-        billingRate: billingType === 'billable' && billingRate ? Number(billingRate) : null,
-        currency: billingType === 'billable' ? currency : null,
+        billingRate: needsRate && billingRate ? Number(billingRate) : null,
+        currency: isBillable ? currency : null,
+        milestones: billingMethod === 'milestone' && isBillable ? validMilestones : [],
+        phases: phases.filter((p) => p.name.trim()) as any,
       });
-      setName(''); setDescription(''); setClientName(''); setBillingType('non-billable'); setBillingRate(''); setCurrency('USD');
+      setName(''); setDescription(''); setClientName(''); setIsBillable(false); setBillingMethod('hourly'); setBillingRate(''); setCurrency('USD'); setMilestones([{ name: '', amount: 0 }]); setPhases([]);
+      setShowForm(false);
       reload();
     } catch (e) { setError((e as Error).message); }
   }
@@ -53,36 +64,130 @@ export function Projects() {
           <h1 className="ts-h1">Projects</h1>
           <p className="ts-sub">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</p>
         </div>
-        <div className="ts-nav-left">
-          <input className="input" placeholder="New project name" value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <input className="input" placeholder="Description (optional)" value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <input className="input" placeholder="Client name *" value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-          <select className="input pm-select" value={billingType}
-            onChange={(e) => setBillingType(e.target.value as 'billable' | 'non-billable')}>
-            <option value="non-billable">Non-Billable</option>
-            <option value="billable">Billable</option>
-          </select>
-          {billingType === 'billable' && (
-            <>
-              <input className="input" type="number" placeholder="Billing rate" value={billingRate}
-                onChange={(e) => setBillingRate(e.target.value)} style={{ width: 100 }} />
-              <select className="input pm-select" value={currency} onChange={(e) => setCurrency(e.target.value)} style={{ width: 80 }}>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="INR">INR</option>
-              </select>
-            </>
-          )}
-          <button className="btn btn-auto btn-primary" onClick={add}>Create</button>
-        </div>
+        <button className="btn btn-auto btn-primary" onClick={() => setShowForm((v) => !v)}>
+          {showForm ? 'Cancel' : '+ New project'}
+        </button>
       </header>
+
+      {showForm && (
+        <div className="ts-card card-section create-project-form">
+          <div className="card-title">Create project</div>
+          <div className="form-grid">
+            <label className="form-field">
+              <span className="form-label">Project name *</span>
+              <input className="input" placeholder="e.g. Website Redesign" value={name}
+                onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label className="form-field">
+              <span className="form-label">Client name *</span>
+              <input className="input" placeholder="e.g. Acme Corp" value={clientName}
+                onChange={(e) => setClientName(e.target.value)} />
+            </label>
+            <label className="form-field form-field-full">
+              <span className="form-label">Description</span>
+              <input className="input" placeholder="Brief description (optional)" value={description}
+                onChange={(e) => setDescription(e.target.value)} />
+            </label>
+            <div className="form-field">
+              <span className="form-label">Billable?</span>
+              <div className="billing-toggle">
+                <button type="button" className={`toggle-chip${!isBillable ? ' on' : ''}`} onClick={() => setIsBillable(false)}>Non-Billable</button>
+                <button type="button" className={`toggle-chip${isBillable ? ' on' : ''}`} onClick={() => setIsBillable(true)}>Billable</button>
+              </div>
+            </div>
+            {isBillable && (
+              <div className="form-field">
+                <span className="form-label">Billing method</span>
+                <select className="input" value={billingMethod}
+                  onChange={(e) => setBillingMethod(e.target.value as typeof billingMethod)}>
+                  <option value="hourly">Hourly</option>
+                  <option value="fixed-price">Fixed Charge</option>
+                  <option value="milestone">Milestone</option>
+                </select>
+              </div>
+            )}
+            {isBillable && (
+              <label className="form-field">
+                <span className="form-label">Currency</span>
+                <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="INR">INR</option>
+                </select>
+              </label>
+            )}
+            {isBillable && billingMethod === 'hourly' && (
+              <label className="form-field">
+                <span className="form-label">Hourly rate</span>
+                <input className="input" type="number" placeholder="0.00" value={billingRate}
+                  onChange={(e) => setBillingRate(e.target.value)} />
+              </label>
+            )}
+            {isBillable && billingMethod === 'fixed-price' && (
+              <label className="form-field">
+                <span className="form-label">Fixed charge amount</span>
+                <input className="input" type="number" placeholder="0.00" value={billingRate}
+                  onChange={(e) => setBillingRate(e.target.value)} />
+              </label>
+            )}
+            {isBillable && billingMethod === 'milestone' && (
+              <div className="form-field form-field-full">
+                <span className="form-label">Milestones ({milestones.length})</span>
+                <div className="ms-list">
+                  {milestones.map((ms, i) => (
+                    <div key={i} className="ms-row">
+                      <span className="ms-num">{i + 1}</span>
+                      <input className="input ms-name" placeholder="Milestone name" value={ms.name}
+                        onChange={(e) => { const next = [...milestones]; next[i] = { ...ms, name: e.target.value }; setMilestones(next); }} />
+                      <input className="input ms-amt" type="number" placeholder="Amount" value={ms.amount || ''}
+                        onChange={(e) => { const next = [...milestones]; next[i] = { ...ms, amount: Number(e.target.value) }; setMilestones(next); }} />
+                      {milestones.length > 1 && (
+                        <button type="button" className="ms-del" onClick={() => setMilestones(milestones.filter((_, j) => j !== i))}>&times;</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="link-btn" style={{ marginTop: 6 }}
+                  onClick={() => setMilestones([...milestones, { name: '', amount: 0 }])}>
+                  + Add milestone
+                </button>
+                {milestones.length > 0 && (
+                  <div className="ms-total">
+                    Total: {currency} {milestones.reduce((s, m) => s + (m.amount || 0), 0).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="phase-builder">
+            <div className="form-label" style={{ marginBottom: 6 }}>Phases ({phases.length})</div>
+            {phases.length === 0 && <p className="ts-sub" style={{ margin: 0 }}>No phases — project will be a single-phase project.</p>}
+            <div className="ms-list">
+              {phases.map((ph, i) => (
+                <div key={i} className="ms-row">
+                  <span className="phase-num">Phase {i + 1}</span>
+                  <input className="input ms-name" placeholder="Phase name" value={ph.name}
+                    onChange={(e) => { const next = [...phases]; next[i] = { ...ph, name: e.target.value }; setPhases(next); }} />
+                  <input className="input ms-name" placeholder="Description (optional)" value={ph.description}
+                    onChange={(e) => { const next = [...phases]; next[i] = { ...ph, description: e.target.value }; setPhases(next); }} />
+                  <button type="button" className="ms-del" onClick={() => setPhases(phases.filter((_, j) => j !== i))}>&times;</button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="link-btn" style={{ marginTop: 6 }}
+              onClick={() => setPhases([...phases, { name: '', description: '' }])}>
+              + Add phase
+            </button>
+          </div>
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <button className="btn btn-auto btn-primary" onClick={add}>Create project</button>
+            <button className="btn btn-auto" onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
       <div className="ts-tiles">
         <div className="ts-tile ts-tile-accent">
           <span className="ts-tile-label">Total projects</span>
@@ -360,12 +465,15 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <div className="ts-sub" style={{ marginTop: 8 }}>
               <strong>Client:</strong> {project.clientName || 'Unassigned'}
               {' · '}
-              <span className={`status-badge ${project.billingType === 'billable' ? 'status-done' : 'status-archived'}`}>
+              <span className={`status-badge ${project.billingType !== 'non-billable' ? 'status-done' : 'status-archived'}`}>
                 <span className="status-dot" aria-hidden="true" />
-                {project.billingType === 'billable' ? 'Billable' : 'Non-Billable'}
+                {project.billingType === 'non-billable' ? 'Non-Billable' : project.billingType === 'hourly' ? 'Hourly' : project.billingType === 'fixed-price' ? 'Fixed Price' : project.billingType === 'milestone' ? 'Milestone' : 'Billable'}
               </span>
-              {project.billingType === 'billable' && project.billingRate != null && (
+              {project.billingType === 'hourly' && project.billingRate != null && (
                 <span> · {project.currency ?? 'USD'} {project.billingRate}/hr</span>
+              )}
+              {project.billingType === 'fixed-price' && project.billingRate != null && (
+                <span> · {project.currency ?? 'USD'} {project.billingRate} (fixed)</span>
               )}
             </div>
             <button className="btn btn-auto" onClick={() => { setDescriptionDraft(project.description || ''); setEditingDescription(true); }}>
@@ -374,6 +482,10 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
           </>
         )}
       </div>
+
+      {(project.phases?.length ?? 0) > 0 && (
+        <PhaseTimeline projectId={id} phases={project.phases!} activePhase={project.activePhase ?? null} onReload={reload} onError={setError} tasks={tasks} />
+      )}
 
       <div className="ts-card overview">
         <div className="overview-ring">
@@ -525,7 +637,74 @@ function ProjectDetail({ id, onBack }: { id: string; onBack: () => void }) {
         onDecideExt={decideExt}
         onSaveAssignees={saveAssignees}
         onSaveDescription={saveTaskDescription}
+        phases={project.phases}
       />
+    </div>
+  );
+}
+
+function PhaseTimeline({ projectId, phases, activePhase, onReload, onError, tasks }: {
+  projectId: string; phases: Phase[]; activePhase: string | null;
+  onReload: () => void; onError: (msg: string) => void; tasks: TaskDetail[];
+}) {
+  const [newName, setNewName] = useState('');
+  const sorted = [...phases].sort((a, b) => a.order - b.order);
+  const activeIdx = sorted.findIndex((p) => p._id === activePhase);
+  const canAdvance = activeIdx >= 0 && activeIdx < sorted.length - 1;
+
+  async function handleAdd() {
+    if (!newName.trim()) return;
+    try { await addPhase(projectId, newName.trim()); setNewName(''); onReload(); }
+    catch (e) { onError((e as Error).message); }
+  }
+
+  async function handleAdvance() {
+    if (!window.confirm('Complete current phase and move to next?')) return;
+    try { await advancePhase(projectId); onReload(); }
+    catch (e) { onError((e as Error).message); }
+  }
+
+  async function handleDelete(phaseId: string) {
+    if (!window.confirm('Delete this phase?')) return;
+    try { await deletePhase(projectId, phaseId); onReload(); }
+    catch (e) { onError((e as Error).message); }
+  }
+
+  return (
+    <div className="ts-card card-section">
+      <div className="card-title">Phases</div>
+      <div className="phase-timeline">
+        {sorted.map((ph, i) => {
+          const taskCount = tasks.filter((t) => t.phaseId === ph._id).length;
+          const doneCount = tasks.filter((t) => t.phaseId === ph._id && t.status === 'done').length;
+          return (
+            <div key={ph._id} className={`phase-step phase-${ph.status}`}>
+              <div className="phase-indicator">
+                <span className={`phase-dot phase-dot-${ph.status}`}>{ph.status === 'completed' ? '✓' : i + 1}</span>
+                {i < sorted.length - 1 && <span className={`phase-line ${sorted[i + 1]?.status !== 'upcoming' ? 'phase-line-done' : ''}`} />}
+              </div>
+              <div className="phase-content">
+                <div className="phase-header">
+                  <span className="phase-name">{ph.name}</span>
+                  <span className={`phase-status-badge phase-sb-${ph.status}`}>{ph.status}</span>
+                  {ph.status === 'upcoming' && taskCount === 0 && (
+                    <button className="ms-del" type="button" onClick={() => handleDelete(ph._id)}>&times;</button>
+                  )}
+                </div>
+                {ph.description && <p className="ts-sub" style={{ margin: '2px 0 0' }}>{ph.description}</p>}
+                <span className="ts-sub">{taskCount} task{taskCount !== 1 ? 's' : ''}{taskCount > 0 ? ` · ${doneCount} done` : ''}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+        <input className="input" placeholder="New phase name" value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }} style={{ maxWidth: 200 }} />
+        <button className="btn btn-auto" onClick={handleAdd}>Add phase</button>
+        {canAdvance && <button className="btn btn-auto btn-primary" onClick={handleAdvance}>Advance to next phase</button>}
+      </div>
     </div>
   );
 }

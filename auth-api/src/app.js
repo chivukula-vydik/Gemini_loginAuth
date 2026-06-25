@@ -21,6 +21,7 @@ import { createHolidaysRouter } from './routes/holidays.js';
 import { createReportsRouter } from './routes/reports.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createManagerRouter } from './routes/manager.js';
+import { createOrgRouter } from './routes/org.js';
 
 export function createApp(config) {
   const app = express();
@@ -91,6 +92,7 @@ export function createApp(config) {
   app.use('/reports', createReportsRouter());
   app.use('/dashboard', createDashboardRouter());
   app.use('/manager', createManagerRouter());
+  app.use('/org', createOrgRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

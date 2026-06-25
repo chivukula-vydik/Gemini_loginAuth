@@ -49,7 +49,7 @@ export function ManagerHome() {
               </div>
               <div className="dash-card-body">
                 <span className="dash-metric-value dash-metric-hero">
-                  {data.pendingApprovals.leave + data.pendingApprovals.timesheets + data.pendingApprovals.regularise + data.pendingApprovals.editRequests + data.pendingApprovals.claimRequests}
+                  {data.pendingApprovals.leave + data.pendingApprovals.timesheets + data.pendingApprovals.regularise + data.pendingApprovals.editRequests + data.pendingApprovals.claimRequests + (data.pendingApprovals.overtime || 0)}
                 </span>
                 <span className="dash-metric-sub">total pending</span>
                 <div className="dash-approval-breakdown">
@@ -58,6 +58,7 @@ export function ManagerHome() {
                   {data.pendingApprovals.regularise > 0 && <span className="dash-approval-item">{data.pendingApprovals.regularise} regularise</span>}
                   {data.pendingApprovals.editRequests > 0 && <span className="dash-approval-item">{data.pendingApprovals.editRequests} edits</span>}
                   {data.pendingApprovals.claimRequests > 0 && <span className="dash-approval-item">{data.pendingApprovals.claimRequests} claims</span>}
+                  {(data.pendingApprovals.overtime || 0) > 0 && <span className="dash-approval-item">{data.pendingApprovals.overtime} overtime</span>}
                 </div>
               </div>
             </div>
