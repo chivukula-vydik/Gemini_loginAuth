@@ -15,6 +15,11 @@ import { Timesheet } from '../src/models/Timesheet.js';
 import { Overtime } from '../src/models/Overtime.js';
 import { Skill } from '../src/models/Skill.js';
 import { LeaveBalance, DEFAULT_QUOTAS } from '../src/models/LeaveBalance.js';
+import { OnboardingCase } from '../src/models/OnboardingCase.js';
+import { Offer } from '../src/models/Offer.js';
+import { OnboardingTemplate } from '../src/models/OnboardingTemplate.js';
+import { OnboardingTask } from '../src/models/OnboardingTask.js';
+import { DocumentRequest } from '../src/models/DocumentRequest.js';
 
 // Usage:  node scripts/seed-all.js
 
@@ -579,6 +584,107 @@ async function main() {
     }
   }
   console.log(`✓ Timesheets: ${tsCount}`);
+
+  // ── Onboarding ────────────────────────────────────────────
+  await OnboardingCase.deleteMany({});
+  await Offer.deleteMany({});
+  await OnboardingTemplate.deleteMany({});
+  await OnboardingTask.deleteMany({});
+  await DocumentRequest.deleteMany({});
+
+  const hrUser = users.find(u => u.roles.includes('hr')) || users[0];
+  const managerUser = users.find(u => u.roles.includes('reporting_manager')) || users[1];
+
+  const template = await OnboardingTemplate.create({
+    name: 'Engineering FTE Onboarding',
+    appliesTo: { employmentType: 'full_time' },
+    tasks: [
+      { key: 'provision_laptop', title: 'Provision laptop', ownerRole: 'it', offsetDays: -3, category: 'asset', mandatory: true, dependsOn: [] },
+      { key: 'setup_email', title: 'Create email account', ownerRole: 'it', offsetDays: -2, category: 'access', mandatory: true, dependsOn: ['provision_laptop'] },
+      { key: 'id_card', title: 'Prepare ID card', ownerRole: 'hr', offsetDays: -1, category: 'admin', mandatory: true, dependsOn: [] },
+      { key: 'welcome_kit', title: 'Prepare welcome kit', ownerRole: 'hr', offsetDays: 0, category: 'admin', mandatory: false, dependsOn: [] },
+      { key: 'team_intro', title: 'Schedule team introduction', ownerRole: 'manager', offsetDays: 0, category: 'training', mandatory: true, dependsOn: [] },
+      { key: 'read_handbook', title: 'Read employee handbook', ownerRole: 'candidate', offsetDays: -5, category: 'document', mandatory: true, dependsOn: [] },
+      { key: 'bank_details', title: 'Submit bank details', ownerRole: 'candidate', offsetDays: -3, category: 'document', mandatory: true, dependsOn: [] },
+    ],
+  });
+
+  const candidates = [
+    { firstName: 'Priya', lastName: 'Sharma', personalEmail: 'priya.sharma@gmail.com', phone: '9876543210', designation: 'Senior Engineer', status: 'DRAFT' },
+    { firstName: 'Arjun', lastName: 'Patel', personalEmail: 'arjun.patel@gmail.com', phone: '9876543211', designation: 'Product Manager', status: 'OFFER_SENT' },
+    { firstName: 'Neha', lastName: 'Gupta', personalEmail: 'neha.gupta@gmail.com', phone: '9876543212', designation: 'UX Designer', status: 'OFFER_ACCEPTED' },
+    { firstName: 'Rahul', lastName: 'Kumar', personalEmail: 'rahul.kumar@gmail.com', phone: '9876543213', designation: 'Frontend Developer', status: 'PRE_BOARDING' },
+    { firstName: 'Ananya', lastName: 'Singh', personalEmail: 'ananya.singh@gmail.com', phone: '9876543214', designation: 'Data Analyst', status: 'JOINED' },
+    { firstName: 'Vikram', lastName: 'Reddy', personalEmail: 'vikram.reddy@gmail.com', phone: '9876543215', designation: 'Backend Engineer', status: 'INDUCTION' },
+    { firstName: 'Deepa', lastName: 'Nair', personalEmail: 'deepa.nair@gmail.com', phone: '9876543216', designation: 'QA Lead', status: 'PROBATION' },
+  ];
+
+  for (const cand of candidates) {
+    const joiningDate = new Date('2026-08-01');
+    const c = await OnboardingCase.create({
+      candidate: { firstName: cand.firstName, lastName: cand.lastName, personalEmail: cand.personalEmail, phone: cand.phone },
+      designation: cand.designation,
+      reportingManager: managerUser._id,
+      joiningDate,
+      probationMonths: 3,
+      employmentType: 'full_time',
+      workflowTemplate: template._id,
+      status: cand.status,
+      createdBy: hrUser._id,
+    });
+
+    if (['OFFER_SENT', 'OFFER_ACCEPTED', 'PRE_BOARDING', 'JOINED', 'INDUCTION', 'PROBATION'].includes(cand.status)) {
+      const offerStatus = cand.status === 'OFFER_SENT' ? 'sent'
+        : ['OFFER_DECLINED'].includes(cand.status) ? 'declined'
+        : 'accepted';
+      await Offer.create({
+        onboardingCase: c._id,
+        ctcAnnual: 1200000 + Math.floor(Math.random() * 800000),
+        componentsPreview: [
+          { key: 'basic', label: 'Basic', type: 'earning', calc: 'percent_of_ctc', value: 50, taxable: true, proratable: true },
+          { key: 'hra', label: 'HRA', type: 'earning', calc: 'percent_of_basic', value: 40, taxable: true, proratable: true },
+          { key: 'pf', label: 'PF (Employer)', type: 'deduction', calc: 'percent_of_basic', value: 12, taxable: false, proratable: true },
+        ],
+        joiningDate,
+        status: offerStatus,
+        sentAt: new Date(),
+        respondedAt: offerStatus !== 'sent' ? new Date() : null,
+      });
+    }
+
+    if (['PRE_BOARDING', 'JOINED', 'INDUCTION', 'PROBATION'].includes(cand.status)) {
+      const defaultDocs = ['pan', 'aadhaar', 'bank_proof', 'photo', 'education'];
+      for (const docType of defaultDocs) {
+        const mandatory = ['pan', 'aadhaar', 'bank_proof', 'photo'].includes(docType);
+        const isVerified = ['JOINED', 'INDUCTION', 'PROBATION'].includes(cand.status) && mandatory;
+        await DocumentRequest.create({
+          onboardingCase: c._id,
+          docType,
+          mandatory,
+          verifyStatus: isVerified ? 'verified' : (cand.status !== 'PRE_BOARDING' && mandatory ? 'submitted' : 'awaiting'),
+          ...(isVerified ? { verifiedBy: hrUser._id, verifiedAt: new Date() } : {}),
+        });
+      }
+
+      for (const t of template.tasks) {
+        const isDone = ['JOINED', 'INDUCTION', 'PROBATION'].includes(cand.status);
+        await OnboardingTask.create({
+          onboardingCase: c._id,
+          templateKey: t.key,
+          title: t.title,
+          ownerRole: t.ownerRole,
+          assignedTo: t.ownerRole === 'manager' ? managerUser._id : (t.ownerRole === 'hr' ? hrUser._id : null),
+          dueDate: new Date(joiningDate.getTime() + t.offsetDays * 86400000),
+          dependsOn: t.dependsOn,
+          mandatory: t.mandatory,
+          status: isDone ? 'done' : 'pending',
+          ...(isDone ? { completedAt: new Date(), completedBy: hrUser._id } : {}),
+        });
+      }
+    }
+  }
+
+  console.log('  Onboarding: 7 cases, 1 template, tasks + docs per case');
 
   // ── Summary ──
   console.log('\n✅ Full seed complete!');
