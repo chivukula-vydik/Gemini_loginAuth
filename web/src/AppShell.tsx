@@ -1,9 +1,9 @@
-import { type ReactElement } from 'react';
+import { type ReactElement, useState, useCallback } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
-import { navForRoles, keyForPath, NavKey } from './pm/nav';
+import { navSectionsForRoles, keyForPath, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
 import { AdminDepartments } from './pm/AdminDepartments';
@@ -47,6 +47,9 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   payroll: <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
   'my-payslips': <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" />,
   reimbursements: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
+  declarations: <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M9 14l2 2 4-4" />,
+  'tax-summary': <path d="M4 7h16M4 11h16M4 15h10M4 19h6" />,
+  'reimbursement-approvals': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -60,24 +63,43 @@ function NavIcon({ name }: { name: NavKey }) {
 
 export function AppShell() {
   const { user, signOut } = useAuth();
-  const items = navForRoles(user?.roles ?? ['employee']);
+  const sections = navSectionsForRoles(user?.roles ?? ['employee']);
   const navigate = useNavigate();
   const location = useLocation();
   const active = keyForPath(location.pathname);
   const name = personName(user);
   const initial = (name[0] ?? '?').toUpperCase();
 
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = useCallback((title: string) => {
+    setCollapsed(prev => ({ ...prev, [title]: !prev[title] }));
+  }, []);
+
   return (
     <div className="shell">
       <aside className="shell-sidebar">
         <div className="shell-brand"><span className="logo">A</span><span className="name">Auth Service</span></div>
         <nav className="shell-nav">
-          {items.map((it) => (
-            <a key={it.key} className={`shell-nav-item${active === it.key ? ' active' : ''}`}
-              href={it.path} onClick={(e) => { e.preventDefault(); navigate(it.path); }}>
-              <NavIcon name={it.key} />
-              <span>{it.label}</span>
-            </a>
+          {sections.map((sec, si) => (
+            <div key={si} className={sec.title ? 'shell-nav-section' : ''}>
+              {sec.title && (
+                <button className="shell-nav-header" onClick={() => toggle(sec.title)}>
+                  <svg className="shell-nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transform: collapsed[sec.title] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  <span>{sec.title}</span>
+                </button>
+              )}
+              {!collapsed[sec.title] && sec.items.map((it) => (
+                <a key={it.key} className={`shell-nav-item${active === it.key ? ' active' : ''}`}
+                  href={it.path} onClick={(e) => { e.preventDefault(); navigate(it.path); }}>
+                  <NavIcon name={it.key} />
+                  <span>{it.label}</span>
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="shell-foot">

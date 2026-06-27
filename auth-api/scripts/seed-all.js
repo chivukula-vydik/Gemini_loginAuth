@@ -22,6 +22,10 @@ import { PayGrade } from '../src/models/PayGrade.js';
 import { PayGroup } from '../src/models/PayGroup.js';
 import { SalaryStructure } from '../src/models/SalaryStructure.js';
 import { InvestmentDeclaration } from '../src/models/InvestmentDeclaration.js';
+import { PayrollRun } from '../src/models/PayrollRun.js';
+import { Payslip } from '../src/models/Payslip.js';
+import { Reimbursement } from '../src/models/Reimbursement.js';
+import { Loan } from '../src/models/Loan.js';
 
 // Usage:  node scripts/seed-all.js
 
@@ -759,6 +763,189 @@ async function main() {
     });
   }
   console.log('  ✓ salary structures seeded');
+
+  // ── Investment Declarations ──
+  await InvestmentDeclaration.deleteMany({});
+  let declCount = 0;
+  const SECTIONS = ['80C', '80D', '80G', '80E', '80TTA', 'HRA'];
+  for (const u of allUsers) {
+    const role = u.roles?.[0] || 'employee';
+    const regime = Math.random() > 0.3 ? 'new' : 'old';
+    const items = [];
+    if (regime === 'old') {
+      const numItems = rand(1, 4);
+      for (let i = 0; i < numItems; i++) {
+        items.push({
+          section: SECTIONS[i % SECTIONS.length],
+          declaredAmount: pick([50000, 100000, 150000, 25000]),
+          proofAmount: null,
+          verifyStatus: 'pending',
+        });
+      }
+    }
+    await InvestmentDeclaration.create({
+      user: u._id,
+      financialYear: '2026-27',
+      regime,
+      items,
+      phase: 'declaration',
+    });
+    declCount++;
+  }
+  console.log(`✓ Investment declarations: ${declCount}`);
+
+  // ── Loans ──
+  await Loan.deleteMany({});
+  let loanCount = 0;
+  const LOAN_AMOUNTS = [50000, 100000, 200000, 300000];
+  for (let i = 0; i < 8; i++) {
+    const emp = allUsers[i + 5];
+    const principal = pick(LOAN_AMOUNTS);
+    const tenure = pick([6, 12, 18, 24]);
+    const emi = Math.round(principal / tenure);
+    const schedule = [];
+    for (let m = 0; m < tenure; m++) {
+      const d = new Date(2026, 0 + m, 1);
+      schedule.push({
+        period: { month: d.getMonth() + 1, year: d.getFullYear() },
+        amount: emi,
+        status: m < 6 ? 'paid' : 'due',
+      });
+    }
+    await Loan.create({
+      user: emp._id,
+      principal,
+      emiAmount: emi,
+      tenureMonths: tenure,
+      schedule,
+      status: 'active',
+    });
+    loanCount++;
+  }
+  console.log(`✓ Loans: ${loanCount}`);
+
+  // ── Reimbursements ──
+  await Reimbursement.deleteMany({});
+  let reimbCount = 0;
+  const REIMB_CATEGORIES = ['travel', 'food', 'internet', 'medical', 'other'];
+  const REIMB_DESCS = {
+    travel: ['Cab to client office', 'Train tickets - site visit', 'Airport transfer', 'Inter-city bus fare'],
+    food: ['Team lunch', 'Client dinner', 'Late-night meal during deploy', 'Working lunch with vendor'],
+    internet: ['Monthly broadband bill', 'Mobile hotspot plan', 'WiFi router purchase'],
+    medical: ['Doctor consultation fee', 'Lab test charges', 'Pharmacy bill', 'Annual health checkup'],
+    other: ['Stationery purchase', 'Courier charges', 'Printing cost', 'Co-working space day pass'],
+  };
+  for (let i = 0; i < 20; i++) {
+    const emp = employees[i % employees.length];
+    const cat = pick(REIMB_CATEGORIES);
+    const statuses = ['submitted', 'submitted', 'approved', 'approved', 'rejected'];
+    const status = statuses[i % statuses.length];
+    const rm = rms[i % rms.length];
+    const claim = await Reimbursement.create({
+      user: emp._id,
+      category: cat,
+      amount: pick([250, 500, 800, 1200, 1500, 2500, 3500, 5000, 7500]),
+      claimDate: ymd(addDays(today, -rand(1, 30))),
+      description: pick(REIMB_DESCS[cat]),
+      status,
+      approver: status !== 'submitted' ? rm._id : null,
+      approvedAt: status === 'approved' ? addDays(today, -rand(1, 5)) : null,
+      rejectionReason: status === 'rejected' ? 'Receipt not clear, please resubmit' : '',
+    });
+    reimbCount++;
+  }
+  console.log(`✓ Reimbursements: ${reimbCount}`);
+
+  // ── Payroll Runs + Payslips (last 3 months) ──
+  await PayrollRun.deleteMany({});
+  await Payslip.deleteMany({});
+  let runCount = 0;
+  let slipCount = 0;
+  const salaryStructures = await SalaryStructure.find();
+  const salaryByUser = new Map(salaryStructures.map(s => [String(s.user), s]));
+  const statConfig = await StatutoryConfig.findOne().sort('-effectiveFrom');
+
+  for (let mo = 0; mo < 3; mo++) {
+    const d = new Date(today.getFullYear(), today.getMonth() - mo, 1);
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const status = mo === 0 ? 'DRAFT' : 'PAID';
+
+    const run = await PayrollRun.create({
+      period: { month, year },
+      payGroup: payGroup._id,
+      status,
+      runType: 'regular',
+      lockedAt: status === 'PAID' ? addDays(d, 28) : null,
+      lockedBy: status === 'PAID' ? userMap['arjun.sharma@test.com']._id : null,
+    });
+    runCount++;
+
+    let runGross = 0, runDeductions = 0, runNet = 0;
+
+    for (const u of allUsers) {
+      const ss = salaryByUser.get(String(u._id));
+      if (!ss) continue;
+
+      const monthlyBasic = Math.round(ss.ctcAnnual * 0.4 / 12);
+      const monthlyHra = Math.round(monthlyBasic * 0.5);
+      const monthlySpecial = Math.round(ss.ctcAnnual / 12 - monthlyBasic - monthlyHra);
+
+      const lopDays = Math.random() > 0.9 ? rand(1, 3) : 0;
+      const payableDays = 30 - lopDays;
+      const lopFactor = payableDays / 30;
+
+      const basic = Math.round(monthlyBasic * lopFactor);
+      const hra = Math.round(monthlyHra * lopFactor);
+      const special = Math.round(monthlySpecial * lopFactor);
+      const gross = basic + hra + special;
+
+      const pfWage = Math.min(basic, statConfig?.pf?.wageCeiling || 15000);
+      const pf = Math.round(pfWage * (statConfig?.pf?.employeePct || 12) / 100);
+      const esic = gross <= (statConfig?.esic?.grossCeiling || 21000)
+        ? Math.round(gross * (statConfig?.esic?.employeePct || 0.75) / 100)
+        : 0;
+      const pt = gross > 20000 ? 200 : gross > 15000 ? 150 : 0;
+      const annualTaxable = ss.ctcAnnual - 75000;
+      const tds = Math.round(Math.max(0, annualTaxable > 400000 ? (Math.min(annualTaxable, 800000) - 400000) * 0.05 + Math.max(0, annualTaxable - 800000) * 0.10 : 0) / 12);
+
+      const totalDeductions = pf + esic + pt + tds;
+      const netPay = gross - totalDeductions;
+
+      runGross += gross;
+      runDeductions += totalDeductions;
+      runNet += netPay;
+
+      await Payslip.create({
+        payrollRun: run._id,
+        user: u._id,
+        period: { month, year },
+        earnings: [
+          { key: 'basic', label: 'Basic', amount: basic },
+          { key: 'hra', label: 'HRA', amount: hra },
+          { key: 'special', label: 'Special Allowance', amount: special },
+        ],
+        deductions: [
+          { key: 'pf', label: 'Provident Fund', amount: pf },
+          ...(esic > 0 ? [{ key: 'esic', label: 'ESIC', amount: esic }] : []),
+          { key: 'pt', label: 'Professional Tax', amount: pt },
+          { key: 'tds', label: 'TDS', amount: tds },
+        ],
+        reimbursements: [],
+        statutory: { pf, esic, pt, tds },
+        gross,
+        totalDeductions,
+        netPay,
+        lopDays,
+        paidDays: payableDays,
+      });
+      slipCount++;
+    }
+
+    run.totals = { gross: runGross, deductions: runDeductions, netPay: runNet, headcount: allUsers.length };
+    await run.save();
+  }
+  console.log(`✓ Payroll runs: ${runCount}, Payslips: ${slipCount}`);
 
   // ── Summary ──
   console.log('\n✅ Full seed complete!');

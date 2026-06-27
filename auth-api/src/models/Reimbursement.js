@@ -6,7 +6,13 @@ const ReimbursementSchema = new mongoose.Schema({
   amount:      { type: Number, required: true },
   claimDate:   { type: String, required: true },
   description: { type: String, default: '' },
-  attachments: [{ url: String, filename: String }],
+  attachments: [{
+    fileId:      { type: mongoose.Schema.Types.ObjectId },
+    filename:    { type: String },
+    contentType: { type: String },
+    size:        { type: Number },
+    uploadedAt:  { type: Date, default: Date.now },
+  }],
 
   status:    { type: String, enum: ['submitted', 'approved', 'rejected', 'paid'], default: 'submitted', index: true },
   approver:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

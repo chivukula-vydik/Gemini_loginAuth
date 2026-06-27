@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, setUserDepartment, setUserShift, listDepartments, listShifts, getUserLeaveBalance, updateUserLeaveBalance, UserRow, Department, ShiftDef, LeaveBalanceRecord } from './pmApi';
 import { useAuth } from '../authContext';
 import { personName, initials } from './personName';
@@ -115,6 +116,7 @@ function RoleMultiSelect({ selected, onChange }: { selected: Role[]; onChange: (
 
 export function AdminUsers() {
   const { user: me } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [shifts, setShifts] = useState<ShiftDef[]>([]);
@@ -292,7 +294,7 @@ export function AdminUsers() {
               return (
                 <tr key={u._id} className={inactive ? 'row-inactive' : undefined}>
                   <td className="ts-task">
-                    <span className="person-pill">
+                    <span className="person-pill" style={{ cursor: 'pointer' }} onClick={() => navigate(`/users/${u._id}`)}>
                       <span className="person-avatar">{initials(u)}</span>
                       <span className="user-id">
                         <span className="user-id-name">
@@ -341,6 +343,9 @@ export function AdminUsers() {
                   </td>
                   <td className="col-left">
                     <div className="row-actions">
+                      <button className="table-action" onClick={() => navigate(`/users/${u._id}`)}>
+                        View
+                      </button>
                       <button className="table-action" onClick={() => openLeaveEdit(u._id)}>
                         Leave
                       </button>

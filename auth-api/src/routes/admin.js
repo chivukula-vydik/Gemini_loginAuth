@@ -13,6 +13,8 @@ import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import { Department } from '../models/Department.js';
 import { Shift } from '../models/Shift.js';
 import { LeaveBalance, QUOTA_LEAVE_TYPES, getOrCreateBalance } from '../models/LeaveBalance.js';
+import { Attendance } from '../models/Attendance.js';
+import { Leave } from '../models/Leave.js';
 
 const ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
 
@@ -27,6 +29,55 @@ export function createAdminRouter() {
   router.get('/users', asyncHandler(async (req, res) => {
     const users = await User.find().select('email displayName roles role active reestimationCount reportingManagerId departmentId shiftId').sort('email');
     res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
+  }));
+
+  router.get('/users/:id/detail', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id)
+      .select('email displayName roles active employeeCode phone dateOfBirth dateOfJoining employmentType probationEndDate skills providers createdAt attendanceActivatedDate')
+      .populate('departmentId', 'name')
+      .populate('designationId', 'name')
+      .populate('locationId', 'name')
+      .populate('legalEntityId', 'name')
+      .populate('businessUnitId', 'name')
+      .populate('shiftId', 'name startTime endTime')
+      .populate('reportingManagerId', 'displayName email')
+      .populate('skills', 'name');
+    if (!user) return res.status(404).json({ error: 'not found' });
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const [attendance, leaves, leaveBalance, tasks, timesheets] = await Promise.all([
+      Attendance.find({ userId: user._id }).sort({ date: -1 }).limit(30).lean(),
+      Leave.find({ userId: user._id }).sort({ startDate: -1 }).limit(20).lean(),
+      getOrCreateBalance(user._id, now.getFullYear()),
+      Task.find({ 'assignees.user': user._id }).populate('project', 'name').sort({ dueDate: -1 }).limit(20).lean(),
+      Timesheet.find({ userId: user._id }).sort({ weekStart: -1 }).limit(8).lean(),
+    ]);
+
+    const attendanceStats = {
+      totalDays: attendance.length,
+      presentDays: attendance.filter((a) => a.status === 'present' || a.status === 'wfh').length,
+      wfhDays: attendance.filter((a) => a.status === 'wfh').length,
+      avgEffective: attendance.length > 0 ? Math.round(attendance.reduce((s, a) => s + (a.effectiveMinutes || 0), 0) / attendance.length) : 0,
+    };
+
+    res.json({
+      profile: user,
+      attendance: attendance.slice(0, 15),
+      attendanceStats,
+      leaves,
+      leaveBalance: {
+        casual: leaveBalance.casual,
+        sick: leaveBalance.sick,
+        earned: leaveBalance.earned,
+        year: leaveBalance.year,
+      },
+      tasks,
+      timesheets,
+    });
   }));
 
   router.patch('/users/:id/roles', asyncHandler(async (req, res) => {
