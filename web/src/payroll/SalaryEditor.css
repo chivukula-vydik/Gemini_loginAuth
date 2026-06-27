@@ -1,0 +1,19 @@
+/* web/src/payroll/SalaryEditor.css */
+.se-page { padding: 28px 32px; max-width: 800px; }
+.se-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.se-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 28px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.se-card-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+
+.se-row { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1fr 40px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface); }
+.se-row:last-child { border-bottom: none; }
+.se-row-header { font-size: 11px; font-weight: 600; color: var(--faint); text-transform: uppercase; }
+
+.se-input { padding: 8px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); width: 100%; }
+.se-select { padding: 8px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); width: 100%; }
+.se-remove { background: none; border: none; color: var(--danger, #ef4444); cursor: pointer; font-size: 16px; }
+
+.se-add-btn { display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; font-size: 12px; font-weight: 500; color: var(--primary); background: var(--primary-soft); border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; }
+
+.se-footer { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+.se-total { font-size: 15px; font-weight: 700; color: var(--text); }
+.se-total-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }

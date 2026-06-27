@@ -1,6 +1,6 @@
 export { PayrollRunList } from './PayrollRunList';
 export { PayrollRunDetail } from './PayrollRunDetail';
-export function SalaryEditor() { return <div>Salary Editor</div>; }
+export { SalaryEditor } from './SalaryEditor';
 export function MyPayslips() { return <div>My Payslips</div>; }
 export function Declarations() { return <div>Declarations</div>; }
 export function TaxSummary() { return <div>Tax Summary</div>; }
