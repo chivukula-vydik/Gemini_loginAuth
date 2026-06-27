@@ -3,7 +3,11 @@ import mongoose from 'mongoose';
 const claimRequestSchema = new mongoose.Schema({
   taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task', required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  status: { type: String, enum: ['pending', 'approved', 'denied'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'manager_approved', 'approved', 'denied'], default: 'pending' },
+  managerDecidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  managerDecidedAt: { type: Date, default: null },
+  financeDecidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  financeDecidedAt: { type: Date, default: null },
   decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   decidedAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
