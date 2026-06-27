@@ -25,6 +25,7 @@ import { createManagerRouter } from './routes/manager.js';
 import { createOrgRouter } from './routes/org.js';
 import { createPeopleRouter } from './routes/people.js';
 import { createPayrollRouter } from './routes/payroll.js';
+import { createSalaryRouter } from './routes/salary.js';
 
 export function createApp(config) {
   const app = express();
@@ -106,6 +107,7 @@ export function createApp(config) {
   app.use('/org', createOrgRouter());
   app.use('/people', createPeopleRouter());
   app.use('/payroll', createPayrollRouter());
+  app.use('/salary', createSalaryRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
