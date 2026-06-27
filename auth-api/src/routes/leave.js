@@ -119,7 +119,7 @@ export function createLeaveRouter() {
   }));
 
   // GET /leave/pending — approval review queue
-  router.get('/pending', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
+  router.get('/pending', requireRole('admin', 'reporting_manager', 'team_lead', 'hr', 'director', 'vp'), asyncHandler(async (req, res) => {
     let filter = { status: 'pending' };
     const roles = req.user.roles || [req.user.role || 'employee'];
     if (roles.includes('reporting_manager') || roles.includes('team_lead')) {

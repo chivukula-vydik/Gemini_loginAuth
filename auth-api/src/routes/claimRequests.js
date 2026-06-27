@@ -9,7 +9,7 @@ import { canEditProject } from '../services/authz.js';
 
 export function createClaimRequestsRouter() {
   const router = express.Router();
-  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager', 'finance'));
+  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager', 'finance', 'director', 'vp'));
 
   router.get('/', asyncHandler(async (req, res) => {
     const roles = req.user.roles || [req.user.role];

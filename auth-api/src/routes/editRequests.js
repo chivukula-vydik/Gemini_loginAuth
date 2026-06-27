@@ -8,7 +8,7 @@ import { Project } from '../models/Project.js';
 
 export function createEditRequestsRouter() {
   const router = express.Router();
-  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager'));
+  router.use(requireAuth, requireRole('pm', 'admin', 'reporting_manager', 'director', 'vp'));
 
   router.get('/', asyncHandler(async (req, res) => {
     const status = req.query.status || 'pending';
@@ -30,7 +30,7 @@ export function createEditRequestsRouter() {
     res.json(reqs);
   }));
 
-  router.patch('/:id', asyncHandler(async (req, res) => {
+  router.patch('/:id', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approved', 'denied'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const reqDoc = await EditRequest.findByIdAndUpdate(

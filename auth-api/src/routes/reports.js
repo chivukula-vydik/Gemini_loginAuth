@@ -11,7 +11,7 @@ export function createReportsRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
-  router.get('/utilization', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.get('/utilization', requireRole('pm', 'admin', 'finance', 'director', 'vp'), asyncHandler(async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate required' });
 
