@@ -22,6 +22,7 @@ import { TeamAttendanceDashboard } from './attendance/TeamAttendanceDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 import { OnboardingBoard, CaseDetail, MyOnboardingTasks, TemplateBuilder } from './onboarding/index';
+import { MyRequests } from './pm/MyRequests';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -37,6 +38,7 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'my-skills': <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />,
   timesheet: <path d="M12 8v4l3 3M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
   attendance: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 11l-4 4-2-2" />,
+  'my-requests': <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M9 14l2 2 4-4" />,
   utilization: <path d="M18 20V10M12 20V4M6 20v-6" />,
   'my-team': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
   'team-attendance': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 14v4l2-1 2 1v-4" />,
@@ -109,6 +111,7 @@ export function AppShell() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/timesheet" element={<TimesheetPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/my-requests" element={<MyRequests />} />
           <Route path="/utilization" element={<Utilization />} />
           <Route path="/my-team" element={<MyTeam />} />
           <Route path="/team-attendance" element={<TeamAttendanceDashboard />} />
