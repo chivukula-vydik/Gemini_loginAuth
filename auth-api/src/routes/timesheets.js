@@ -45,14 +45,23 @@ export function createTimesheetRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
-  // PM/admin review queue. Registered before '/:weekStart' so 'review' is not
-  // parsed as a weekStart. Not PM-scoped — every pm/admin sees all submissions.
-  router.get('/review', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  // Review queue — scoped by role
+  router.get('/review', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
     const status = req.query.status || 'submitted';
     const filter = { status };
-    if ((req.user.roles || [req.user.role]).includes('reporting_manager')) {
+    const roles = req.user.roles || [req.user.role];
+    if (roles.includes('reporting_manager') || roles.includes('team_lead')) {
       const teamIds = await User.find({ reportingManagerId: req.user.sub }).select('_id');
       filter.userId = { $in: teamIds.map((u) => u._id) };
+    } else if (roles.includes('pm') && !roles.includes('admin')) {
+      const projects = await Project.find({
+        $or: [{ ownerPm: req.user.sub }, { members: req.user.sub }],
+      }).select('members ownerPm');
+      const memberIds = new Set();
+      for (const p of projects) {
+        for (const m of (p.members || [])) memberIds.add(String(m));
+      }
+      filter.userId = { $in: [...memberIds].map((id) => new mongoose.Types.ObjectId(id)) };
     }
     const docs = await Timesheet.find(filter)
       .populate('userId', 'displayName email')
@@ -88,7 +97,7 @@ export function createTimesheetRouter() {
     }));
   }));
 
-  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const doc = await Timesheet.findById(req.params.id);
@@ -150,7 +159,7 @@ export function createTimesheetRouter() {
     res.json({ ok: true, status: update.status, dayStatus: newDs });
   }));
 
-  router.get('/review/:id/detail', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.get('/review/:id/detail', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
     const doc = await Timesheet.findById(req.params.id).populate('userId', 'displayName email');
     if (!doc) return res.status(404).json({ error: 'not found' });
 
@@ -185,7 +194,7 @@ export function createTimesheetRouter() {
     });
   }));
 
-  router.get('/review/:id/notes', requireRole('pm', 'admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.get('/review/:id/notes', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
     const doc = await Timesheet.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     const rows = [];

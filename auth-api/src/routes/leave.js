@@ -117,24 +117,22 @@ export function createLeaveRouter() {
     res.json(docs.map((d) => ({ ...d.toObject(), days: d.requestedDays || workingDays(d.startDate, d.endDate) })));
   }));
 
-  // GET /leave/pending — pm/admin/reporting_manager review queue
-  router.get('/pending', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+  // GET /leave/pending — approval review queue
+  router.get('/pending', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
     let filter = { status: 'pending' };
     const roles = req.user.roles || [req.user.role || 'employee'];
-    if (roles.includes('reporting_manager')) {
+    if (roles.includes('reporting_manager') || roles.includes('team_lead')) {
       filter.assignedApprover = req.user.sub;
-    } else if (roles.includes('pm')) {
-      filter.assignedApprover = null;
     }
-    // admin sees all — no extra filter
+    // admin and hr see all pending — no extra filter
     const docs = await Leave.find(filter)
       .populate('userId', 'displayName email')
       .sort({ requestedAt: -1 });
     res.json(docs.map((d) => ({ ...d.toObject(), days: d.requestedDays || workingDays(d.startDate, d.endDate) })));
   }));
 
-  // PATCH /leave/:id/decide — pm/admin/reporting_manager approves or rejects
-  router.patch('/:id/decide', requireRole('admin', 'pm', 'reporting_manager'), asyncHandler(async (req, res) => {
+  // PATCH /leave/:id/decide — approves or rejects
+  router.patch('/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -143,8 +141,10 @@ export function createLeaveRouter() {
     const doc = await Leave.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (doc.status !== 'pending') return res.status(409).json({ error: 'already decided' });
-    if ((req.user.roles || [req.user.role]).includes('reporting_manager') && String(doc.assignedApprover) !== req.user.sub) {
-      return res.status(403).json({ error: 'you are not the assigned approver for this request' });
+
+    const roles = req.user.roles || [req.user.role];
+    if ((roles.includes('reporting_manager') || roles.includes('team_lead')) && String(doc.assignedApprover) !== req.user.sub) {
+      return res.status(404).json({ error: 'not found' });
     }
 
     doc.status = decision;
