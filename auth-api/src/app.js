@@ -24,6 +24,7 @@ import { createDashboardRouter } from './routes/dashboard.js';
 import { createManagerRouter } from './routes/manager.js';
 import { createOrgRouter } from './routes/org.js';
 import { createOnboardingRouter } from './routes/onboarding.js';
+import { createOnboardingPortalRouter } from './routes/onboardingPortal.js';
 
 export function createApp(config) {
   const app = express();
@@ -104,6 +105,7 @@ export function createApp(config) {
   app.use('/manager', createManagerRouter());
   app.use('/org', createOrgRouter());
   app.use('/onboarding', createOnboardingRouter());
+  app.use('/onboarding/portal', createOnboardingPortalRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
