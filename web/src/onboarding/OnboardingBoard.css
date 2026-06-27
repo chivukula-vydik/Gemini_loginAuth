@@ -1,0 +1,25 @@
+.ob-page { padding: 28px 32px; }
+.ob-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+.ob-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; }
+.ob-column { min-width: 260px; max-width: 280px; flex-shrink: 0; }
+.ob-col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ob-col-count { background: var(--border); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 600; color: var(--muted); }
+.ob-col-cards { display: flex; flex-direction: column; gap: 8px; }
+.ob-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); cursor: pointer; transition: border-color 0.12s; }
+.ob-card:hover { border-color: var(--accent); }
+.ob-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.ob-card-role { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.ob-card-meta { display: flex; align-items: center; justify-content: space-between; }
+.ob-card-date { font-size: 11px; color: var(--muted); }
+.ob-card-progress { font-size: 11px; font-weight: 600; }
+.ob-card-progress.ready { color: #15803d; }
+.ob-card-progress.partial { color: #b45309; }
+.ob-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }
+
+.ob-create-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.ob-create-card { background: var(--card); border-radius: var(--radius); padding: 28px 32px; width: 520px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.ob-create-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 18px; }
+.ob-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.ob-form-group { display: flex; flex-direction: column; gap: 5px; }
+.ob-form-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ob-form-full { grid-column: 1 / -1; }
