@@ -1,4 +1,4 @@
-export function PayrollRunList() { return <div>Payroll Runs</div>; }
+export { PayrollRunList } from './PayrollRunList';
 export function PayrollRunDetail() { return <div>Run Detail</div>; }
 export function SalaryEditor() { return <div>Salary Editor</div>; }
 export function MyPayslips() { return <div>My Payslips</div>; }
