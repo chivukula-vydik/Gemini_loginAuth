@@ -17,6 +17,7 @@ import { Attendance } from '../models/Attendance.js';
 import { Leave } from '../models/Leave.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { User } from '../models/User.js';
+import { StatutoryReport } from '../models/StatutoryReport.js';
 import { computePayrollInput } from '../services/payrollBridge.js';
 import { buildPayslip } from '../services/payrollEngine.js';
 
@@ -220,6 +221,17 @@ export function createPayrollRouter() {
     run.status = 'PAID';
     await run.save();
     res.json(run);
+  }));
+
+  // --- Reports ---
+  router.get('/reports/:type', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+    const { type } = req.params;
+    const filter = { type };
+    if (req.query.month) filter['period.month'] = Number(req.query.month);
+    if (req.query.year) filter['period.year'] = Number(req.query.year);
+    if (req.query.fy) filter['period.fy'] = req.query.fy;
+    const reports = await StatutoryReport.find(filter).sort('-createdAt');
+    res.json(reports);
   }));
 
   return router;
