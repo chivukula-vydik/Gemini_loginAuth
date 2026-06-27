@@ -15,11 +15,21 @@ import { Timesheet } from '../src/models/Timesheet.js';
 import { Overtime } from '../src/models/Overtime.js';
 import { Skill } from '../src/models/Skill.js';
 import { LeaveBalance, DEFAULT_QUOTAS } from '../src/models/LeaveBalance.js';
+import { LegalEntity } from '../src/models/LegalEntity.js';
+import { BusinessUnit } from '../src/models/BusinessUnit.js';
+import { StatutoryConfig } from '../src/models/StatutoryConfig.js';
+import { PayGrade } from '../src/models/PayGrade.js';
+import { PayGroup } from '../src/models/PayGroup.js';
+import { SalaryStructure } from '../src/models/SalaryStructure.js';
+import { InvestmentDeclaration } from '../src/models/InvestmentDeclaration.js';
 
 // Usage:  node scripts/seed-all.js
 
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function ymdUtc(d) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function at(date, hour, minute) {
   const d = new Date(date);
@@ -29,35 +39,36 @@ function at(date, hour, minute) {
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function addDaysUtc(d, n) { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; }
 
 const PASSWORD = 'test1234';
 
 const PEOPLE = [
-  { name: 'Arjun Sharma', email: 'arjun.sharma@test.com', role: 'admin' },
-  { name: 'Priya Patel', email: 'priya.patel@test.com', role: 'vp' },
-  { name: 'Rahul Verma', email: 'rahul.verma@test.com', role: 'director' },
-  { name: 'Sneha Iyer', email: 'sneha.iyer@test.com', role: 'pm' },
-  { name: 'Vikram Reddy', email: 'vikram.reddy@test.com', role: 'pm' },
-  { name: 'Ananya Gupta', email: 'ananya.gupta@test.com', role: 'hr' },
-  { name: 'Deepak Joshi', email: 'deepak.joshi@test.com', role: 'finance' },
-  { name: 'Kavitha Nair', email: 'kavitha.nair@test.com', role: 'reporting_manager' },
-  { name: 'Suresh Kumar', email: 'suresh.kumar@test.com', role: 'reporting_manager' },
-  { name: 'Meera Krishnan', email: 'meera.krishnan@test.com', role: 'team_lead' },
-  { name: 'Aditya Singh', email: 'aditya.singh@test.com', role: 'employee' },
-  { name: 'Divya Menon', email: 'divya.menon@test.com', role: 'employee' },
-  { name: 'Rohan Deshmukh', email: 'rohan.deshmukh@test.com', role: 'employee' },
-  { name: 'Pooja Rao', email: 'pooja.rao@test.com', role: 'employee' },
-  { name: 'Nikhil Thakur', email: 'nikhil.thakur@test.com', role: 'employee' },
-  { name: 'Lakshmi Sundaram', email: 'lakshmi.sundaram@test.com', role: 'employee' },
-  { name: 'Amit Chauhan', email: 'amit.chauhan@test.com', role: 'employee' },
-  { name: 'Ritu Agarwal', email: 'ritu.agarwal@test.com', role: 'employee' },
-  { name: 'Karthik Bhat', email: 'karthik.bhat@test.com', role: 'employee' },
-  { name: 'Nisha Pillai', email: 'nisha.pillai@test.com', role: 'employee' },
-  { name: 'Sanjay Malhotra', email: 'sanjay.malhotra@test.com', role: 'employee' },
-  { name: 'Tanya Saxena', email: 'tanya.saxena@test.com', role: 'employee' },
-  { name: 'Rajesh Hegde', email: 'rajesh.hegde@test.com', role: 'employee' },
-  { name: 'Swati Kulkarni', email: 'swati.kulkarni@test.com', role: 'employee' },
-  { name: 'Manish Tiwari', email: 'manish.tiwari@test.com', role: 'employee' },
+  { name: 'Arjun Sharma', email: 'arjun.sharma@test.com', role: 'admin', dob: '1990-03-15', gender: 'male', blood: 'B+', marital: 'married', city: 'Bangalore' },
+  { name: 'Priya Patel', email: 'priya.patel@test.com', role: 'vp', dob: '1985-07-22', gender: 'female', blood: 'A+', marital: 'married', city: 'Mumbai' },
+  { name: 'Rahul Verma', email: 'rahul.verma@test.com', role: 'director', dob: '1988-11-10', gender: 'male', blood: 'O+', marital: 'married', city: 'Delhi' },
+  { name: 'Sneha Iyer', email: 'sneha.iyer@test.com', role: 'pm', dob: '1993-06-26', gender: 'female', blood: 'AB+', marital: 'single', city: 'Chennai' },
+  { name: 'Vikram Reddy', email: 'vikram.reddy@test.com', role: 'pm', dob: '1991-06-27', gender: 'male', blood: 'B+', marital: 'married', city: 'Hyderabad' },
+  { name: 'Ananya Gupta', email: 'ananya.gupta@test.com', role: 'hr', dob: '1994-06-28', gender: 'female', blood: 'A-', marital: 'single', city: 'Bangalore' },
+  { name: 'Deepak Joshi', email: 'deepak.joshi@test.com', role: 'finance', dob: '1989-06-29', gender: 'male', blood: 'O+', marital: 'married', city: 'Pune' },
+  { name: 'Kavitha Nair', email: 'kavitha.nair@test.com', role: 'reporting_manager', dob: '1992-06-27', gender: 'female', blood: 'B-', marital: 'married', city: 'Kochi' },
+  { name: 'Suresh Kumar', email: 'suresh.kumar@test.com', role: 'reporting_manager', dob: '1987-07-03', gender: 'male', blood: 'A+', marital: 'married', city: 'Bangalore' },
+  { name: 'Meera Krishnan', email: 'meera.krishnan@test.com', role: 'team_lead', dob: '1995-06-26', gender: 'female', blood: 'O-', marital: 'single', city: 'Chennai' },
+  { name: 'Aditya Singh', email: 'aditya.singh@test.com', role: 'employee', dob: '1996-07-06', gender: 'male', blood: 'B+', marital: 'single', city: 'Delhi' },
+  { name: 'Divya Menon', email: 'divya.menon@test.com', role: 'employee', dob: '1994-06-30', gender: 'female', blood: 'A+', marital: 'single', city: 'Bangalore' },
+  { name: 'Rohan Deshmukh', email: 'rohan.deshmukh@test.com', role: 'employee', dob: '1993-07-16', gender: 'male', blood: 'AB-', marital: 'married', city: 'Pune' },
+  { name: 'Pooja Rao', email: 'pooja.rao@test.com', role: 'employee', dob: '1997-06-27', gender: 'female', blood: 'O+', marital: 'single', city: 'Hyderabad' },
+  { name: 'Nikhil Thakur', email: 'nikhil.thakur@test.com', role: 'employee', dob: '1990-08-25', gender: 'male', blood: 'A-', marital: 'married', city: 'Mumbai' },
+  { name: 'Lakshmi Sundaram', email: 'lakshmi.sundaram@test.com', role: 'employee', dob: '1991-07-11', gender: 'female', blood: 'B+', marital: 'married', city: 'Chennai' },
+  { name: 'Amit Chauhan', email: 'amit.chauhan@test.com', role: 'employee', dob: '1988-08-10', gender: 'male', blood: 'O+', marital: 'married', city: 'Delhi' },
+  { name: 'Ritu Agarwal', email: 'ritu.agarwal@test.com', role: 'employee', dob: '1995-06-28', gender: 'female', blood: 'AB+', marital: 'single', city: 'Bangalore' },
+  { name: 'Karthik Bhat', email: 'karthik.bhat@test.com', role: 'employee', dob: '1992-09-24', gender: 'male', blood: 'B-', marital: 'single', city: 'Mangalore' },
+  { name: 'Nisha Pillai', email: 'nisha.pillai@test.com', role: 'employee', dob: '1994-10-24', gender: 'female', blood: 'A+', marital: 'single', city: 'Trivandrum' },
+  { name: 'Sanjay Malhotra', email: 'sanjay.malhotra@test.com', role: 'employee', dob: '1989-06-29', gender: 'male', blood: 'O-', marital: 'married', city: 'Chandigarh' },
+  { name: 'Tanya Saxena', email: 'tanya.saxena@test.com', role: 'employee', dob: '1996-12-23', gender: 'female', blood: 'B+', marital: 'single', city: 'Jaipur' },
+  { name: 'Rajesh Hegde', email: 'rajesh.hegde@test.com', role: 'employee', dob: '1987-01-12', gender: 'male', blood: 'A+', marital: 'married', city: 'Bangalore' },
+  { name: 'Swati Kulkarni', email: 'swati.kulkarni@test.com', role: 'employee', dob: '1993-06-26' },
+  { name: 'Manish Tiwari', email: 'manish.tiwari@test.com', role: 'employee', dob: '1991-07-02' },
 ];
 
 const PROJECTS_DATA = [
@@ -139,38 +150,66 @@ async function main() {
     process.exit(1);
   }
 
+  // ── Lookup legal entities & business units ──
+  const allEntities = await LegalEntity.find({ active: true });
+  const allBUs = await BusinessUnit.find({ active: true });
+
+  const EMERGENCY_NAMES = ['Ramesh', 'Sunita', 'Rajesh', 'Meena', 'Prakash', 'Lakshmi', 'Mohan', 'Geeta', 'Sunil', 'Kavita'];
+  const EMERGENCY_RELS = ['Father', 'Mother', 'Spouse', 'Brother', 'Sister'];
+  const BANKS = ['State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra Bank', 'Punjab National Bank'];
+  const ADDRESSES = [
+    '42, MG Road, Indiranagar', '15, HSR Layout, Sector 2', '8, Koramangala 4th Block',
+    '23, Banjara Hills, Road No 12', '56, Powai, Hiranandani Gardens', '31, Anna Nagar, 2nd Avenue',
+    '7, Aundh, DP Road', '19, Sector 62, Noida', '44, Salt Lake, Sector V', '12, Jubilee Hills',
+  ];
+
   // ── Create Users ──
   const userMap = {};
   for (let i = 0; i < PEOPLE.length; i++) {
     const p = PEOPLE[i];
+    const joiningDate = addDays(new Date(), -rand(30, 365));
+    const probEnd = addDays(joiningDate, 180);
+    const emergName = pick(EMERGENCY_NAMES) + ' ' + p.name.split(' ').pop();
+    const panLetter = p.name[0].toUpperCase();
+    const userData = {
+      email: p.email,
+      displayName: p.name,
+      passwordHash: hash,
+      roles: [p.role],
+      active: true,
+      employeeCode: `EMP${String(i + 1).padStart(4, '0')}`,
+      departmentId: pick(allDepts)._id,
+      designationId: pick(allDesigs)._id,
+      locationId: pick(allLocs)._id,
+      shiftId: defaultShift?._id || null,
+      legalEntityId: pick(allEntities)?._id || null,
+      businessUnitId: pick(allBUs)?._id || null,
+      employmentType: i < 20 ? 'full-time' : pick(['full-time', 'contract', 'intern']),
+      dateOfJoining: joiningDate,
+      probationEndDate: probEnd,
+      dateOfBirth: new Date(p.dob),
+      phone: `+91 ${rand(70000, 99999)} ${rand(10000, 99999)}`,
+      gender: p.gender,
+      bloodGroup: p.blood,
+      maritalStatus: p.marital,
+      nationality: 'Indian',
+      address: `${pick(ADDRESSES)}, ${p.city}, India - ${rand(400000, 600000)}`,
+      emergencyContactName: emergName,
+      emergencyContactPhone: `+91 ${rand(70000, 99999)} ${rand(10000, 99999)}`,
+      emergencyContactRelation: pick(EMERGENCY_RELS),
+      pan: `${panLetter}${String.fromCharCode(65 + rand(0, 25))}${String.fromCharCode(65 + rand(0, 25))}P${String.fromCharCode(65 + rand(0, 25))}${rand(1000, 9999)}${String.fromCharCode(65 + rand(0, 25))}`,
+      aadhaar: `${rand(2000, 9999)} ${rand(1000, 9999)} ${rand(1000, 9999)}`,
+      bankName: pick(BANKS),
+      bankAccount: `${rand(10000000, 99999999)}${rand(1000, 9999)}`,
+      ifsc: `${pick(['SBIN', 'HDFC', 'ICIC', 'UTIB', 'KKBK', 'PUNB'])}0${rand(100000, 999999)}`,
+      attendanceActivatedDate: ymd(addDays(new Date(), -45)),
+    };
+
     let user = await User.findOne({ email: p.email });
     if (!user) {
-      user = await User.create({
-        email: p.email,
-        displayName: p.name,
-        passwordHash: hash,
-        roles: [p.role],
-        active: true,
-        employeeCode: `EMP${String(i + 1).padStart(4, '0')}`,
-        departmentId: pick(allDepts)._id,
-        designationId: pick(allDesigs)._id,
-        locationId: pick(allLocs)._id,
-        shiftId: defaultShift?._id || null,
-        employmentType: i < 20 ? 'full-time' : pick(['full-time', 'contract', 'intern']),
-        dateOfJoining: addDays(new Date(), -rand(60, 900)),
-        phone: `+91 ${rand(70000, 99999)} ${rand(10000, 99999)}`,
-        attendanceActivatedDate: ymd(addDays(new Date(), -45)),
-      });
+      user = await User.create(userData);
     } else {
-      user.passwordHash = hash;
-      user.displayName = p.name;
-      user.roles = [p.role];
-      if (!user.employeeCode) user.employeeCode = `EMP${String(i + 1).padStart(4, '0')}`;
-      if (!user.departmentId) user.departmentId = pick(allDepts)._id;
-      if (!user.designationId) user.designationId = pick(allDesigs)._id;
-      if (!user.locationId) user.locationId = pick(allLocs)._id;
-      if (!user.shiftId) user.shiftId = defaultShift?._id || null;
-      if (!user.attendanceActivatedDate) user.attendanceActivatedDate = ymd(addDays(new Date(), -45));
+      Object.assign(user, userData);
       await user.save();
     }
     userMap[p.email] = user;
@@ -219,13 +258,25 @@ async function main() {
 
   // ── Projects & Tasks ──
   const pmUsers = [userMap['sneha.iyer@test.com'], userMap['vikram.reddy@test.com']];
+  const allUsers = Object.values(userMap);
   const allEmployees = [...employees, ...rms];
   const projects = [];
+
+  // Distribute ALL users across projects so everyone has at least 1 project
+  const userProjectAssignment = new Map(); // userId -> [projectIndex]
+  for (let i = 0; i < allUsers.length; i++) {
+    const projIdx = i % PROJECTS_DATA.length;
+    if (!userProjectAssignment.has(projIdx)) userProjectAssignment.set(projIdx, []);
+    userProjectAssignment.get(projIdx).push(allUsers[i]);
+  }
 
   for (let pi = 0; pi < PROJECTS_DATA.length; pi++) {
     const pd = PROJECTS_DATA[pi];
     const pm = pmUsers[pi % pmUsers.length];
-    const memberPool = allEmployees.sort(() => Math.random() - 0.5).slice(0, rand(3, 6));
+    // Guaranteed members from round-robin + a few extra random ones
+    const guaranteed = userProjectAssignment.get(pi) || [];
+    const extras = allEmployees.filter(u => !guaranteed.includes(u)).sort(() => Math.random() - 0.5).slice(0, rand(1, 3));
+    const memberPool = [...new Set([...guaranteed, ...extras])];
     const memberIds = memberPool.map((u) => u._id);
 
     let project = await Project.findOne({ name: pd.name });
@@ -236,8 +287,8 @@ async function main() {
         ownerPm: pm._id,
         members: memberIds,
         status: 'active',
-        startDate: addDays(new Date(), -rand(30, 120)),
-        targetDate: addDays(new Date(), rand(30, 180)),
+        startDate: addDays(new Date(), -rand(14, 30)),
+        targetDate: addDays(new Date(), rand(7, 30)),
         clientName: pd.client,
         billingType: pd.billing,
         billingRate: pd.rate || null,
@@ -275,22 +326,23 @@ async function main() {
       const assignee = memberPool[ti % memberPool.length];
       const statuses = ['todo', 'in_progress', 'in_progress', 'done', 'done', 'blocked'];
       const status = statuses[ti] || 'todo';
+      const estHours = rand(4, 16);
       await Task.create({
         project: project._id,
         phaseId: project.phases[Math.min(ti < 3 ? 0 : 1, project.phases.length - 1)]._id,
         title: tasks[ti],
         description: `Task for ${pd.name}`,
-        estimatedHours: rand(4, 40),
-        estimateValue: rand(4, 40),
+        estimatedHours: estHours,
+        estimateValue: estHours,
         estimateUnit: 'hours',
-        assignees: [{ user: assignee._id, sharePct: 100, estimatedHours: rand(4, 40) }],
+        assignees: [{ user: assignee._id, sharePct: 100, estimatedHours: estHours }],
         requiredSkills: taskSkillIds,
         status,
-        percentComplete: status === 'done' ? 100 : status === 'in_progress' ? rand(20, 80) : 0,
+        percentComplete: status === 'done' ? 100 : status === 'in_progress' ? rand(30, 75) : 0,
         createdBy: pm._id,
-        startDate: addDays(new Date(), -rand(5, 60)),
-        dueDate: addDays(new Date(), rand(5, 45)),
-        completedAt: status === 'done' ? addDays(new Date(), -rand(1, 15)) : null,
+        startDate: addDays(new Date(), -rand(3, 20)),
+        dueDate: addDays(new Date(), status === 'done' ? -rand(1, 5) : rand(2, 14)),
+        completedAt: status === 'done' ? addDays(new Date(), -rand(1, 5)) : null,
       });
     }
     // Update project requiredSkills
@@ -369,45 +421,39 @@ async function main() {
   const leaveTypes = ['casual', 'sick', 'earned'];
   let leaveCount = 0;
   for (const emp of employees) {
-    // 2-3 leave requests per employee
-    const count = rand(2, 3);
-    for (let i = 0; i < count; i++) {
-      const type = pick(leaveTypes);
-      const startOffset = rand(5, 40);
-      const duration = rand(1, 3);
-      const startDate = ymd(addDays(today, -startOffset));
-      const endDate = ymd(addDays(today, -startOffset + duration - 1));
-      const rm = await User.findById(emp.reportingManagerId);
+    // 1 past leave per employee (realistic for a month)
+    const type = pick(leaveTypes);
+    const startOffset = rand(5, 25);
+    const duration = rand(1, 2);
+    const startDate = ymd(addDays(today, -startOffset));
+    const endDate = ymd(addDays(today, -startOffset + duration - 1));
+    const rm = await User.findById(emp.reportingManagerId);
 
-      const existing = await Leave.findOne({ userId: emp._id, startDate });
-      if (existing) continue;
+    const existing = await Leave.findOne({ userId: emp._id, startDate });
+    if (existing) continue;
 
-      const statuses = ['approved', 'approved', 'pending', 'rejected'];
-      const status = statuses[i] || 'pending';
-
-      await Leave.create({
-        userId: emp._id,
-        type,
-        startDate,
-        endDate,
-        halfDay: duration === 1 && Math.random() > 0.7 ? 'first' : 'none',
-        requestedDays: workingDays(startDate, endDate),
-        reason: pick(LEAVE_REASONS),
-        status,
-        requestedAt: addDays(today, -startOffset - 2),
-        decidedBy: status !== 'pending' ? rm?._id : null,
-        decidedAt: status !== 'pending' ? addDays(today, -startOffset - 1) : null,
-        assignedApprover: rm?._id || null,
-      });
-      leaveCount++;
-    }
+    await Leave.create({
+      userId: emp._id,
+      type,
+      startDate,
+      endDate,
+      halfDay: duration === 1 && Math.random() > 0.7 ? 'first' : 'none',
+      requestedDays: workingDays(startDate, endDate),
+      reason: pick(LEAVE_REASONS),
+      status: 'approved',
+      requestedAt: addDays(today, -startOffset - 2),
+      decidedBy: rm?._id || null,
+      decidedAt: addDays(today, -startOffset - 1),
+      assignedApprover: rm?._id || null,
+    });
+    leaveCount++;
   }
-  // A few fresh pending leaves for testing approvals
-  for (let i = 0; i < 4; i++) {
+  // 2 fresh pending leaves for testing approvals
+  for (let i = 0; i < 2; i++) {
     const emp = employees[i];
     const rm = await User.findById(emp.reportingManagerId);
-    const startDate = ymd(addDays(today, rand(2, 10)));
-    const endDate = ymd(addDays(today, rand(11, 14)));
+    const startDate = ymd(addDays(today, rand(3, 7)));
+    const endDate = ymd(addDays(today, rand(4, 8)));
     const existing = await Leave.findOne({ userId: emp._id, startDate });
     if (existing) continue;
     await Leave.create({
@@ -511,43 +557,64 @@ async function main() {
   ];
 
   let tsCount = 0;
-  for (const emp of [...employees, ...rms]) {
+  // All users get timesheets
+  for (const emp of allUsers) {
     const userTasks = await Task.find({ 'assignees.user': emp._id }).limit(3);
     if (userTasks.length === 0) continue;
 
-    for (let w = 0; w < 4; w++) {
-      const monday = addDays(today, -(today.getDay() === 0 ? 6 : today.getDay() - 1) - w * 7);
-      const weekStart = ymd(monday);
+    // Vary weeks: most log 3-4 weeks, some only 2
+    const weeksToLog = rand(2, 4);
+
+    for (let w = 0; w < weeksToLog; w++) {
+      // Use UTC to match backend's currentMonday() function
+      const nowUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+      const utcDow = nowUtc.getUTCDay();
+      const mondayUtc = addDaysUtc(nowUtc, (utcDow === 0 ? -6 : 1 - utcDow) - w * 7);
+      const weekStart = ymdUtc(mondayUtc);
 
       const existing = await Timesheet.findOne({ userId: emp._id, weekStart });
       if (existing) continue;
 
-      // w=0 current week → draft, w=1 last week → submitted, w=2/3 older → approved
       const statuses = ['draft', 'submitted', 'approved', 'approved'];
       const status = statuses[w] || 'approved';
 
       const n = userTasks.length;
       const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri'];
-      const todayDow = today.getDay();
-      const todayIdx = todayDow === 0 ? -1 : todayDow - 1; // 0=mon..4=fri, -1=sun
+      const todayDow = nowUtc.getUTCDay();
+      const todayIdx = todayDow === 0 ? -1 : todayDow - 1;
+
+      const dayEntries = {};
+      for (let di = 0; di < dayKeys.length; di++) {
+        const dk = dayKeys[di];
+        const isFuture = w === 0 && di > todayIdx;
+        if (isFuture) {
+          dayEntries[dk] = userTasks.map(() => 0);
+        } else {
+          // Realistic variation: 5h-8h per day (not everyone does full 8h every day)
+          const totalSlots = rand(10, 16); // 10-16 slots of 30min = 5h-8h
+          const splits = userTasks.map(() => 0);
+          for (let s = 0; s < totalSlots; s++) {
+            const idx = Math.random() < 0.5 ? 0 : rand(0, n - 1);
+            splits[idx]++;
+          }
+          dayEntries[dk] = splits.map((s) => s * 30);
+        }
+      }
+
       const tsTasks = userTasks.map((t, ti) => {
         const isBillable = projBillable.get(String(t.project)) || false;
-        const share = ti === 0 ? 0.5 : (0.5 / (n - 1 || 1));
-        const dayMin = () => Math.round(rand(420, 480) * share);
-        const dayNote = () => Math.random() > 0.5 ? pick(WORK_NOTES) : '';
+        const dayNote = () => Math.random() > 0.6 ? pick(WORK_NOTES) : '';
         const entries = {}, billable = {}, notes = {};
-        for (let di = 0; di < dayKeys.length; di++) {
-          const dk = dayKeys[di];
-          const isFuture = w === 0 && di > todayIdx;
-          entries[dk] = isFuture ? 0 : dayMin();
+        for (const dk of dayKeys) {
+          entries[dk] = dayEntries[dk][ti];
           billable[dk] = isBillable;
-          notes[dk] = isFuture ? '' : dayNote();
+          notes[dk] = entries[dk] > 0 ? dayNote() : '';
         }
         return { id: `task-${ti}`, name: t.title, taskId: t._id, entries, billable, notes };
       });
 
-      const submittedAt = status !== 'draft' ? addDays(monday, 5) : null;
-      const reviewedAt = status === 'approved' ? addDays(monday, 6) : null;
+      const submittedAt = status !== 'draft' ? addDaysUtc(mondayUtc, 5) : null;
+      const reviewedAt = status === 'approved' ? addDaysUtc(mondayUtc, 6) : null;
       const reviewer = status === 'approved' ? pmUsers[w % pmUsers.length]._id : null;
 
       const dayStatus = {};
@@ -579,6 +646,119 @@ async function main() {
     }
   }
   console.log(`✓ Timesheets: ${tsCount}`);
+
+  // ─── Payroll seed data ───────────────────────────────────────────────
+  await StatutoryConfig.deleteMany({});
+  await StatutoryConfig.create({
+    effectiveFrom: '2026-04-01',
+    pf: { employeePct: 12, employerPct: 12, wageCeiling: 15000 },
+    esic: { employeePct: 0.75, employerPct: 3.25, grossCeiling: 21000 },
+    pt: [
+      { state: 'Telangana', slabs: [
+        { upTo: 15000, amount: 0 },
+        { upTo: 20000, amount: 150 },
+        { upTo: 999999999, amount: 200 },
+      ]},
+      { state: 'Karnataka', slabs: [
+        { upTo: 15000, amount: 0 },
+        { upTo: 25000, amount: 200 },
+        { upTo: 999999999, amount: 200 },
+      ]},
+    ],
+    tds: {
+      old: {
+        slabs: [
+          { upTo: 250000, rate: 0 },
+          { upTo: 500000, rate: 5 },
+          { upTo: 1000000, rate: 20 },
+          { upTo: 999999999, rate: 30 },
+        ],
+        standardDeduction: 50000,
+      },
+      new: {
+        slabs: [
+          { upTo: 400000, rate: 0 },
+          { upTo: 800000, rate: 5 },
+          { upTo: 1200000, rate: 10 },
+          { upTo: 1600000, rate: 15 },
+          { upTo: 2000000, rate: 20 },
+          { upTo: 2400000, rate: 25 },
+          { upTo: 999999999, rate: 30 },
+        ],
+        standardDeduction: 75000,
+      },
+    },
+  });
+  console.log('  ✓ statutory config seeded');
+
+  await PayGrade.deleteMany({});
+  const grades = await PayGrade.insertMany([
+    { code: 'G1', label: 'Junior', minCtc: 300000, maxCtc: 600000, defaultComponents: [
+      { key: 'basic', label: 'Basic', type: 'earning', calc: 'fixed', value: 180000, taxable: true, proratable: true },
+      { key: 'hra', label: 'HRA', type: 'earning', calc: 'percent_of_basic', value: 50, taxable: true, proratable: true },
+      { key: 'special', label: 'Special Allowance', type: 'earning', calc: 'fixed', value: 60000, taxable: true, proratable: true },
+    ]},
+    { code: 'G2', label: 'Mid-Level', minCtc: 600000, maxCtc: 1200000, defaultComponents: [
+      { key: 'basic', label: 'Basic', type: 'earning', calc: 'fixed', value: 420000, taxable: true, proratable: true },
+      { key: 'hra', label: 'HRA', type: 'earning', calc: 'percent_of_basic', value: 50, taxable: true, proratable: true },
+      { key: 'special', label: 'Special Allowance', type: 'earning', calc: 'fixed', value: 120000, taxable: true, proratable: true },
+    ]},
+    { code: 'G3', label: 'Senior', minCtc: 1200000, maxCtc: 2400000, defaultComponents: [
+      { key: 'basic', label: 'Basic', type: 'earning', calc: 'fixed', value: 720000, taxable: true, proratable: true },
+      { key: 'hra', label: 'HRA', type: 'earning', calc: 'percent_of_basic', value: 50, taxable: true, proratable: true },
+      { key: 'special', label: 'Special Allowance', type: 'earning', calc: 'fixed', value: 240000, taxable: true, proratable: true },
+      { key: 'lta', label: 'LTA', type: 'earning', calc: 'fixed', value: 60000, taxable: true, proratable: false },
+    ]},
+    { code: 'G4', label: 'Lead / Manager', minCtc: 2400000, maxCtc: 5000000, defaultComponents: [
+      { key: 'basic', label: 'Basic', type: 'earning', calc: 'fixed', value: 1200000, taxable: true, proratable: true },
+      { key: 'hra', label: 'HRA', type: 'earning', calc: 'percent_of_basic', value: 50, taxable: true, proratable: true },
+      { key: 'special', label: 'Special Allowance', type: 'earning', calc: 'fixed', value: 480000, taxable: true, proratable: true },
+      { key: 'lta', label: 'LTA', type: 'earning', calc: 'fixed', value: 120000, taxable: true, proratable: false },
+    ]},
+  ]);
+  console.log('  ✓ pay grades seeded');
+
+  await PayGroup.deleteMany({});
+  const legalEntity = await LegalEntity.findOne();
+  const payGroup = await PayGroup.create({
+    name: 'India - Monthly - HYD',
+    entity: legalEntity?._id || null,
+    cycle: 'calendar',
+    ptState: 'Telangana',
+    members: allUsers.map(u => u._id),
+  });
+  console.log('  ✓ pay group seeded');
+
+  // Assign pay grades to users by role
+  const gradeMap = { employee: grades[0], pm: grades[1], reporting_manager: grades[2], admin: grades[3] };
+  for (const u of allUsers) {
+    const role = u.roles?.[0] || 'employee';
+    const grade = gradeMap[role] || grades[0];
+    await User.updateOne({ _id: u._id }, { payGrade: grade._id, payGroup: payGroup._id });
+  }
+  console.log('  ✓ user pay assignments updated');
+
+  await SalaryStructure.deleteMany({});
+  const ctcByGrade = { G1: 500000, G2: 900000, G3: 1800000, G4: 3600000 };
+  for (const u of allUsers) {
+    const role = u.roles?.[0] || 'employee';
+    const grade = gradeMap[role] || grades[0];
+    const ctc = ctcByGrade[grade.code] || 500000;
+    const components = grade.defaultComponents.map(c => {
+      const scaled = { ...c.toObject ? c.toObject() : c };
+      if (scaled.calc === 'fixed') {
+        scaled.value = Math.round(ctc * (scaled.value / (grade.minCtc + grade.maxCtc) * 2));
+      }
+      return scaled;
+    });
+    await SalaryStructure.create({
+      user: u._id,
+      ctcAnnual: ctc,
+      components: grade.defaultComponents,
+      effectiveFrom: '2026-01-01',
+    });
+  }
+  console.log('  ✓ salary structures seeded');
 
   // ── Summary ──
   console.log('\n✅ Full seed complete!');
