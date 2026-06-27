@@ -25,6 +25,7 @@ import { createManagerRouter } from './routes/manager.js';
 import { createOrgRouter } from './routes/org.js';
 import { createOnboardingRouter } from './routes/onboarding.js';
 import { createOnboardingPortalRouter } from './routes/onboardingPortal.js';
+import { createMyRequestsRouter } from './routes/myRequests.js';
 
 export function createApp(config) {
   const app = express();
@@ -104,6 +105,7 @@ export function createApp(config) {
   app.use('/dashboard', createDashboardRouter());
   app.use('/manager', createManagerRouter());
   app.use('/org', createOrgRouter());
+  app.use('/my-requests', createMyRequestsRouter());
   app.use('/onboarding/portal', createOnboardingPortalRouter());
   app.use('/onboarding', createOnboardingRouter());
 
