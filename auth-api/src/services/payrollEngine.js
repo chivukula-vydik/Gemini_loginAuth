@@ -1,3 +1,5 @@
+import { computePF, computeESIC, computePT, computeMonthlyTDS } from './statutoryEngine.js';
+
 export function resolveMonthlyAmounts(components, ctcAnnual) {
   const basicComp = components.find(c => c.key === 'basic');
   const annualBasic = basicComp ? basicComp.value : 0;
@@ -23,4 +25,82 @@ export function resolveMonthlyAmounts(components, ctcAnnual) {
       proratable: comp.proratable,
     };
   });
+}
+
+export function buildPayslip({ components, ctcAnnual, input, statutoryConfig, regime, declarations, reimbursements, loanEmis }) {
+  const resolved = resolveMonthlyAmounts(components, ctcAnnual);
+  const { payableDays, lopDays, otHours, billableHours } = input;
+  const paidDays = payableDays - lopDays;
+
+  const earnings = [];
+  let grossEarnings = 0;
+
+  for (const comp of resolved) {
+    if (comp.type !== 'earning') continue;
+    let amount = comp.monthlyAmount;
+    if (comp.proratable && payableDays > 0 && lopDays > 0) {
+      amount = Math.round((amount * paidDays / payableDays) * 100) / 100;
+    }
+    earnings.push({ key: comp.key, label: comp.label, amount });
+    grossEarnings += amount;
+  }
+
+  const reimbursementLines = reimbursements.map(r => ({
+    key: `reimb_${r.category || r._id}`,
+    label: `Reimbursement - ${r.category || 'Other'}`,
+    amount: r.amount,
+  }));
+  const reimbTotal = reimbursementLines.reduce((s, r) => s + r.amount, 0);
+
+  const basicEarning = earnings.find(e => e.key === 'basic');
+  const basicMonthly = basicEarning ? basicEarning.amount : 0;
+
+  const pf = computePF(basicMonthly, statutoryConfig.pf);
+  const esic = computeESIC(grossEarnings, statutoryConfig.esic);
+  const ptSlabs = statutoryConfig.pt || [];
+  const pt = computePT(grossEarnings, ptSlabs);
+
+  const tdsConfig = regime === 'old' ? statutoryConfig.tds.old : statutoryConfig.tds.new;
+  const tds = computeMonthlyTDS({
+    annualGross: grossEarnings * 12,
+    regime,
+    slabs: tdsConfig?.slabs || [],
+    standardDeduction: tdsConfig?.standardDeduction || 0,
+    declarations: declarations || [],
+  });
+
+  const deductions = [];
+
+  const compDeductions = resolved.filter(c => c.type === 'deduction');
+  for (const comp of compDeductions) {
+    let amount = comp.monthlyAmount;
+    if (comp.proratable && payableDays > 0 && lopDays > 0) {
+      amount = Math.round((amount * paidDays / payableDays) * 100) / 100;
+    }
+    deductions.push({ key: comp.key, label: comp.label, amount });
+  }
+
+  for (const emi of loanEmis) {
+    deductions.push({ key: 'loan_emi', label: emi.label || 'Loan EMI', amount: emi.amount });
+  }
+
+  const statutoryDeductions = pf.employee + esic.employee + pt + tds;
+  const compDeductionTotal = deductions.reduce((s, d) => s + d.amount, 0);
+  const totalDeductions = statutoryDeductions + compDeductionTotal;
+  const gross = grossEarnings + reimbTotal;
+  const netPay = Math.round((gross - totalDeductions) * 100) / 100;
+
+  return {
+    earnings,
+    deductions,
+    reimbursements: reimbursementLines,
+    statutory: { pf: pf.employee, esic: esic.employee, pt, tds },
+    gross: Math.round(gross * 100) / 100,
+    totalDeductions: Math.round(totalDeductions * 100) / 100,
+    netPay,
+    lopDays,
+    paidDays,
+    otHours,
+    billableHours,
+  };
 }
