@@ -23,6 +23,8 @@ import { createReportsRouter } from './routes/reports.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createManagerRouter } from './routes/manager.js';
 import { createOrgRouter } from './routes/org.js';
+import { createPeopleRouter } from './routes/people.js';
+import { createPayrollRouter } from './routes/payroll.js';
 
 export function createApp(config) {
   const app = express();
@@ -102,6 +104,8 @@ export function createApp(config) {
   app.use('/dashboard', createDashboardRouter());
   app.use('/manager', createManagerRouter());
   app.use('/org', createOrgRouter());
+  app.use('/people', createPeopleRouter());
+  app.use('/payroll', createPayrollRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
