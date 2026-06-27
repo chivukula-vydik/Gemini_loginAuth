@@ -6,6 +6,7 @@ import {
 } from './attendanceApi';
 import { getPendingLeave, decideLeave, LeavePending, LEAVE_TYPE_LABELS } from './leaveApi';
 import { getPendingRegularise, decideRegularise, RegularisePending } from './attendanceApi';
+import { useAuth } from '../authContext';
 
 type Tab = 'dashboard' | 'approvals' | 'overtime' | 'time-off' | 'reports';
 
@@ -81,7 +82,7 @@ function TodayStatsCards({ stats }: { stats: TodayStats }) {
 }
 
 // ─── Leave sidebar ───
-function LeaveSidebar({ leaves, onDecide, deciding }: { leaves: LeavePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null }) {
+function LeaveSidebar({ leaves, onDecide, deciding, readOnly }: { leaves: LeavePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null; readOnly?: boolean }) {
   if (leaves.length === 0) return <p className="ts-empty">No pending leave requests.</p>;
   return (
     <div className="tad-leave-list">
@@ -93,10 +94,12 @@ function LeaveSidebar({ leaves, onDecide, deciding }: { leaves: LeavePending[]; 
           </div>
           <div className="tad-leave-dates">{fmtDate(l.startDate)} – {fmtDate(l.endDate)} · {l.days} day{l.days !== 1 ? 's' : ''}</div>
           {l.reason && <div className="tad-leave-reason">{l.reason}</div>}
-          <div className="tad-leave-actions">
-            <button className="btn btn-auto btn-primary" disabled={deciding === l._id} onClick={() => onDecide(l._id, 'approved')}>Approve</button>
-            <button className="btn btn-auto btn-outline" disabled={deciding === l._id} onClick={() => onDecide(l._id, 'rejected')}>Reject</button>
-          </div>
+          {!readOnly && (
+            <div className="tad-leave-actions">
+              <button className="btn btn-auto btn-primary" disabled={deciding === l._id} onClick={() => onDecide(l._id, 'approved')}>Approve</button>
+              <button className="btn btn-auto btn-outline" disabled={deciding === l._id} onClick={() => onDecide(l._id, 'rejected')}>Reject</button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -104,7 +107,7 @@ function LeaveSidebar({ leaves, onDecide, deciding }: { leaves: LeavePending[]; 
 }
 
 // ─── Regularise sidebar ───
-function RegulariseSidebar({ items, onDecide, deciding }: { items: RegularisePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null }) {
+function RegulariseSidebar({ items, onDecide, deciding, readOnly }: { items: RegularisePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null; readOnly?: boolean }) {
   if (items.length === 0) return <p className="ts-empty">No pending regularise requests.</p>;
   return (
     <div className="tad-leave-list">
@@ -117,10 +120,12 @@ function RegulariseSidebar({ items, onDecide, deciding }: { items: RegularisePen
           <div className="tad-leave-dates">{fmtDate(r.date)}</div>
           <div className="tad-leave-reason">{r.regularise.reason}</div>
           {r.regularise.correctedCheckIn && <div className="tad-leave-reason">Check-in: {r.regularise.correctedCheckIn} · Check-out: {r.regularise.correctedCheckOut || '—'}</div>}
-          <div className="tad-leave-actions">
-            <button className="btn btn-auto btn-primary" disabled={deciding === r._id} onClick={() => onDecide(r._id, 'approved')}>Approve</button>
-            <button className="btn btn-auto btn-outline" disabled={deciding === r._id} onClick={() => onDecide(r._id, 'rejected')}>Reject</button>
-          </div>
+          {!readOnly && (
+            <div className="tad-leave-actions">
+              <button className="btn btn-auto btn-primary" disabled={deciding === r._id} onClick={() => onDecide(r._id, 'approved')}>Approve</button>
+              <button className="btn btn-auto btn-outline" disabled={deciding === r._id} onClick={() => onDecide(r._id, 'rejected')}>Reject</button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -128,7 +133,7 @@ function RegulariseSidebar({ items, onDecide, deciding }: { items: RegularisePen
 }
 
 // ─── Overtime sidebar ───
-function OvertimeSidebar({ items, onDecide, deciding }: { items: OvertimePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null }) {
+function OvertimeSidebar({ items, onDecide, deciding, readOnly }: { items: OvertimePending[]; onDecide: (id: string, d: 'approved' | 'rejected') => void; deciding: string | null; readOnly?: boolean }) {
   if (items.length === 0) return <p className="ts-empty">No pending overtime requests.</p>;
   return (
     <div className="tad-leave-list">
@@ -140,10 +145,12 @@ function OvertimeSidebar({ items, onDecide, deciding }: { items: OvertimePending
           </div>
           <div className="tad-leave-dates">{fmtDate(o.date)} · {o.startTime} – {o.endTime} · {Math.floor(o.minutes / 60)}h {o.minutes % 60}m</div>
           {o.note && <div className="tad-leave-reason">{o.note}</div>}
-          <div className="tad-leave-actions">
-            <button className="btn btn-auto btn-primary" disabled={deciding === o._id} onClick={() => onDecide(o._id, 'approved')}>Approve</button>
-            <button className="btn btn-auto btn-outline" disabled={deciding === o._id} onClick={() => onDecide(o._id, 'rejected')}>Reject</button>
-          </div>
+          {!readOnly && (
+            <div className="tad-leave-actions">
+              <button className="btn btn-auto btn-primary" disabled={deciding === o._id} onClick={() => onDecide(o._id, 'approved')}>Approve</button>
+              <button className="btn btn-auto btn-outline" disabled={deciding === o._id} onClick={() => onDecide(o._id, 'rejected')}>Reject</button>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -227,6 +234,10 @@ function ReportsTab({ stats }: { stats: TeamMemberStats[] }) {
 
 // ─── Main Dashboard ───
 export function TeamAttendanceDashboard() {
+  const { user } = useAuth();
+  const roles = user?.roles ?? ['employee'];
+  const isReadOnly = (roles.includes('hr') || roles.includes('director') || roles.includes('vp'))
+    && !roles.includes('admin') && !roles.includes('reporting_manager') && !roles.includes('pm') && !roles.includes('team_lead');
   const now = new Date();
   const [tab, setTab] = useState<Tab>('dashboard');
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
@@ -335,13 +346,13 @@ export function TeamAttendanceDashboard() {
 
             <div className="tad-main-right">
               <h3 className="rm-section-title">Leave Requests <span className="tad-badge">{leaves.length}</span></h3>
-              <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} />
+              <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} readOnly={isReadOnly} />
 
               <h3 className="rm-section-title" style={{ marginTop: 20 }}>Overtime Requests <span className="tad-badge">{overtime.length}</span></h3>
-              <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} />
+              <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} readOnly={isReadOnly} />
 
               <h3 className="rm-section-title" style={{ marginTop: 20 }}>Regularise Requests <span className="tad-badge">{regularise.length}</span></h3>
-              <RegulariseSidebar items={regularise} onDecide={handleRegDecide} deciding={deciding} />
+              <RegulariseSidebar items={regularise} onDecide={handleRegDecide} deciding={deciding} readOnly={isReadOnly} />
             </div>
           </div>
         </>
@@ -350,25 +361,25 @@ export function TeamAttendanceDashboard() {
       {tab === 'approvals' && (
         <>
           <h2 className="rm-section-title">Pending Leave</h2>
-          <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} />
+          <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} readOnly={isReadOnly} />
           <h2 className="rm-section-title" style={{ marginTop: 20 }}>Pending Overtime</h2>
-          <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} />
+          <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} readOnly={isReadOnly} />
           <h2 className="rm-section-title" style={{ marginTop: 20 }}>Pending Regularise</h2>
-          <RegulariseSidebar items={regularise} onDecide={handleRegDecide} deciding={deciding} />
+          <RegulariseSidebar items={regularise} onDecide={handleRegDecide} deciding={deciding} readOnly={isReadOnly} />
         </>
       )}
 
       {tab === 'overtime' && (
         <>
           <h2 className="rm-section-title">Overtime Requests <span className="tad-badge">{overtime.length}</span></h2>
-          <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} />
+          <OvertimeSidebar items={overtime} onDecide={handleOTDecide} deciding={deciding} readOnly={isReadOnly} />
         </>
       )}
 
       {tab === 'time-off' && (
         <>
           <h2 className="rm-section-title">Leave Requests</h2>
-          <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} />
+          <LeaveSidebar leaves={leaves} onDecide={handleLeaveDecide} deciding={deciding} readOnly={isReadOnly} />
         </>
       )}
 
