@@ -1,0 +1,318 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Org Tree — Keka-style visual chart
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ot-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────────────────────── */
+.ot-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.ot-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 34px;
+  width: 240px;
+  flex-shrink: 0;
+}
+
+.ot-search {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: var(--fs-xs);
+  color: var(--text);
+  width: 100%;
+}
+.ot-search::placeholder { color: var(--muted); }
+
+.ot-toolbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ot-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.ot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.ot-toggle input[type="checkbox"] { cursor: pointer; }
+
+/* ─── Tree area ───────────────────────────────────────────────────────────── */
+.ot-tree-area {
+  padding: 16px 0 40px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.ot-tree-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ot-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+  font-size: var(--fs-sm);
+}
+
+/* ─── Org card ────────────────────────────────────────────────────────────── */
+.ot-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  width: 210px;
+  cursor: pointer;
+  transition: box-shadow .15s, border-color .15s;
+  position: relative;
+  z-index: 1;
+}
+
+.ot-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.ot-card--root {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+  width: 230px;
+}
+
+.ot-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ot-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ot-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ot-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ot-card-title {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ot-card-location {
+  font-size: 10px;
+  color: var(--faint, var(--muted));
+  margin-top: 2px;
+}
+
+.ot-card-dept {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--primary);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 12px;
+}
+
+.ot-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ─── Connectors ──────────────────────────────────────────────────────────── */
+.ot-connector-down {
+  width: 2px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 auto;
+}
+
+.ot-connector-down--root {
+  height: 20px;
+}
+
+.ot-connector-up {
+  width: 2px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 auto;
+}
+
+/* ─── Children / branches ─────────────────────────────────────────────────── */
+.ot-children {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 20px;
+  position: relative;
+}
+
+/* Horizontal connector line across children */
+.ot-children::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: 2px;
+  background: var(--border);
+  /* Stretch from center of first child to center of last child */
+  left: calc(50% - (50% - 105px));
+  right: calc(50% - (50% - 105px));
+}
+
+/* For 1 child, no horizontal line needed */
+.ot-children:has(> :only-child)::before {
+  display: none;
+}
+
+.ot-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ot-branch-card-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.ot-expand-btn {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  color: var(--muted);
+  transition: background .15s, color .15s;
+}
+.ot-expand-btn:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ─── Department grouped view ─────────────────────────────────────────────── */
+.ot-dept-group {
+  width: 100%;
+  max-width: 1000px;
+  margin-bottom: 24px;
+}
+
+.ot-dept-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ot-dept-count {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ot-dept-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .ot-children {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .ot-children::before { display: none; }
+  .ot-card { width: 190px; }
+  .ot-card--root { width: 200px; }
+}
+
+@media (max-width: 600px) {
+  .ot-toolbar { flex-direction: column; align-items: stretch; }
+  .ot-search-wrap { width: 100%; }
+  .ot-toolbar-right { margin-left: 0; justify-content: space-between; }
+  .ot-card { width: 170px; padding: 10px; }
+}

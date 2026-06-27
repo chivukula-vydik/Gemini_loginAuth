@@ -1,9 +1,9 @@
-import { type ReactElement } from 'react';
+import { type ReactElement, useState, useCallback } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
-import { navForRoles, keyForPath, NavKey } from './pm/nav';
+import { navSectionsForRoles, keyForPath, NavKey } from './pm/nav';
 import { AdminUsers } from './pm/AdminUsers';
 import { AdminSkills } from './pm/AdminSkills';
 import { AdminDepartments } from './pm/AdminDepartments';
@@ -17,12 +17,15 @@ import { Requests } from './pm/Requests';
 import { Marketplace } from './pm/Marketplace';
 import { Utilization } from './pm/Utilization';
 import { RoleHome } from './dashboard/RoleHome';
+import { ProfilePage } from './dashboard/ProfilePage';
+import { UserDetailPage } from './pm/UserDetailPage';
 import { MyTeam } from './dashboard/MyTeam';
 import { TeamAttendanceDashboard } from './attendance/TeamAttendanceDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 import { OnboardingBoard, CaseDetail, MyOnboardingTasks, TemplateBuilder } from './onboarding/index';
 import { MyRequests } from './pm/MyRequests';
+import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals } from './payroll/index';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -46,6 +49,13 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   onboarding: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM20 8v6M23 11h-6" />,
   'onboarding-tasks': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   'onboarding-templates': <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6" />,
+  profile: <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />,
+  payroll: <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
+  'my-payslips': <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" />,
+  reimbursements: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
+  declarations: <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M9 14l2 2 4-4" />,
+  'tax-summary': <path d="M4 7h16M4 11h16M4 15h10M4 19h6" />,
+  'reimbursement-approvals': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -59,31 +69,50 @@ function NavIcon({ name }: { name: NavKey }) {
 
 export function AppShell() {
   const { user, signOut } = useAuth();
-  const items = navForRoles(user?.roles ?? ['employee']);
+  const sections = navSectionsForRoles(user?.roles ?? ['employee']);
   const navigate = useNavigate();
   const location = useLocation();
   const active = keyForPath(location.pathname);
   const name = personName(user);
   const initial = (name[0] ?? '?').toUpperCase();
 
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = useCallback((title: string) => {
+    setCollapsed(prev => ({ ...prev, [title]: !prev[title] }));
+  }, []);
+
   return (
     <div className="shell">
       <aside className="shell-sidebar">
         <div className="shell-brand"><span className="logo">A</span><span className="name">Auth Service</span></div>
         <nav className="shell-nav">
-          {items.map((it) => (
-            <a key={it.key} className={`shell-nav-item${active === it.key ? ' active' : ''}`}
-              href={it.path} onClick={(e) => { e.preventDefault(); navigate(it.path); }}>
-              <NavIcon name={it.key} />
-              <span>{it.label}</span>
-            </a>
+          {sections.map((sec, si) => (
+            <div key={si} className={sec.title ? 'shell-nav-section' : ''}>
+              {sec.title && (
+                <button className="shell-nav-header" onClick={() => toggle(sec.title)}>
+                  <svg className="shell-nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transform: collapsed[sec.title] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  <span>{sec.title}</span>
+                </button>
+              )}
+              {!collapsed[sec.title] && sec.items.map((it) => (
+                <a key={it.key} className={`shell-nav-item${active === it.key ? ' active' : ''}`}
+                  href={it.path} onClick={(e) => { e.preventDefault(); navigate(it.path); }}>
+                  <NavIcon name={it.key} />
+                  <span>{it.label}</span>
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="shell-foot">
           <ThemeToggle />
           <div className="shell-user">
-            <div className="shell-avatar">{initial}</div>
-            <div className="shell-user-meta">
+            <div className="shell-avatar" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>{initial}</div>
+            <div className="shell-user-meta" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
               <div className="shell-user-email">{name}</div>
               {user?.roles && <div className="shell-user-role">{user.roles.join(', ')}</div>}
             </div>
@@ -100,6 +129,7 @@ export function AppShell() {
         <Routes>
           <Route path="/" element={<RoleHome />} />
           <Route path="/users" element={<AdminUsers />} />
+          <Route path="/users/:id" element={<UserDetailPage />} />
           <Route path="/skills" element={<AdminSkills />} />
           <Route path="/departments" element={<AdminDepartments />} />
           <Route path="/shifts" element={<AdminShifts />} />
@@ -120,6 +150,16 @@ export function AppShell() {
           <Route path="/onboarding/:id" element={<CaseDetail />} />
           <Route path="/onboarding-tasks" element={<MyOnboardingTasks />} />
           <Route path="/onboarding-templates" element={<TemplateBuilder />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/payroll" element={<PayrollRunList />} />
+          <Route path="/payroll/run/:id" element={<PayrollRunDetail />} />
+          <Route path="/payroll/salary/:userId" element={<SalaryEditor />} />
+          <Route path="/my-payslips" element={<MyPayslips />} />
+          <Route path="/my-payslips/:year/:month" element={<MyPayslips />} />
+          <Route path="/declarations" element={<Declarations />} />
+          <Route path="/tax-summary" element={<TaxSummary />} />
+          <Route path="/reimbursements" element={<Reimbursements />} />
+          <Route path="/reimbursement-approvals" element={<ReimbursementApprovals />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

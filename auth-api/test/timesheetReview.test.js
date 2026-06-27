@@ -31,8 +31,8 @@ function bearer(user) {
 }
 
 test('PATCH /timesheets/review/:id with decision=return stores the rejection reason', async () => {
-  const emp = await User.create({ email: 'ts-emp1@x.com', displayName: 'Emp', role: 'employee' });
-  const pm = await User.create({ email: 'ts-pm1@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ts-emp1@x.com', displayName: 'Emp', roles: ['employee'] });
+  const pm = await User.create({ email: 'ts-pm1@x.com', displayName: 'PM', roles: ['pm'] });
   const doc = await Timesheet.create({ userId: emp._id, weekStart: '2024-01-01', status: 'submitted' });
 
   const res = await request(app).patch(`/timesheets/review/${doc._id}`)
@@ -47,8 +47,8 @@ test('PATCH /timesheets/review/:id with decision=return stores the rejection rea
 });
 
 test('PATCH /timesheets/review/:id with decision=return truncates reason to 1000 chars', async () => {
-  const emp = await User.create({ email: 'ts-emp2@x.com', displayName: 'Emp', role: 'employee' });
-  const pm = await User.create({ email: 'ts-pm2@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ts-emp2@x.com', displayName: 'Emp', roles: ['employee'] });
+  const pm = await User.create({ email: 'ts-pm2@x.com', displayName: 'PM', roles: ['pm'] });
   const doc = await Timesheet.create({ userId: emp._id, weekStart: '2024-01-08', status: 'submitted' });
   const longReason = 'x'.repeat(1500);
 
@@ -61,8 +61,8 @@ test('PATCH /timesheets/review/:id with decision=return truncates reason to 1000
 });
 
 test('PATCH /timesheets/review/:id with decision=approve clears any rejection reason', async () => {
-  const emp = await User.create({ email: 'ts-emp3@x.com', displayName: 'Emp', role: 'employee' });
-  const pm = await User.create({ email: 'ts-pm3@x.com', displayName: 'PM', role: 'pm' });
+  const emp = await User.create({ email: 'ts-emp3@x.com', displayName: 'Emp', roles: ['employee'] });
+  const pm = await User.create({ email: 'ts-pm3@x.com', displayName: 'PM', roles: ['pm'] });
   const doc = await Timesheet.create({
     userId: emp._id, weekStart: '2024-01-15', status: 'submitted', rejectionReason: 'stale reason from a prior cycle',
   });
@@ -77,7 +77,7 @@ test('PATCH /timesheets/review/:id with decision=approve clears any rejection re
 });
 
 test('GET /timesheets/:weekStart includes rejectionReason for a returned week', async () => {
-  const emp = await User.create({ email: 'ts-emp4@x.com', displayName: 'Emp', role: 'employee' });
+  const emp = await User.create({ email: 'ts-emp4@x.com', displayName: 'Emp', roles: ['employee'] });
   await Timesheet.create({
     userId: emp._id, weekStart: '2024-01-22', status: 'returned', rejectionReason: 'Missing hours on Friday.',
   });
@@ -90,7 +90,7 @@ test('GET /timesheets/:weekStart includes rejectionReason for a returned week', 
 });
 
 test('GET /timesheets/:weekStart returns an empty rejectionReason when there is no timesheet doc', async () => {
-  const emp = await User.create({ email: 'ts-emp5@x.com', displayName: 'Emp', role: 'employee' });
+  const emp = await User.create({ email: 'ts-emp5@x.com', displayName: 'Emp', roles: ['employee'] });
 
   const res = await request(app).get('/timesheets/2024-02-05')
     .set('Authorization', bearer(emp));

@@ -3,45 +3,42 @@ import assert from 'node:assert/strict';
 import { resolveRoles, canViewProject, canEditProject, canCreateTask, canLogProgress } from '../src/services/authz.js';
 
 test('resolveRoles: promotes the configured ADMIN_EMAIL', () => {
-  const user = { email: 'boss@acme.com', role: 'employee' };
+  const user = { email: 'boss@acme.com', roles: ['employee'] };
   const roles = resolveRoles(user, { ADMIN_EMAIL: 'boss@acme.com' });
   assert.ok(roles.includes('admin'));
 });
 
 test('resolveRoles: case-insensitive email match', () => {
-  const user = { email: 'Boss@Acme.com', role: 'employee' };
+  const user = { email: 'Boss@Acme.com', roles: ['employee'] };
   const roles = resolveRoles(user, { ADMIN_EMAIL: 'boss@acme.com' });
   assert.ok(roles.includes('admin'));
 });
 
-test('resolveRoles: keeps stored role when no match', () => {
-  const roles1 = resolveRoles({ email: 'a@b.com', role: 'pm' }, { ADMIN_EMAIL: 'boss@acme.com' });
-  assert.ok(roles1.includes('pm'));
-  assert.ok(!roles1.includes('admin'));
-  const roles2 = resolveRoles({ email: 'a@b.com' }, {});
-  assert.ok(roles2.includes('employee'));
+test('resolveRoles: keeps stored roles when no match', () => {
+  assert.deepEqual(resolveRoles({ email: 'a@b.com', roles: ['pm'] }, { ADMIN_EMAIL: 'boss@acme.com' }), ['pm']);
+  assert.deepEqual(resolveRoles({ email: 'a@b.com' }, {}), ['employee']);
 });
 
 test('canViewProject: admin, owner, and members can view; others cannot', () => {
   const project = { ownerPm: 'pm1', members: ['emp1'] };
-  assert.equal(canViewProject({ sub: 'x', role: 'admin' }, project), true);
-  assert.equal(canViewProject({ sub: 'pm1', role: 'pm' }, project), true);
-  assert.equal(canViewProject({ sub: 'emp1', role: 'employee' }, project), true);
-  assert.equal(canViewProject({ sub: 'emp2', role: 'employee' }, project), false);
+  assert.equal(canViewProject({ sub: 'x', roles: ['admin'] }, project), true);
+  assert.equal(canViewProject({ sub: 'pm1', roles: ['pm'] }, project), true);
+  assert.equal(canViewProject({ sub: 'emp1', roles: ['employee'] }, project), true);
+  assert.equal(canViewProject({ sub: 'emp2', roles: ['employee'] }, project), false);
 });
 
 test('canEditProject: admin or owning PM only', () => {
   const project = { ownerPm: 'pm1', members: ['emp1'] };
-  assert.equal(canEditProject({ sub: 'pm1', role: 'pm' }, project), true);
-  assert.equal(canEditProject({ sub: 'pm2', role: 'pm' }, project), false);
-  assert.equal(canEditProject({ sub: 'emp1', role: 'employee' }, project), false);
-  assert.equal(canEditProject({ sub: 'x', role: 'admin' }, project), true);
+  assert.equal(canEditProject({ sub: 'pm1', roles: ['pm'] }, project), true);
+  assert.equal(canEditProject({ sub: 'pm2', roles: ['pm'] }, project), false);
+  assert.equal(canEditProject({ sub: 'emp1', roles: ['employee'] }, project), false);
+  assert.equal(canEditProject({ sub: 'x', roles: ['admin'] }, project), true);
 });
 
 test('canCreateTask: matches canEditProject rule', () => {
   const project = { ownerPm: 'pm1', members: [] };
-  assert.equal(canCreateTask({ sub: 'pm1', role: 'pm' }, project), true);
-  assert.equal(canCreateTask({ sub: 'pm2', role: 'pm' }, project), false);
+  assert.equal(canCreateTask({ sub: 'pm1', roles: ['pm'] }, project), true);
+  assert.equal(canCreateTask({ sub: 'pm2', roles: ['pm'] }, project), false);
 });
 
 test('canLogProgress: only the assignee may log progress', () => {

@@ -41,7 +41,7 @@ function yesterdayStr() {
 // --- Leave balance / quota ---
 
 test('GET /leave/balance creates a default balance with the standard quotas', async () => {
-  const emp = await User.create({ email: 'bal-1@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'bal-1@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/leave/balance').set('Authorization', bearer(emp));
   assert.equal(res.status, 200);
   assert.equal(res.body.casual.total, 12);
@@ -51,7 +51,7 @@ test('GET /leave/balance creates a default balance with the standard quotas', as
 });
 
 test('POST /leave rejects a request that exceeds the remaining balance', async () => {
-  const emp = await User.create({ email: 'bal-2@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'bal-2@x.com', displayName: 'E', roles: ['employee'] });
   // Sick quota is 6 days; ask for a 10-weekday range (two full work weeks).
   const res = await request(app).post('/leave')
     .set('Authorization', bearer(emp))
@@ -61,8 +61,8 @@ test('POST /leave rejects a request that exceeds the remaining balance', async (
 });
 
 test('Approving leave increments used balance by requestedDays, unpaid leave is not tracked', async () => {
-  const pm = await User.create({ email: 'bal-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'bal-3@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'bal-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'bal-3@x.com', displayName: 'E', roles: ['employee'] });
 
   // 2026-07-06 (Mon) .. 2026-07-07 (Tue) — 2 working days.
   const applied = await request(app).post('/leave')
@@ -91,7 +91,7 @@ test('Approving leave increments used balance by requestedDays, unpaid leave is 
 // --- Half-day leave ---
 
 test('POST /leave with halfDay charges 0.5 days and rejects multi-day half-day requests', async () => {
-  const emp = await User.create({ email: 'half-1@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'half-1@x.com', displayName: 'E', roles: ['employee'] });
 
   const multiDay = await request(app).post('/leave')
     .set('Authorization', bearer(emp))
@@ -107,8 +107,8 @@ test('POST /leave with halfDay charges 0.5 days and rejects multi-day half-day r
 });
 
 test('Approving a half-day leave stamps attendance with a half-day note', async () => {
-  const pm = await User.create({ email: 'half-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'half-2@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'half-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'half-2@x.com', displayName: 'E', roles: ['employee'] });
 
   const applied = await request(app).post('/leave')
     .set('Authorization', bearer(emp))
@@ -124,8 +124,8 @@ test('Approving a half-day leave stamps attendance with a half-day note', async 
 // --- Holiday calendar ---
 
 test('POST /holidays is admin-only and rejects duplicate dates', async () => {
-  const admin = await User.create({ email: 'hol-admin@x.com', displayName: 'A', role: 'admin' });
-  const emp = await User.create({ email: 'hol-emp@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'hol-admin@x.com', displayName: 'A', roles: ['admin'] });
+  const emp = await User.create({ email: 'hol-emp@x.com', displayName: 'E', roles: ['employee'] });
 
   const forbidden = await request(app).post('/holidays')
     .set('Authorization', bearer(emp)).send({ date: '2026-08-15', name: 'Independence Day' });
@@ -141,8 +141,8 @@ test('POST /holidays is admin-only and rejects duplicate dates', async () => {
 });
 
 test('GET /attendance/month merges holidays as synthetic entries without persisting them', async () => {
-  const admin = await User.create({ email: 'hol-month-admin@x.com', displayName: 'A', role: 'admin' });
-  const emp = await User.create({ email: 'hol-month@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'hol-month-admin@x.com', displayName: 'A', roles: ['admin'] });
+  const emp = await User.create({ email: 'hol-month@x.com', displayName: 'E', roles: ['employee'] });
   await request(app).post('/holidays')
     .set('Authorization', bearer(admin)).send({ date: '2026-09-02', name: 'Founders Day' });
 
@@ -158,8 +158,8 @@ test('GET /attendance/month merges holidays as synthetic entries without persist
 });
 
 test('GET /attendance/range returns docs for an arbitrary date span, merging holiday placeholders', async () => {
-  const admin = await User.create({ email: 'range-admin@x.com', displayName: 'A', role: 'admin' });
-  const emp = await User.create({ email: 'range-emp@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'range-admin@x.com', displayName: 'A', roles: ['admin'] });
+  const emp = await User.create({ email: 'range-emp@x.com', displayName: 'E', roles: ['employee'] });
   await request(app).post('/holidays')
     .set('Authorization', bearer(admin)).send({ date: '2026-11-03', name: 'Mid-week Holiday' });
   await Attendance.create({ userId: emp._id, date: '2026-11-01', status: 'present', effectiveMinutes: 480 });
@@ -177,7 +177,7 @@ test('GET /attendance/range returns docs for an arbitrary date span, merging hol
 });
 
 test('GET /attendance/range spanning two calendar months returns both months\' docs', async () => {
-  const emp = await User.create({ email: 'range-span@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'range-span@x.com', displayName: 'E', roles: ['employee'] });
   await Attendance.create({ userId: emp._id, date: '2026-01-30', status: 'present', effectiveMinutes: 480 });
   await Attendance.create({ userId: emp._id, date: '2026-02-02', status: 'present', effectiveMinutes: 480 });
 
@@ -189,13 +189,13 @@ test('GET /attendance/range spanning two calendar months returns both months\' d
 });
 
 test('GET /attendance/range requires both start and end', async () => {
-  const emp = await User.create({ email: 'range-missing@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'range-missing@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/attendance/range?start=2026-09-01').set('Authorization', bearer(emp));
   assert.equal(res.status, 400);
 });
 
 test('GET /attendance/range computes live effective minutes for an in-progress (no checkout) session today', async () => {
-  const emp = await User.create({ email: 'live-1@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'live-1@x.com', displayName: 'E', roles: ['employee'] });
   const today = todayStr();
   const checkIn = new Date(Date.now() - 90 * 60000); // checked in 90 minutes ago
   await Attendance.create({
@@ -212,7 +212,7 @@ test('GET /attendance/range computes live effective minutes for an in-progress (
 });
 
 test('GET /attendance/range subtracts an open break from the live effective minutes', async () => {
-  const emp = await User.create({ email: 'live-2@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'live-2@x.com', displayName: 'E', roles: ['employee'] });
   const today = todayStr();
   const checkIn = new Date(Date.now() - 90 * 60000);
   const breakStart = new Date(Date.now() - 10 * 60000);
@@ -230,7 +230,7 @@ test('GET /attendance/range subtracts an open break from the live effective minu
 });
 
 test('GET /attendance/range flags a past day with checkIn but no checkOut as needsRegularise', async () => {
-  const emp = await User.create({ email: 'live-3@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'live-3@x.com', displayName: 'E', roles: ['employee'] });
   const yest = yesterdayStr();
   await Attendance.create({
     userId: emp._id, date: yest, checkIn: new Date(Date.now() - 24 * 60 * 60000),
@@ -245,7 +245,7 @@ test('GET /attendance/range flags a past day with checkIn but no checkOut as nee
 });
 
 test('GET /attendance/range leaves a completed day untouched (no live override, no needsRegularise)', async () => {
-  const emp = await User.create({ email: 'live-4@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'live-4@x.com', displayName: 'E', roles: ['employee'] });
   const yest = yesterdayStr();
   await Attendance.create({
     userId: emp._id, date: yest, checkIn: new Date(Date.now() - 25 * 60 * 60000),
@@ -261,7 +261,7 @@ test('GET /attendance/range leaves a completed day untouched (no live override, 
 });
 
 test('GET /attendance/month does not apply the live-elapsed override (isolated from /range)', async () => {
-  const emp = await User.create({ email: 'live-5@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'live-5@x.com', displayName: 'E', roles: ['employee'] });
   const today = todayStr();
   const [y, m] = today.split('-');
   await Attendance.create({
@@ -277,8 +277,8 @@ test('GET /attendance/month does not apply the live-elapsed override (isolated f
 });
 
 test('GET /attendance/stats excludes holiday dates from the absent count', async () => {
-  const admin = await User.create({ email: 'hol-stats-admin@x.com', displayName: 'A', role: 'admin' });
-  const emp = await User.create({ email: 'hol-stats@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'hol-stats-admin@x.com', displayName: 'A', roles: ['admin'] });
+  const emp = await User.create({ email: 'hol-stats@x.com', displayName: 'E', roles: ['employee'] });
   await request(app).post('/holidays')
     .set('Authorization', bearer(admin)).send({ date: '2026-10-02', name: 'Gandhi Jayanti' });
   await Attendance.create({ userId: emp._id, date: '2026-10-02', status: 'absent' });
@@ -292,10 +292,10 @@ test('GET /attendance/stats excludes holiday dates from the absent count', async
 // --- Team attendance view ---
 
 test('GET /attendance/team is scoped to the PM\'s project members', async () => {
-  const pm = await User.create({ email: 'team-pm@x.com', displayName: 'PM', role: 'pm' });
-  const otherPm = await User.create({ email: 'team-other-pm@x.com', displayName: 'PM2', role: 'pm' });
-  const member = await User.create({ email: 'team-member@x.com', displayName: 'Member', role: 'employee' });
-  const outsider = await User.create({ email: 'team-outsider@x.com', displayName: 'Outsider', role: 'employee' });
+  const pm = await User.create({ email: 'team-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const otherPm = await User.create({ email: 'team-other-pm@x.com', displayName: 'PM2', roles: ['pm'] });
+  const member = await User.create({ email: 'team-member@x.com', displayName: 'Member', roles: ['employee'] });
+  const outsider = await User.create({ email: 'team-outsider@x.com', displayName: 'Outsider', roles: ['employee'] });
 
   await Project.create({ name: 'Proj A', ownerPm: pm._id, members: [member._id] });
   await Project.create({ name: 'Proj B', ownerPm: otherPm._id, members: [outsider._id] });
@@ -314,14 +314,14 @@ test('GET /attendance/team is scoped to the PM\'s project members', async () => 
 });
 
 test('GET /attendance/team is forbidden for employees', async () => {
-  const emp = await User.create({ email: 'team-forb@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'team-forb@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/attendance/team?year=2026&month=11').set('Authorization', bearer(emp));
   assert.equal(res.status, 403);
 });
 
 test('GET /attendance/team includes every other user for admin', async () => {
-  const admin = await User.create({ email: 'team-admin@x.com', displayName: 'A', role: 'admin' });
-  const someone = await User.create({ email: 'team-someone@x.com', displayName: 'S', role: 'employee' });
+  const admin = await User.create({ email: 'team-admin@x.com', displayName: 'A', roles: ['admin'] });
+  const someone = await User.create({ email: 'team-someone@x.com', displayName: 'S', roles: ['employee'] });
   const res = await request(app).get('/attendance/team?year=2026&month=11').set('Authorization', bearer(admin));
   assert.equal(res.status, 200);
   const ids = res.body.map((m) => String(m.userId));

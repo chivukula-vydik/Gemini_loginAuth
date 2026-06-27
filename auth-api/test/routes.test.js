@@ -45,21 +45,21 @@ function soleAssigneeId(task) {
 }
 
 test('employee is forbidden from admin routes', async () => {
-  const emp = await User.create({ email: 'e@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'e@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/admin/users').set('Authorization', bearer(emp));
   assert.equal(res.status, 403);
 });
 
 test('admin can list users', async () => {
-  const admin = await User.create({ email: 'a@x.com', displayName: 'A', role: 'admin' });
+  const admin = await User.create({ email: 'a@x.com', displayName: 'A', roles: ['admin'] });
   const res = await request(app).get('/admin/users').set('Authorization', bearer(admin));
   assert.equal(res.status, 200);
   assert.ok(Array.isArray(res.body));
 });
 
 test('pm cannot edit a project they do not own', async () => {
-  const owner = await User.create({ email: 'pm1@x.com', displayName: 'PM1', role: 'pm' });
-  const other = await User.create({ email: 'pm2@x.com', displayName: 'PM2', role: 'pm' });
+  const owner = await User.create({ email: 'pm1@x.com', displayName: 'PM1', roles: ['pm'] });
+  const other = await User.create({ email: 'pm2@x.com', displayName: 'PM2', roles: ['pm'] });
   const project = await Project.create({ name: 'P', ownerPm: owner._id, members: [] });
   const res = await request(app)
     .patch(`/projects/${project._id}`)
@@ -69,15 +69,15 @@ test('pm cannot edit a project they do not own', async () => {
 });
 
 test('employee sees only their assigned tasks via /tasks/mine', async () => {
-  const emp = await User.create({ email: 'e2@x.com', displayName: 'E2', role: 'employee' });
+  const emp = await User.create({ email: 'e2@x.com', displayName: 'E2', roles: ['employee'] });
   const res = await request(app).get('/tasks/mine').set('Authorization', bearer(emp));
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, []);
 });
 
 test('PATCH /tasks/:id/assignees rejects an assignee who is not a project member', async () => {
-  const pm = await User.create({ email: 'pm9@x.com', displayName: 'PM9', role: 'pm' });
-  const outsider = await User.create({ email: 'out@x.com', displayName: 'Out', role: 'employee' });
+  const pm = await User.create({ email: 'pm9@x.com', displayName: 'PM9', roles: ['pm'] });
+  const outsider = await User.create({ email: 'out@x.com', displayName: 'Out', roles: ['employee'] });
   const project = await Project.create({ name: 'PJ', ownerPm: pm._id, members: [] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   const res = await request(app)
@@ -87,20 +87,21 @@ test('PATCH /tasks/:id/assignees rejects an assignee who is not a project member
   assert.equal(res.status, 400);
 });
 
-test('GET /users is forbidden for employees, allowed for PM', async () => {
-  const emp = await User.create({ email: 'dir-e@x.com', displayName: 'E', role: 'employee' });
-  const pm = await User.create({ email: 'dir-pm@x.com', displayName: 'PM', role: 'pm' });
+test('GET /users is accessible for all authenticated users', async () => {
+  const emp = await User.create({ email: 'dir-e@x.com', displayName: 'E', roles: ['employee'] });
+  const pm = await User.create({ email: 'dir-pm@x.com', displayName: 'PM', roles: ['pm'] });
   const r1 = await request(app).get('/users').set('Authorization', bearer(emp));
-  assert.equal(r1.status, 403);
+  assert.equal(r1.status, 200);
+  assert.ok(Array.isArray(r1.body));
   const r2 = await request(app).get('/users').set('Authorization', bearer(pm));
   assert.equal(r2.status, 200);
   assert.ok(Array.isArray(r2.body));
 });
 
 test('PATCH /tasks/:id/progress: assignee can set, non-assignee gets 403, value clamps', async () => {
-  const pm = await User.create({ email: 'pp@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'ee@x.com', displayName: 'E', role: 'employee' });
-  const other = await User.create({ email: 'oo@x.com', displayName: 'O', role: 'employee' });
+  const pm = await User.create({ email: 'pp@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'ee@x.com', displayName: 'E', roles: ['employee'] });
+  const other = await User.create({ email: 'oo@x.com', displayName: 'O', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
   const forbidden = await request(app).patch(`/tasks/${task._id}/progress`)
@@ -114,8 +115,8 @@ test('PATCH /tasks/:id/progress: assignee can set, non-assignee gets 403, value 
 });
 
 test('PATCH /tasks/:id/progress: marking done stamps completedAt, leaving done clears it', async () => {
-  const pm = await User.create({ email: 'pp2@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'ee2@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'pp2@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'ee2@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
   const done = await request(app).patch(`/tasks/${task._id}/progress`)
@@ -131,8 +132,8 @@ test('PATCH /tasks/:id/progress: marking done stamps completedAt, leaving done c
 });
 
 test('GET /timesheets offers assigned tasks to add (current week only), never auto-injecting them', async () => {
-  const pm = await User.create({ email: 'tpm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'temp@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'tpm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'temp@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'Assigned work', assignees: assignedTo(emp._id), createdBy: pm._id });
 
@@ -155,8 +156,8 @@ test('GET /timesheets offers assigned tasks to add (current week only), never au
 });
 
 test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine reports actualMinutes', async () => {
-  const pm = await User.create({ email: 'apm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'aemp@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'apm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'aemp@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const mine = await Task.create({ project: project._id, title: 'Mine', assignees: assignedTo(emp._id), createdBy: pm._id });
   const notMine = await Task.create({ project: project._id, title: 'NotMine', assignees: assignedTo(pm._id), createdBy: pm._id });
@@ -182,8 +183,8 @@ test('PUT /timesheets strips a taskId not assigned to the caller; /tasks/mine re
 });
 
 test('PATCH /admin/users/:id/active: admin deactivates an employee but not themselves', async () => {
-  const admin = await User.create({ email: 'aa1@x.com', displayName: 'A', role: 'admin' });
-  const emp = await User.create({ email: 'ee1@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'aa1@x.com', displayName: 'A', roles: ['admin'] });
+  const emp = await User.create({ email: 'ee1@x.com', displayName: 'E', roles: ['employee'] });
   const ok = await request(app).patch(`/admin/users/${emp._id}/active`)
     .set('Authorization', bearer(admin)).send({ active: false });
   assert.equal(ok.status, 200);
@@ -194,9 +195,9 @@ test('PATCH /admin/users/:id/active: admin deactivates an employee but not thems
 });
 
 test('GET /users directory excludes deactivated users', async () => {
-  const pm = await User.create({ email: 'dpm@x.com', displayName: 'PM', role: 'pm' });
-  await User.create({ email: 'act@x.com', displayName: 'Act', role: 'employee', active: true });
-  await User.create({ email: 'ina@x.com', displayName: 'Ina', role: 'employee', active: false });
+  const pm = await User.create({ email: 'dpm@x.com', displayName: 'PM', roles: ['pm'] });
+  await User.create({ email: 'act@x.com', displayName: 'Act', roles: ['employee'], active: true });
+  await User.create({ email: 'ina@x.com', displayName: 'Ina', roles: ['employee'], active: false });
   const res = await request(app).get('/users').set('Authorization', bearer(pm));
   assert.equal(res.status, 200);
   const emails = res.body.map((u) => u.email);
@@ -205,9 +206,9 @@ test('GET /users directory excludes deactivated users', async () => {
 });
 
 test('DELETE /admin/users/:id: blocks self and project owners, deletes others and cleans up refs', async () => {
-  const admin = await User.create({ email: 'del-a@x.com', displayName: 'A', role: 'admin' });
-  const pm = await User.create({ email: 'del-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'del-e@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'del-a@x.com', displayName: 'A', roles: ['admin'] });
+  const pm = await User.create({ email: 'del-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'del-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
 
@@ -227,10 +228,10 @@ test('DELETE /admin/users/:id: blocks self and project owners, deletes others an
 });
 
 test('PATCH /projects/:id reassigns owner (PM/admin only) and clears the delete block', async () => {
-  const admin = await User.create({ email: 'ro-a@x.com', displayName: 'A', role: 'admin' });
-  const pm1 = await User.create({ email: 'ro-pm1@x.com', displayName: 'PM1', role: 'pm' });
-  const pm2 = await User.create({ email: 'ro-pm2@x.com', displayName: 'PM2', role: 'pm' });
-  const emp = await User.create({ email: 'ro-e@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'ro-a@x.com', displayName: 'A', roles: ['admin'] });
+  const pm1 = await User.create({ email: 'ro-pm1@x.com', displayName: 'PM1', roles: ['pm'] });
+  const pm2 = await User.create({ email: 'ro-pm2@x.com', displayName: 'PM2', roles: ['pm'] });
+  const emp = await User.create({ email: 'ro-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm1._id, members: [] });
 
   // cannot reassign to an employee
@@ -250,8 +251,8 @@ test('PATCH /projects/:id reassigns owner (PM/admin only) and clears the delete 
 });
 
 test('DELETE /projects/:id removes the project and its tasks; non-owner PM forbidden', async () => {
-  const owner = await User.create({ email: 'pd-pm@x.com', displayName: 'PM', role: 'pm' });
-  const other = await User.create({ email: 'pd-pm2@x.com', displayName: 'PM2', role: 'pm' });
+  const owner = await User.create({ email: 'pd-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const other = await User.create({ email: 'pd-pm2@x.com', displayName: 'PM2', roles: ['pm'] });
   const project = await Project.create({ name: 'P', ownerPm: owner._id, members: [] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: owner._id });
 
@@ -266,7 +267,7 @@ test('DELETE /projects/:id removes the project and its tasks; non-owner PM forbi
 
 test('refresh is rejected for a deactivated user', async () => {
   const { issueRefreshToken } = await import('../src/services/tokens.js');
-  const u = await User.create({ email: 'ref@x.com', displayName: 'R', role: 'employee', active: true });
+  const u = await User.create({ email: 'ref@x.com', displayName: 'R', roles: ['employee'], active: true });
   const token = await issueRefreshToken(u);
   u.active = false;
   await u.save();
@@ -275,14 +276,14 @@ test('refresh is rejected for a deactivated user', async () => {
 });
 
 test('edit-requests: GET is forbidden for employees', async () => {
-  const emp = await User.create({ email: 'er-e@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'er-e@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/edit-requests').set('Authorization', bearer(emp));
   assert.equal(res.status, 403);
 });
 
 test('GET /edit-requests omits legacy requests that have no projectId', async () => {
-  const pm = await User.create({ email: 'leg-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'leg-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'leg-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'leg-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   // legacy doc (old per-day model) inserted raw to bypass the now-required projectId
   await EditRequest.collection.insertOne({
@@ -298,8 +299,8 @@ test('GET /edit-requests omits legacy requests that have no projectId', async ()
 });
 
 test('PUT /timesheets: project-scoped grant unlocks only that project and is consumed on change', async () => {
-  const pm = await User.create({ email: 'ps-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'ps-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'ps-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'ps-e@x.com', displayName: 'E', roles: ['employee'] });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   const projB = await Project.create({ name: 'B', ownerPm: pm._id, members: [emp._id] });
   const taskA = await Task.create({ project: projA._id, title: 'TA', assignees: assignedTo(emp._id), createdBy: pm._id });
@@ -327,8 +328,8 @@ test('PUT /timesheets: project-scoped grant unlocks only that project and is con
 });
 
 test('PUT /timesheets: a no-op save leaves an approved grant approved', async () => {
-  const pm = await User.create({ email: 'noop-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'noop-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'noop-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'noop-e@x.com', displayName: 'E', roles: ['employee'] });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   const taskA = await Task.create({ project: projA._id, title: 'TA', assignees: assignedTo(emp._id), createdBy: pm._id });
   const wk = '2020-01-06';
@@ -347,8 +348,8 @@ test('PUT /timesheets: a no-op save leaves an approved grant approved', async ()
 
 test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and rows carry projectId', async () => {
   const { currentMonday } = await import('../src/services/timesheetRows.js');
-  const pm = await User.create({ email: 'get-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'get-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'get-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'get-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
   const wk = currentMonday();
@@ -374,8 +375,8 @@ test('GET /timesheets returns todayDay, project-scoped grants, readOnly, and row
 
 test('POST edit-request requires a projectId the caller has a task on, and dedupes', async () => {
   const { currentMonday } = await import('../src/services/timesheetRows.js');
-  const pm = await User.create({ email: 'req-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'req-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'req-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'req-e@x.com', displayName: 'E', roles: ['employee'] });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   const projOther = await Project.create({ name: 'O', ownerPm: pm._id, members: [] });
   await Task.create({ project: projA._id, title: 'TA', assignees: assignedTo(emp._id), createdBy: pm._id });
@@ -399,8 +400,8 @@ test('POST edit-request requires a projectId the caller has a task on, and dedup
 
 test('edit-request is rejected for the current week (requests are previous-weeks only)', async () => {
   const { currentMonday } = await import('../src/services/timesheetRows.js');
-  const pm = await User.create({ email: 'reqcw-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'reqcw-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'reqcw-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'reqcw-e@x.com', displayName: 'E', roles: ['employee'] });
   const projA = await Project.create({ name: 'A', ownerPm: pm._id, members: [emp._id] });
   await Task.create({ project: projA._id, title: 'TA', assignees: assignedTo(emp._id), createdBy: pm._id });
   const wk = currentMonday();
@@ -417,8 +418,8 @@ test('edit-request is rejected for the current week (requests are previous-weeks
 // auth gate can reach). The 409 behavior is covered by the test above.
 
 test('GET /marketplace returns unassigned, skill-matched tasks across all non-archived projects', async () => {
-  const pm = await User.create({ email: 'mk-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'mk-e@x.com', displayName: 'E', role: 'employee', skills: [] });
+  const pm = await User.create({ email: 'mk-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'mk-e@x.com', displayName: 'E', roles: ['employee'], skills: [] });
   const memberProject = await Project.create({ name: 'Mine', ownerPm: pm._id, members: [emp._id] });
   const otherProject = await Project.create({ name: 'Other', ownerPm: pm._id, members: [] });
   const archivedProject = await Project.create({ name: 'Archived', ownerPm: pm._id, members: [], status: 'archived' });
@@ -446,8 +447,8 @@ test('GET /marketplace returns unassigned, skill-matched tasks across all non-ar
 });
 
 test('POST /tasks/:id/claim allows a skill-matched non-member, rejects a skill mismatch, dedupes', async () => {
-  const pm = await User.create({ email: 'cl-pm@x.com', displayName: 'PM', role: 'pm' });
-  const outsider = await User.create({ email: 'cl-o@x.com', displayName: 'O', role: 'employee', skills: [] });
+  const pm = await User.create({ email: 'cl-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const outsider = await User.create({ email: 'cl-o@x.com', displayName: 'O', roles: ['employee'], skills: [] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [] });
 
   // No required skills → a non-member can claim despite not being on the project.
@@ -467,9 +468,9 @@ test('POST /tasks/:id/claim allows a skill-matched non-member, rejects a skill m
 });
 
 test('claim-requests: GET 403 for employee; approve assigns task and auto-denies competitors', async () => {
-  const pm = await User.create({ email: 'cd-pm@x.com', displayName: 'PM', role: 'pm' });
-  const a = await User.create({ email: 'cd-a@x.com', displayName: 'A', role: 'employee' });
-  const b = await User.create({ email: 'cd-b@x.com', displayName: 'B', role: 'employee' });
+  const pm = await User.create({ email: 'cd-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const a = await User.create({ email: 'cd-a@x.com', displayName: 'A', roles: ['employee'] });
+  const b = await User.create({ email: 'cd-b@x.com', displayName: 'B', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [a._id, b._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   const claimA = await ClaimRequest.create({ taskId: task._id, userId: a._id });
@@ -487,7 +488,7 @@ test('claim-requests: GET 403 for employee; approve assigns task and auto-denies
 });
 
 test('task create + edit accept a startDate', async () => {
-  const pm = await User.create({ email: 'sd-pm@x.com', displayName: 'PM', role: 'pm' });
+  const pm = await User.create({ email: 'sd-pm@x.com', displayName: 'PM', roles: ['pm'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [] });
   const created = await request(app).post(`/projects/${project._id}/tasks`)
     .set('Authorization', bearer(pm)).send({ title: 'T', startDate: '2026-06-16' });
@@ -501,8 +502,8 @@ test('task create + edit accept a startDate', async () => {
 });
 
 test('PATCH /tasks/:id/assignees assigns directly even when employee is busy (no offer)', async () => {
-  const pm = await User.create({ email: 'of-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'of-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'of-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'of-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   await Task.create({ project: project._id, title: 'Busy', assignees: assignedTo(emp._id), status: 'in_progress', createdBy: pm._id });
   const second = await Task.create({ project: project._id, title: 'Second', createdBy: pm._id });
@@ -518,8 +519,8 @@ test('PATCH /tasks/:id/assignees assigns directly even when employee is busy (no
 });
 
 test('a free employee is assigned directly (no offer)', async () => {
-  const pm = await User.create({ email: 'fr-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'fr-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'fr-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'fr-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   const res = await request(app).patch(`/tasks/${task._id}/assignees`)
@@ -531,9 +532,9 @@ test('a free employee is assigned directly (no offer)', async () => {
 });
 
 test('employee accepts an offer -> task assigned; another employee cannot decide it', async () => {
-  const pm = await User.create({ email: 'ac-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'ac-e@x.com', displayName: 'E', role: 'employee' });
-  const other = await User.create({ email: 'ac-o@x.com', displayName: 'O', role: 'employee' });
+  const pm = await User.create({ email: 'ac-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'ac-e@x.com', displayName: 'E', roles: ['employee'] });
+  const other = await User.create({ email: 'ac-o@x.com', displayName: 'O', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   const offer = await AssignmentOffer.create({ taskId: task._id, userId: emp._id, offeredBy: pm._id });
@@ -555,8 +556,8 @@ test('employee accepts an offer -> task assigned; another employee cannot decide
 });
 
 test('declining an offer leaves the task unassigned', async () => {
-  const pm = await User.create({ email: 'dc-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'dc-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'dc-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'dc-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   const offer = await AssignmentOffer.create({ taskId: task._id, userId: emp._id, offeredBy: pm._id });
@@ -571,8 +572,8 @@ test('declining an offer leaves the task unassigned', async () => {
 });
 
 test('re-assigning a busy employee twice does not create pending offers', async () => {
-  const pm = await User.create({ email: 'dd-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'dd-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'dd-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'dd-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   await Task.create({ project: project._id, title: 'Busy', assignees: assignedTo(emp._id), status: 'in_progress', createdBy: pm._id });
   const second = await Task.create({ project: project._id, title: 'Second', createdBy: pm._id });
@@ -585,9 +586,9 @@ test('re-assigning a busy employee twice does not create pending offers', async 
 });
 
 test('re-saving assignees preserves an already-submitted estimate', async () => {
-  const pm = await User.create({ email: 'me-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'me-u1@x.com', displayName: 'U1', role: 'employee' });
-  const u2 = await User.create({ email: 'me-u2@x.com', displayName: 'U2', role: 'employee' });
+  const pm = await User.create({ email: 'me-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'me-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const u2 = await User.create({ email: 'me-u2@x.com', displayName: 'U2', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
 
@@ -621,10 +622,10 @@ test('re-saving assignees preserves an already-submitted estimate', async () => 
 });
 
 test('my-estimate: submitting records a pending request without changing the approved estimate', async () => {
-  const pm = await User.create({ email: 'mye-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'mye-u1@x.com', displayName: 'U1', role: 'employee' });
-  const u2 = await User.create({ email: 'mye-u2@x.com', displayName: 'U2', role: 'employee' });
-  const outsider = await User.create({ email: 'mye-out@x.com', displayName: 'Out', role: 'employee' });
+  const pm = await User.create({ email: 'mye-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'mye-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const u2 = await User.create({ email: 'mye-u2@x.com', displayName: 'U2', roles: ['employee'] });
+  const outsider = await User.create({ email: 'mye-out@x.com', displayName: 'Out', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
   const task = await Task.create({ project: project._id, title: 'T', startDate: '2026-06-15', createdBy: pm._id });
 
@@ -656,9 +657,9 @@ test('my-estimate: submitting records a pending request without changing the app
 });
 
 test('my-estimate decision: approve applies the estimate; totals + deadline finalize once all approved', async () => {
-  const pm = await User.create({ email: 'myd-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'myd-u1@x.com', displayName: 'U1', role: 'employee' });
-  const u2 = await User.create({ email: 'myd-u2@x.com', displayName: 'U2', role: 'employee' });
+  const pm = await User.create({ email: 'myd-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'myd-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const u2 = await User.create({ email: 'myd-u2@x.com', displayName: 'U2', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
   const task = await Task.create({ project: project._id, title: 'T', startDate: '2026-06-15', createdBy: pm._id });
 
@@ -689,8 +690,8 @@ test('my-estimate decision: approve applies the estimate; totals + deadline fina
 });
 
 test('my-estimate decision: reject clears the request and leaves the approved estimate unchanged', async () => {
-  const pm = await User.create({ email: 'myr-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'myr-u1@x.com', displayName: 'U1', role: 'employee' });
+  const pm = await User.create({ email: 'myr-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'myr-u1@x.com', displayName: 'U1', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
 
@@ -711,8 +712,8 @@ test('my-estimate decision: reject clears the request and leaves the approved es
 });
 
 test('my-estimate decision: only a PM/owner who is not the requester can decide', async () => {
-  const pm = await User.create({ email: 'mya-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'mya-u1@x.com', displayName: 'U1', role: 'employee' });
+  const pm = await User.create({ email: 'mya-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'mya-u1@x.com', displayName: 'U1', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [pm._id, u1._id] });
   const task = await Task.create({ project: project._id, title: 'T', createdBy: pm._id });
   await request(app).patch(`/tasks/${task._id}/assignees`)
@@ -736,14 +737,14 @@ test('my-estimate decision: only a PM/owner who is not the requester can decide'
 });
 
 test('project requiredSkills: keeps active skills on create/patch and returns them populated', async () => {
-  const pm = await User.create({ email: 'rs-pm@x.com', displayName: 'PM', role: 'pm' });
+  const pm = await User.create({ email: 'rs-pm@x.com', displayName: 'PM', roles: ['pm'] });
   const active = await Skill.create({ name: 'React', active: true });
   const inactive = await Skill.create({ name: 'COBOL', active: false });
 
   // Create: only the active skill is kept.
   const created = await request(app).post('/projects')
     .set('Authorization', bearer(pm))
-    .send({ name: 'P', requiredSkills: [String(active._id), String(inactive._id)] });
+    .send({ name: 'P', clientName: 'TestClient', requiredSkills: [String(active._id), String(inactive._id)] });
   assert.equal(created.status, 201);
   assert.deepEqual(created.body.requiredSkills.map(String), [String(active._id)]);
 
@@ -764,11 +765,11 @@ test('project requiredSkills: keeps active skills on create/patch and returns th
 });
 
 test('GET /projects/:id/candidates: workload + skill match, sorted, PM-only', async () => {
-  const pm = await User.create({ email: 'cand-pm@x.com', displayName: 'PM', role: 'pm' });
+  const pm = await User.create({ email: 'cand-pm@x.com', displayName: 'PM', roles: ['pm'] });
   const vue = await Skill.create({ name: 'Vue', active: true });
-  const free = await User.create({ email: 'cand-free@x.com', displayName: 'Free', role: 'employee', skills: [vue._id] });
-  const busy = await User.create({ email: 'cand-busy@x.com', displayName: 'Busy', role: 'employee', skills: [] });
-  const member = await User.create({ email: 'cand-mem@x.com', displayName: 'Mem', role: 'employee', skills: [vue._id] });
+  const free = await User.create({ email: 'cand-free@x.com', displayName: 'Free', roles: ['employee'], skills: [vue._id] });
+  const busy = await User.create({ email: 'cand-busy@x.com', displayName: 'Busy', roles: ['employee'], skills: [] });
+  const member = await User.create({ email: 'cand-mem@x.com', displayName: 'Mem', roles: ['employee'], skills: [vue._id] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [member._id], requiredSkills: [vue._id] });
 
   // 'busy' carries 36h of active work; 'free' carries none.
@@ -813,9 +814,9 @@ test('GET /projects/:id/candidates: workload + skill match, sorted, PM-only', as
 });
 
 test('my-eta: assignee sets, updates, and clears their personal completion estimate', async () => {
-  const pm = await User.create({ email: 'eta-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'eta-u1@x.com', displayName: 'U1', role: 'employee' });
-  const outsider = await User.create({ email: 'eta-out@x.com', displayName: 'Out', role: 'employee' });
+  const pm = await User.create({ email: 'eta-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'eta-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const outsider = await User.create({ email: 'eta-out@x.com', displayName: 'Out', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
 
@@ -845,8 +846,8 @@ test('my-eta: assignee sets, updates, and clears their personal completion estim
 });
 
 test('my-eta is exposed on /tasks/mine and on the project detail assignee', async () => {
-  const pm = await User.create({ email: 'eta2-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'eta2-u1@x.com', displayName: 'U1', role: 'employee' });
+  const pm = await User.create({ email: 'eta2-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'eta2-u1@x.com', displayName: 'U1', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'T-eta', assignees: assignedTo(u1._id), createdBy: pm._id });
 
@@ -863,8 +864,8 @@ test('my-eta is exposed on /tasks/mine and on the project detail assignee', asyn
 });
 
 test('estimate proposal is blocked for tasks that have assignees', async () => {
-  const pm = await User.create({ email: 'blk-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'blk-e@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'blk-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'blk-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
 
@@ -875,9 +876,9 @@ test('estimate proposal is blocked for tasks that have assignees', async () => {
 });
 
 test('my-tasks row exposes my estimate, my deadline, and pending state', async () => {
-  const pm = await User.create({ email: 'mtr-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'mtr-u1@x.com', displayName: 'U1', role: 'employee' });
-  const u2 = await User.create({ email: 'mtr-u2@x.com', displayName: 'U2', role: 'employee' });
+  const pm = await User.create({ email: 'mtr-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'mtr-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const u2 = await User.create({ email: 'mtr-u2@x.com', displayName: 'U2', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id, u2._id] });
   const task = await Task.create({
     project: project._id,
@@ -917,8 +918,8 @@ test('my-tasks row exposes my estimate, my deadline, and pending state', async (
 });
 
 test('re-estimation history: an ask is recorded pending and stamped on decision (Part 4)', async () => {
-  const pm = await User.create({ email: 'reh-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'reh-u1@x.com', displayName: 'U1', role: 'employee' });
+  const pm = await User.create({ email: 'reh-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'reh-u1@x.com', displayName: 'U1', roles: ['employee'] });
   const project = await Project.create({ name: 'Apollo', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'Build API', assignees: assignedTo(u1._id), createdBy: pm._id });
 
@@ -957,9 +958,9 @@ test('re-estimation history: an ask is recorded pending and stamped on decision 
 });
 
 test('GET /users/:id/reestimations: self/PM allowed, others forbidden; aggregate counts requesters', async () => {
-  const pm = await User.create({ email: 'rhist-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'rhist-u1@x.com', displayName: 'U1', role: 'employee' });
-  const other = await User.create({ email: 'rhist-o@x.com', displayName: 'O', role: 'employee' });
+  const pm = await User.create({ email: 'rhist-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'rhist-u1@x.com', displayName: 'U1', roles: ['employee'] });
+  const other = await User.create({ email: 'rhist-o@x.com', displayName: 'O', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
 
@@ -992,9 +993,9 @@ test('GET /users/:id/reestimations: self/PM allowed, others forbidden; aggregate
 });
 
 test('GET /users/reputation: admin only, returns per-person company-fit shape', async () => {
-  const admin = await User.create({ email: 'rep-a@x.com', displayName: 'A', role: 'admin' });
-  const pm = await User.create({ email: 'rep-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'rep-e@x.com', displayName: 'E', role: 'employee' });
+  const admin = await User.create({ email: 'rep-a@x.com', displayName: 'A', roles: ['admin'] });
+  const pm = await User.create({ email: 'rep-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'rep-e@x.com', displayName: 'E', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [emp._id] });
   await Task.create({ project: project._id, title: 'T', assignees: assignedTo(emp._id), createdBy: pm._id });
 
@@ -1017,8 +1018,8 @@ test('GET /users/reputation: admin only, returns per-person company-fit shape', 
 });
 
 test('candidates no longer carry the re-estimation pastRecord, even when the user has one (Part 2 × Part 4)', async () => {
-  const pm = await User.create({ email: 'pr-pm@x.com', displayName: 'PM', role: 'pm' });
-  const u1 = await User.create({ email: 'pr-u1@x.com', displayName: 'U1', role: 'employee' });
+  const pm = await User.create({ email: 'pr-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const u1 = await User.create({ email: 'pr-u1@x.com', displayName: 'U1', roles: ['employee'] });
   const project = await Project.create({ name: 'P', ownerPm: pm._id, members: [u1._id] });
   const task = await Task.create({ project: project._id, title: 'T', assignees: assignedTo(u1._id), createdBy: pm._id });
 

@@ -1,8 +1,9 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
 export type NavItem = { key: NavKey; label: string; path: string };
+export type NavSection = { title: string; items: NavItem[] };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
 
 export function pathForKey(key: NavKey): string {
   return key === 'home' ? '/' : `/${key}`;
@@ -10,105 +11,101 @@ export function pathForKey(key: NavKey): string {
 
 export function keyForPath(pathname: string): NavKey {
   if (pathname === '/') return 'home';
-  const seg = pathname.slice(1);
+  const seg = pathname.split('/').filter(Boolean)[0];
   return ALL_NAV_KEYS.includes(seg as NavKey) ? (seg as NavKey) : 'home';
 }
 
-const PERSONAL_BASE: NavItem[] = [
-  { key: 'home', label: 'Home', path: '/' },
-  { key: 'my-tasks', label: 'My Tasks', path: '/my-tasks' },
-  { key: 'my-skills', label: 'My Skills', path: '/my-skills' },
-  { key: 'marketplace', label: 'Marketplace', path: '/marketplace' },
-  { key: 'timesheet', label: 'Timesheet', path: '/timesheet' },
-  { key: 'attendance', label: 'Attendance', path: '/attendance' },
-  { key: 'my-requests', label: 'My Requests', path: '/my-requests' },
-  { key: 'organisation', label: 'Organisation', path: '/organisation' },
-];
+const I = (key: NavKey, label: string): NavItem => ({ key, label, path: key === 'home' ? '/' : `/${key}` });
 
-function roleAdditions(role: Role): NavItem[] {
-  switch (role) {
-    case 'admin':
-      return [
-        { key: 'users', label: 'Users', path: '/users' },
-        { key: 'skills', label: 'Skills', path: '/skills' },
-        { key: 'departments', label: 'Departments', path: '/departments' },
-        { key: 'shifts', label: 'Shifts', path: '/shifts' },
-        { key: 'company-fit', label: 'Company fit', path: '/company-fit' },
-        { key: 'projects', label: 'Projects', path: '/projects' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'utilization', label: 'Utilization', path: '/utilization' },
-        { key: 'onboarding', label: 'Onboarding', path: '/onboarding' },
-        { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' },
-        { key: 'onboarding-templates', label: 'Onboarding Templates', path: '/onboarding-templates' },
-      ];
-    case 'pm':
-      return [
-        { key: 'projects', label: 'Projects', path: '/projects' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'utilization', label: 'Utilization', path: '/utilization' },
-        { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' },
-      ];
-    case 'reporting_manager':
-      return [
-        { key: 'my-team', label: 'My Team', path: '/my-team' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' },
-      ];
-    case 'team_lead':
-      return [
-        { key: 'my-team', label: 'My Team', path: '/my-team' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' },
-      ];
-    case 'hr':
-      return [
-        { key: 'users', label: 'Users', path: '/users' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' },
-        { key: 'onboarding', label: 'Onboarding', path: '/onboarding' },
-        { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' },
-        { key: 'onboarding-templates', label: 'Onboarding Templates', path: '/onboarding-templates' },
-      ];
-    case 'finance':
-      return [
-        { key: 'projects', label: 'Projects', path: '/projects' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'utilization', label: 'Utilization', path: '/utilization' },
-      ];
-    case 'director':
-    case 'vp':
-      return [
-        { key: 'users', label: 'Users', path: '/users' },
-        { key: 'projects', label: 'Projects', path: '/projects' },
-        { key: 'requests', label: 'Requests', path: '/requests' },
-        { key: 'utilization', label: 'Utilization', path: '/utilization' },
-        { key: 'team-attendance', label: 'Team Attendance', path: '/team-attendance' },
-      ];
-    case 'employee':
-    default:
-      return [];
+function sectionsForRole(role: Role): NavSection[] {
+  const sections: NavSection[] = [];
+
+  sections.push({ title: '', items: [I('home', 'Home')] });
+
+  {
+    const people: NavItem[] = [];
+    if (['admin', 'hr', 'director', 'vp'].includes(role)) {
+      people.push(I('users', 'Users'));
+    }
+    if (role === 'admin') {
+      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'));
+    }
+    people.push(I('organisation', 'Organisation'));
+    sections.push({ title: 'People', items: people });
   }
+
+  if (['admin', 'pm', 'finance', 'director', 'vp'].includes(role)) {
+    const work: NavItem[] = [I('projects', 'Projects')];
+    if (role !== 'finance') work.push(I('my-tasks', 'My Tasks'));
+    work.push(I('timesheet', 'Timesheet'));
+    work.push(I('utilization', 'Utilization'));
+    sections.push({ title: 'Work', items: work });
+  } else if (['reporting_manager', 'team_lead'].includes(role)) {
+    sections.push({ title: 'Work', items: [I('my-tasks', 'My Tasks'), I('timesheet', 'Timesheet')] });
+  } else if (role === 'employee') {
+    sections.push({ title: 'Work', items: [I('my-tasks', 'My Tasks'), I('timesheet', 'Timesheet')] });
+  } else {
+    sections.push({ title: 'Work', items: [I('timesheet', 'Timesheet')] });
+  }
+
+  const attLeave: NavItem[] = [I('attendance', 'Attendance')];
+  if (['admin', 'pm', 'reporting_manager', 'team_lead', 'hr', 'director', 'vp'].includes(role)) {
+    attLeave.push(I('requests', 'Requests'));
+  }
+  if (['reporting_manager', 'team_lead', 'hr', 'director', 'vp'].includes(role)) {
+    attLeave.push(I('team-attendance', 'Team Attendance'));
+  }
+  attLeave.push(I('my-requests', 'My Requests'));
+  attLeave.push(I('reimbursements', 'Reimbursements'));
+  sections.push({ title: 'Attendance & Leave', items: attLeave });
+
+  if (['admin', 'finance'].includes(role)) {
+    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips')] });
+  } else {
+    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips')] });
+  }
+
+  if (['admin', 'hr'].includes(role)) {
+    sections.push({ title: 'Onboarding', items: [I('onboarding', 'Onboarding'), I('onboarding-tasks', 'Onboarding Tasks'), I('onboarding-templates', 'Onboarding Templates')] });
+  }
+
+  const growth: NavItem[] = [I('my-skills', 'My Skills'), I('marketplace', 'Marketplace')];
+  sections.push({ title: 'Growth', items: growth });
+
+  return sections;
 }
 
-export function navForRoles(roles: Role[]): NavItem[] {
+export function navSectionsForRoles(roles: Role[]): NavSection[] {
   const seen = new Set<NavKey>();
-  const result: NavItem[] = [];
-
-  for (const item of PERSONAL_BASE) {
-    seen.add(item.key);
-    result.push(item);
-  }
-
-  const priority: Role[] = ['admin', 'pm', 'hr', 'finance', 'reporting_manager', 'team_lead', 'director', 'vp'];
+  const result: NavSection[] = [];
+  const priority: Role[] = ['admin', 'vp', 'director', 'pm', 'hr', 'finance', 'reporting_manager', 'team_lead', 'employee'];
   const ordered = priority.filter((r) => roles.includes(r));
+  if (ordered.length === 0) ordered.push('employee');
+
+  const sectionMap = new Map<string, NavSection>();
+
   for (const role of ordered) {
-    for (const item of roleAdditions(role)) {
-      if (!seen.has(item.key)) {
-        seen.add(item.key);
-        result.push(item);
+    for (const section of sectionsForRole(role)) {
+      const key = section.title || '__home__';
+      if (!sectionMap.has(key)) {
+        sectionMap.set(key, { title: section.title, items: [] });
+      }
+      const merged = sectionMap.get(key)!;
+      for (const item of section.items) {
+        if (!seen.has(item.key)) {
+          seen.add(item.key);
+          merged.items.push(item);
+        }
       }
     }
   }
 
+  for (const sec of sectionMap.values()) {
+    if (sec.items.length > 0) result.push(sec);
+  }
   return result;
+}
+
+export function navForRoles(roles: Role[]): NavItem[] {
+  return navSectionsForRoles(roles).flatMap(s => s.items);
 }

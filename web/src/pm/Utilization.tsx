@@ -36,20 +36,20 @@ export function Utilization() {
         <>
           <div className="ts-tiles">
             <div className="ts-tile ts-tile-accent">
-              <span className="ts-tile-label">Utilization</span>
+              <span className="ts-tile-label">Avg Utilization</span>
               <span className="ts-tile-value">{report.summary.utilizationPct}%</span>
             </div>
             <div className="ts-tile stat-done">
-              <span className="ts-tile-label">Billable</span>
-              <span className="ts-tile-value">{formatMinutes(report.summary.billableMinutes)}</span>
+              <span className="ts-tile-label">Avg Billable / Person</span>
+              <span className="ts-tile-value">{formatMinutes(report.employees.length > 0 ? Math.round(report.summary.billableMinutes / report.employees.length) : 0)}</span>
             </div>
             <div className="ts-tile stat-logged">
-              <span className="ts-tile-label">Non-Billable</span>
-              <span className="ts-tile-value">{formatMinutes(report.summary.nonBillableMinutes)}</span>
+              <span className="ts-tile-label">Avg Non-Billable / Person</span>
+              <span className="ts-tile-value">{formatMinutes(report.employees.length > 0 ? Math.round(report.summary.nonBillableMinutes / report.employees.length) : 0)}</span>
             </div>
             <div className="ts-tile stat-tasks">
-              <span className="ts-tile-label">Total</span>
-              <span className="ts-tile-value">{formatMinutes(report.summary.totalMinutes)}</span>
+              <span className="ts-tile-label">Employees Tracked</span>
+              <span className="ts-tile-value">{report.employees.length}</span>
             </div>
           </div>
 

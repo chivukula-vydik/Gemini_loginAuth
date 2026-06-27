@@ -398,11 +398,23 @@ a:focus-visible, button:focus-visible, .input:focus-visible, summary:focus-visib
   gap: 18px;
 }
 .shell-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 8px; }
-.shell-nav { display: grid; gap: 3px; flex: 1; align-content: start; }
+.shell-nav { display: grid; gap: 2px; flex: 1; align-content: start; overflow-y: auto; }
+.shell-nav-section { margin-top: 6px; }
+.shell-nav-section:first-child { margin-top: 0; }
+.shell-nav-header {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 6px 12px; font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+  user-select: none; cursor: pointer;
+  background: none; border: none; border-radius: var(--radius-sm);
+  transition: color 0.12s;
+}
+.shell-nav-header:hover { color: var(--text); }
+.shell-nav-chevron { flex-shrink: 0; opacity: 0.6; transition: transform 0.15s ease; }
 .shell-nav-item {
   display: flex; align-items: center; gap: 11px;
-  padding: 9px 12px; border-radius: var(--radius-sm); text-decoration: none;
-  color: var(--muted); font-size: 14px; font-weight: 500;
+  padding: 7px 12px; border-radius: var(--radius-sm); text-decoration: none;
+  color: var(--muted); font-size: 13px; font-weight: 500;
   transition: background 0.12s, color 0.12s;
 }
 .shell-nav-icon { flex-shrink: 0; opacity: 0.85; }

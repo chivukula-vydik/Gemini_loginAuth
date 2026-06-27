@@ -9,6 +9,7 @@
     "test": "node --test \"src/timesheet/**/*.test.ts\" \"src/pm/**/*.test.ts\""
   },
   "dependencies": {
+    "@tabler/icons-react": "^3.44.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.0",
