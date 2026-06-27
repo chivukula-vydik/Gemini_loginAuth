@@ -21,6 +21,7 @@ import { MyTeam } from './dashboard/MyTeam';
 import { TeamAttendanceDashboard } from './attendance/TeamAttendanceDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
+import { OnboardingBoard, CaseDetail, MyOnboardingTasks, TemplateBuilder } from './onboarding/index';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -40,6 +41,9 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'my-team': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />,
   'team-attendance': <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 14v4l2-1 2 1v-4" />,
   organisation: <path d="M12 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 8v4M12 12H6M12 12h6M6 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />,
+  onboarding: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM20 8v6M23 11h-6" />,
+  'onboarding-tasks': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
+  'onboarding-templates': <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -109,6 +113,10 @@ export function AppShell() {
           <Route path="/my-team" element={<MyTeam />} />
           <Route path="/team-attendance" element={<TeamAttendanceDashboard />} />
           <Route path="/organisation" element={<OrgModule />} />
+          <Route path="/onboarding" element={<OnboardingBoard />} />
+          <Route path="/onboarding/:id" element={<CaseDetail />} />
+          <Route path="/onboarding-tasks" element={<MyOnboardingTasks />} />
+          <Route path="/onboarding-templates" element={<TemplateBuilder />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

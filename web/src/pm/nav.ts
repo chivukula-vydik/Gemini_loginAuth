@@ -1,8 +1,8 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
 export type NavItem = { key: NavKey; label: string; path: string };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team', 'team-attendance', 'organisation'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team', 'team-attendance', 'organisation', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
 
 export function pathForKey(key: NavKey): string {
   return key === 'home' ? '/' : `/${key}`;
@@ -34,13 +34,16 @@ function navForRole(role: Role): NavItem[] {
       timesheet,
       attendance,
       org,
+      { key: 'onboarding', label: 'Onboarding', path: '/onboarding' },
+      { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' },
+      { key: 'onboarding-templates', label: 'Onboarding Templates', path: '/onboarding-templates' },
     ];
   }
   if (role === 'pm') {
-    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'requests', label: 'Requests', path: '/requests' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org];
+    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'requests', label: 'Requests', path: '/requests' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org, { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' }];
   }
   if (role === 'reporting_manager' || role === 'team_lead') {
-    return [home, { key: 'my-team', label: 'My Team', path: '/my-team' }, { key: 'requests', label: 'Requests', path: '/requests' }, timesheet, attendance, teamAtt, org];
+    return [home, { key: 'my-team', label: 'My Team', path: '/my-team' }, { key: 'requests', label: 'Requests', path: '/requests' }, timesheet, attendance, teamAtt, org, { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' }];
   }
   if (role === 'director' || role === 'vp') {
     return [
@@ -53,6 +56,7 @@ function navForRole(role: Role): NavItem[] {
       attendance,
       teamAtt,
       org,
+      { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' },
     ];
   }
   if (role === 'hr') {
@@ -64,10 +68,13 @@ function navForRole(role: Role): NavItem[] {
       attendance,
       teamAtt,
       org,
+      { key: 'onboarding', label: 'Onboarding', path: '/onboarding' },
+      { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' },
+      { key: 'onboarding-templates', label: 'Onboarding Templates', path: '/onboarding-templates' },
     ];
   }
   if (role === 'finance') {
-    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org];
+    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org, { key: 'onboarding-tasks', label: 'Onboarding Tasks', path: '/onboarding-tasks' }];
   }
   return [
     home,
