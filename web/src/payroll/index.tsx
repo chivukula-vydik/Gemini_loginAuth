@@ -1,5 +1,5 @@
 export { PayrollRunList } from './PayrollRunList';
-export function PayrollRunDetail() { return <div>Run Detail</div>; }
+export { PayrollRunDetail } from './PayrollRunDetail';
 export function SalaryEditor() { return <div>Salary Editor</div>; }
 export function MyPayslips() { return <div>My Payslips</div>; }
 export function Declarations() { return <div>Declarations</div>; }
