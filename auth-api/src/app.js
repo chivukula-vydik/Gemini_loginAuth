@@ -104,8 +104,8 @@ export function createApp(config) {
   app.use('/dashboard', createDashboardRouter());
   app.use('/manager', createManagerRouter());
   app.use('/org', createOrgRouter());
-  app.use('/onboarding', createOnboardingRouter());
   app.use('/onboarding/portal', createOnboardingPortalRouter());
+  app.use('/onboarding', createOnboardingRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

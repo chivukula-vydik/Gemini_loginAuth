@@ -70,7 +70,7 @@ export function createOnboardingRouter() {
     res.json(doc);
   }));
 
-  router.get('/documents/:fileId/download', asyncHandler(async (req, res) => {
+  router.get('/documents/:fileId/download', requireAuth, asyncHandler(async (req, res) => {
     const bucket = getDocBucket();
     const oid = new mongoose.Types.ObjectId(req.params.fileId);
     const files = await bucket.find({ _id: oid }).toArray();
