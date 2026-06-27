@@ -1,8 +1,8 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements';
 export type NavItem = { key: NavKey; label: string; path: string };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team', 'team-attendance', 'organisation'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements'];
 
 export function pathForKey(key: NavKey): string {
   return key === 'home' ? '/' : `/${key}`;
@@ -31,6 +31,7 @@ function navForRole(role: Role): NavItem[] {
       { key: 'projects', label: 'Projects', path: '/projects' },
       { key: 'requests', label: 'Requests', path: '/requests' },
       { key: 'utilization', label: 'Utilization', path: '/utilization' },
+      { key: 'payroll', label: 'Payroll', path: '/payroll' },
       timesheet,
       attendance,
       org,
@@ -67,13 +68,15 @@ function navForRole(role: Role): NavItem[] {
     ];
   }
   if (role === 'finance') {
-    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, timesheet, attendance, org];
+    return [home, { key: 'projects', label: 'Projects', path: '/projects' }, { key: 'utilization', label: 'Utilization', path: '/utilization' }, { key: 'payroll', label: 'Payroll', path: '/payroll' }, timesheet, attendance, org];
   }
   return [
     home,
     { key: 'my-tasks', label: 'My Tasks', path: '/my-tasks' },
     { key: 'my-skills', label: 'My Skills', path: '/my-skills' },
     { key: 'marketplace', label: 'Marketplace', path: '/marketplace' },
+    { key: 'my-payslips', label: 'My Payslips', path: '/my-payslips' },
+    { key: 'reimbursements', label: 'Reimbursements', path: '/reimbursements' },
     timesheet,
     attendance,
     org,
