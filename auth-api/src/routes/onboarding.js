@@ -26,6 +26,78 @@ function getDocBucket() {
 export function createOnboardingRouter() {
   const router = express.Router();
 
+  // --- Static-prefix routes (registered before /:id to avoid shadowing) ---
+
+  router.post('/tasks/:taskId/complete', requireAuth, asyncHandler(async (req, res) => {
+    const task = await OnboardingTask.findById(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (task.assignedTo && task.assignedTo.toString() !== req.user.sub && !req.user.roles.includes('admin')) {
+      return res.status(403).json({ error: 'not assigned to you' });
+    }
+    task.status = 'done';
+    task.completedAt = new Date();
+    task.completedBy = req.user.sub;
+    await task.save();
+    res.json(task);
+  }));
+
+  router.get('/tasks/mine', requireAuth, asyncHandler(async (req, res) => {
+    const tasks = await OnboardingTask.find({ assignedTo: req.user.sub, status: { $ne: 'done' } })
+      .populate({ path: 'onboardingCase', select: 'candidate designation status joiningDate' })
+      .sort('dueDate');
+    res.json(tasks);
+  }));
+
+  router.post('/documents/:docId/verify', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const doc = await DocumentRequest.findById(req.params.docId);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
+    doc.verifyStatus = 'verified';
+    doc.verifiedBy = req.user.sub;
+    doc.verifiedAt = new Date();
+    if (req.body.extractedFields) doc.submission.extractedFields = req.body.extractedFields;
+    await doc.save();
+    res.json(doc);
+  }));
+
+  router.post('/documents/:docId/reject', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const doc = await DocumentRequest.findById(req.params.docId);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
+    doc.verifyStatus = 'rejected';
+    doc.rejectionReason = req.body.reason || '';
+    await doc.save();
+    res.json(doc);
+  }));
+
+  router.get('/documents/:fileId/download', asyncHandler(async (req, res) => {
+    const bucket = getDocBucket();
+    const oid = new mongoose.Types.ObjectId(req.params.fileId);
+    const files = await bucket.find({ _id: oid }).toArray();
+    if (!files.length) return res.status(404).json({ error: 'file not found' });
+    res.set('Content-Type', files[0].contentType);
+    res.set('Content-Disposition', `inline; filename="${files[0].filename}"`);
+    bucket.openDownloadStream(oid).pipe(res);
+  }));
+
+  router.get('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const templates = await OnboardingTemplate.find().sort('-createdAt');
+    res.json(templates);
+  }));
+
+  router.post('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const { name, appliesTo, tasks } = req.body;
+    if (!name || !tasks?.length) return res.status(400).json({ error: 'name and tasks required' });
+    const template = await OnboardingTemplate.create({ name, appliesTo, tasks });
+    res.status(201).json(template);
+  }));
+
+  router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const template = await OnboardingTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!template) return res.status(404).json({ error: 'not found' });
+    res.json(template);
+  }));
+
   // --- Cases ---
 
   router.post('/', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
@@ -152,26 +224,6 @@ export function createOnboardingRouter() {
     res.json(enriched);
   }));
 
-  router.post('/tasks/:taskId/complete', requireAuth, asyncHandler(async (req, res) => {
-    const task = await OnboardingTask.findById(req.params.taskId);
-    if (!task) return res.status(404).json({ error: 'not found' });
-    if (task.assignedTo && task.assignedTo.toString() !== req.user.sub && !req.user.roles.includes('admin')) {
-      return res.status(403).json({ error: 'not assigned to you' });
-    }
-    task.status = 'done';
-    task.completedAt = new Date();
-    task.completedBy = req.user.sub;
-    await task.save();
-    res.json(task);
-  }));
-
-  router.get('/tasks/mine', requireAuth, asyncHandler(async (req, res) => {
-    const tasks = await OnboardingTask.find({ assignedTo: req.user.sub, status: { $ne: 'done' } })
-      .populate({ path: 'onboardingCase', select: 'candidate designation status joiningDate' })
-      .sort('dueDate');
-    res.json(tasks);
-  }));
-
   // --- Documents ---
 
   router.get('/:id/documents', requireAuth, asyncHandler(async (req, res) => {
@@ -204,58 +256,6 @@ export function createOnboardingRouter() {
     doc.verifyStatus = 'submitted';
     await doc.save();
     res.json(doc);
-  }));
-
-  router.post('/documents/:docId/verify', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const doc = await DocumentRequest.findById(req.params.docId);
-    if (!doc) return res.status(404).json({ error: 'not found' });
-    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
-    doc.verifyStatus = 'verified';
-    doc.verifiedBy = req.user.sub;
-    doc.verifiedAt = new Date();
-    if (req.body.extractedFields) doc.submission.extractedFields = req.body.extractedFields;
-    await doc.save();
-    res.json(doc);
-  }));
-
-  router.post('/documents/:docId/reject', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const doc = await DocumentRequest.findById(req.params.docId);
-    if (!doc) return res.status(404).json({ error: 'not found' });
-    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
-    doc.verifyStatus = 'rejected';
-    doc.rejectionReason = req.body.reason || '';
-    await doc.save();
-    res.json(doc);
-  }));
-
-  router.get('/documents/:fileId/download', asyncHandler(async (req, res) => {
-    const bucket = getDocBucket();
-    const oid = new mongoose.Types.ObjectId(req.params.fileId);
-    const files = await bucket.find({ _id: oid }).toArray();
-    if (!files.length) return res.status(404).json({ error: 'file not found' });
-    res.set('Content-Type', files[0].contentType);
-    res.set('Content-Disposition', `inline; filename="${files[0].filename}"`);
-    bucket.openDownloadStream(oid).pipe(res);
-  }));
-
-  // --- Templates ---
-
-  router.get('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const templates = await OnboardingTemplate.find().sort('-createdAt');
-    res.json(templates);
-  }));
-
-  router.post('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const { name, appliesTo, tasks } = req.body;
-    if (!name || !tasks?.length) return res.status(400).json({ error: 'name and tasks required' });
-    const template = await OnboardingTemplate.create({ name, appliesTo, tasks });
-    res.status(201).json(template);
-  }));
-
-  router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const template = await OnboardingTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if (!template) return res.status(404).json({ error: 'not found' });
-    res.json(template);
   }));
 
   // --- Conversion ---
