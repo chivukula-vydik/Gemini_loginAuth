@@ -1,0 +1,424 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import multer from 'multer';
+import { Readable } from 'stream';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import { OnboardingCase, VALID_TRANSITIONS, TERMINAL_STATES } from '../models/OnboardingCase.js';
+import { Offer } from '../models/Offer.js';
+import { OnboardingTemplate } from '../models/OnboardingTemplate.js';
+import { OnboardingTask } from '../models/OnboardingTask.js';
+import { DocumentRequest } from '../models/DocumentRequest.js';
+import { User } from '../models/User.js';
+import { SalaryStructure } from '../models/SalaryStructure.js';
+import { PayGroup } from '../models/PayGroup.js';
+import { LeaveBalance, DEFAULT_QUOTAS } from '../models/LeaveBalance.js';
+import { PasswordResetToken } from '../models/PasswordResetToken.js';
+import crypto from 'crypto';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function getDocBucket() {
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'onboardingDocs' });
+}
+
+export function createOnboardingRouter() {
+  const router = express.Router();
+
+  // --- Cases ---
+
+  router.post('/', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const { candidate, designation, department, reportingManager, payGrade, payGroup,
+            workLocation, employmentType, joiningDate, probationMonths, workflowTemplate } = req.body;
+    if (!candidate?.firstName || !candidate?.lastName || !candidate?.personalEmail || !joiningDate) {
+      return res.status(400).json({ error: 'candidate (firstName, lastName, personalEmail) and joiningDate required' });
+    }
+    const c = await OnboardingCase.create({
+      candidate, designation, department, reportingManager, payGrade, payGroup,
+      workLocation, employmentType, joiningDate, probationMonths, workflowTemplate,
+      createdBy: req.user.sub,
+    });
+    res.status(201).json(c);
+  }));
+
+  router.get('/', requireAuth, requireRole('admin', 'hr', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.department) filter.department = req.query.department;
+    if (!req.user.roles.includes('admin') && !req.user.roles.includes('hr')) {
+      filter.reportingManager = req.user.sub;
+    }
+    const cases = await OnboardingCase.find(filter)
+      .populate('department', 'name')
+      .populate('reportingManager', 'displayName email')
+      .sort('-createdAt');
+    res.json(cases);
+  }));
+
+  router.get('/:id', requireAuth, asyncHandler(async (req, res) => {
+    const c = await OnboardingCase.findById(req.params.id)
+      .populate('department', 'name')
+      .populate('reportingManager', 'displayName email')
+      .populate('payGrade', 'code label')
+      .populate('payGroup', 'name');
+    if (!c) return res.status(404).json({ error: 'not found' });
+    const offer = await Offer.findOne({ onboardingCase: c._id, status: { $ne: 'revised' } }).sort('-version');
+    const tasks = await OnboardingTask.find({ onboardingCase: c._id }).populate('assignedTo', 'displayName email').sort('dueDate');
+    const docs = await DocumentRequest.find({ onboardingCase: c._id });
+
+    const doneTasks = new Set(tasks.filter(t => t.status === 'done').map(t => t.templateKey));
+    const enrichedTasks = tasks.map(t => {
+      const blocked = t.dependsOn.length > 0 && !t.dependsOn.every(dep => doneTasks.has(dep));
+      return { ...t.toObject(), blocked };
+    });
+
+    const mandatoryDocs = docs.filter(d => d.mandatory);
+    const allMandatoryDocsVerified = mandatoryDocs.length > 0 && mandatoryDocs.every(d => d.verifyStatus === 'verified');
+    const mandatoryTasks = tasks.filter(t => t.mandatory);
+    const allMandatoryTasksDone = mandatoryTasks.every(t => t.status === 'done');
+    const readyToConvert = allMandatoryDocsVerified && allMandatoryTasksDone && offer?.status === 'accepted';
+
+    res.json({ ...c.toObject(), offer, tasks: enrichedTasks, documents: docs, readyToConvert });
+  }));
+
+  // --- Transitions ---
+
+  router.post('/:id/transition', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const { to } = req.body;
+    const c = await OnboardingCase.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    if (TERMINAL_STATES.has(c.status)) return res.status(400).json({ error: 'case is in terminal state' });
+    const allowed = VALID_TRANSITIONS[c.status] || [];
+    if (!allowed.includes(to)) {
+      return res.status(400).json({ error: `cannot transition from ${c.status} to ${to}`, allowed });
+    }
+    if (to === 'PRE_BOARDING') {
+      await instantiateTasks(c);
+      await createDefaultDocRequests(c);
+    }
+    c.status = to;
+    await c.save();
+    res.json(c);
+  }));
+
+  // --- Offers ---
+
+  router.post('/:id/offer', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const c = await OnboardingCase.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    const { ctcAnnual, componentsPreview, expiryDate, letterUrl } = req.body;
+    const existing = await Offer.findOne({ onboardingCase: c._id, status: { $ne: 'revised' } }).sort('-version');
+    if (existing) {
+      existing.status = 'revised';
+      await existing.save();
+    }
+    const version = existing ? existing.version + 1 : 1;
+    const offer = await Offer.create({
+      onboardingCase: c._id, version, ctcAnnual,
+      componentsPreview: componentsPreview || [],
+      joiningDate: c.joiningDate, expiryDate, letterUrl,
+    });
+    res.status(201).json(offer);
+  }));
+
+  router.post('/:id/offer/send', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const c = await OnboardingCase.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    const offer = await Offer.findOne({ onboardingCase: c._id, status: 'draft' }).sort('-version');
+    if (!offer) return res.status(400).json({ error: 'no draft offer to send' });
+    offer.status = 'sent';
+    offer.sentAt = new Date();
+    await offer.save();
+    const token = c.generatePortalToken();
+    await c.save();
+    if (c.status === 'DRAFT') {
+      c.status = 'OFFER_SENT';
+      await c.save();
+    }
+    res.json({ offer, portalLink: `/onboarding/portal/${token}` });
+  }));
+
+  // --- Tasks ---
+
+  router.get('/:id/tasks', requireAuth, asyncHandler(async (req, res) => {
+    const tasks = await OnboardingTask.find({ onboardingCase: req.params.id })
+      .populate('assignedTo', 'displayName email').sort('dueDate');
+    const doneKeys = new Set(tasks.filter(t => t.status === 'done').map(t => t.templateKey));
+    const enriched = tasks.map(t => ({
+      ...t.toObject(),
+      blocked: t.dependsOn.length > 0 && !t.dependsOn.every(dep => doneKeys.has(dep)),
+    }));
+    res.json(enriched);
+  }));
+
+  router.post('/tasks/:taskId/complete', requireAuth, asyncHandler(async (req, res) => {
+    const task = await OnboardingTask.findById(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'not found' });
+    if (task.assignedTo && task.assignedTo.toString() !== req.user.sub && !req.user.roles.includes('admin')) {
+      return res.status(403).json({ error: 'not assigned to you' });
+    }
+    task.status = 'done';
+    task.completedAt = new Date();
+    task.completedBy = req.user.sub;
+    await task.save();
+    res.json(task);
+  }));
+
+  router.get('/tasks/mine', requireAuth, asyncHandler(async (req, res) => {
+    const tasks = await OnboardingTask.find({ assignedTo: req.user.sub, status: { $ne: 'done' } })
+      .populate({ path: 'onboardingCase', select: 'candidate designation status joiningDate' })
+      .sort('dueDate');
+    res.json(tasks);
+  }));
+
+  // --- Documents ---
+
+  router.get('/:id/documents', requireAuth, asyncHandler(async (req, res) => {
+    const docs = await DocumentRequest.find({ onboardingCase: req.params.id });
+    res.json(docs);
+  }));
+
+  router.post('/:id/documents', requireAuth, requireRole('admin', 'hr'), upload.single('file'), asyncHandler(async (req, res) => {
+    const { docId } = req.body;
+    const doc = await DocumentRequest.findById(docId);
+    if (!doc) return res.status(404).json({ error: 'document request not found' });
+    if (!req.file) return res.status(400).json({ error: 'file required' });
+    const bucket = getDocBucket();
+    const stream = bucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype,
+      metadata: { onboardingCase: req.params.id, docType: doc.docType },
+    });
+    const readable = new Readable();
+    readable.push(req.file.buffer);
+    readable.push(null);
+    readable.pipe(stream);
+    await new Promise((resolve, reject) => { stream.on('finish', resolve); stream.on('error', reject); });
+    doc.submission = {
+      fileId: stream.id,
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+      size: req.file.size,
+      uploadedAt: new Date(),
+    };
+    doc.verifyStatus = 'submitted';
+    await doc.save();
+    res.json(doc);
+  }));
+
+  router.post('/documents/:docId/verify', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const doc = await DocumentRequest.findById(req.params.docId);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
+    doc.verifyStatus = 'verified';
+    doc.verifiedBy = req.user.sub;
+    doc.verifiedAt = new Date();
+    if (req.body.extractedFields) doc.submission.extractedFields = req.body.extractedFields;
+    await doc.save();
+    res.json(doc);
+  }));
+
+  router.post('/documents/:docId/reject', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const doc = await DocumentRequest.findById(req.params.docId);
+    if (!doc) return res.status(404).json({ error: 'not found' });
+    if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
+    doc.verifyStatus = 'rejected';
+    doc.rejectionReason = req.body.reason || '';
+    await doc.save();
+    res.json(doc);
+  }));
+
+  router.get('/documents/:fileId/download', asyncHandler(async (req, res) => {
+    const bucket = getDocBucket();
+    const oid = new mongoose.Types.ObjectId(req.params.fileId);
+    const files = await bucket.find({ _id: oid }).toArray();
+    if (!files.length) return res.status(404).json({ error: 'file not found' });
+    res.set('Content-Type', files[0].contentType);
+    res.set('Content-Disposition', `inline; filename="${files[0].filename}"`);
+    bucket.openDownloadStream(oid).pipe(res);
+  }));
+
+  // --- Templates ---
+
+  router.get('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const templates = await OnboardingTemplate.find().sort('-createdAt');
+    res.json(templates);
+  }));
+
+  router.post('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const { name, appliesTo, tasks } = req.body;
+    if (!name || !tasks?.length) return res.status(400).json({ error: 'name and tasks required' });
+    const template = await OnboardingTemplate.create({ name, appliesTo, tasks });
+    res.status(201).json(template);
+  }));
+
+  router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const template = await OnboardingTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!template) return res.status(404).json({ error: 'not found' });
+    res.json(template);
+  }));
+
+  // --- Conversion ---
+
+  router.post('/:id/convert', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const c = await OnboardingCase.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    if (c.status !== 'JOINED') return res.status(400).json({ error: 'case must be in JOINED state' });
+    if (c.convertedUser) return res.status(400).json({ error: 'already converted' });
+
+    const offer = await Offer.findOne({ onboardingCase: c._id, status: 'accepted' }).sort('-version');
+    if (!offer) return res.status(400).json({ error: 'no accepted offer' });
+
+    const mandatoryDocs = await DocumentRequest.find({ onboardingCase: c._id, mandatory: true });
+    const unverified = mandatoryDocs.filter(d => d.verifyStatus !== 'verified');
+    if (unverified.length) {
+      return res.status(400).json({ error: 'mandatory docs not verified', unverified: unverified.map(d => d.docType) });
+    }
+
+    const joiningStr = c.joiningDate.toISOString().slice(0, 10);
+    const probEnd = new Date(c.joiningDate);
+    probEnd.setMonth(probEnd.getMonth() + (c.probationMonths || 3));
+
+    const panDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'pan', verifyStatus: 'verified' });
+    const aadhaarDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'aadhaar', verifyStatus: 'verified' });
+    const bankDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'bank_proof', verifyStatus: 'verified' });
+
+    const empType = c.employmentType === 'full_time' ? 'full-time' : c.employmentType;
+
+    const user = await User.create({
+      email: c.candidate.personalEmail,
+      displayName: `${c.candidate.firstName} ${c.candidate.lastName}`,
+      roles: ['employee'],
+      active: true,
+      departmentId: c.department,
+      reportingManagerId: c.reportingManager,
+      payGrade: c.payGrade,
+      payGroup: c.payGroup,
+      dateOfJoining: c.joiningDate,
+      employmentType: empType,
+      probationEndDate: probEnd,
+      phone: c.candidate.phone || '',
+      pan: panDoc?.submission?.extractedFields?.panNumber || '',
+      aadhaar: aadhaarDoc?.submission?.extractedFields?.aadhaarNumber || '',
+      bankName: bankDoc?.submission?.extractedFields?.bankName || '',
+      bankAccount: bankDoc?.submission?.extractedFields?.accountNumber || '',
+      ifsc: bankDoc?.submission?.extractedFields?.ifsc || '',
+    });
+
+    await SalaryStructure.create({
+      user: user._id,
+      ctcAnnual: offer.ctcAnnual,
+      components: offer.componentsPreview,
+      effectiveFrom: joiningStr,
+    });
+
+    if (c.payGroup) {
+      await PayGroup.updateOne({ _id: c.payGroup }, { $addToSet: { members: user._id } });
+    }
+
+    const joiningYear = c.joiningDate.getFullYear();
+    const joiningMonth = c.joiningDate.getMonth();
+    const remainingMonths = 12 - joiningMonth;
+    await LeaveBalance.create({
+      userId: user._id,
+      year: joiningYear,
+      casual: { total: Math.round(DEFAULT_QUOTAS.casual * remainingMonths / 12), used: 0 },
+      sick:   { total: Math.round(DEFAULT_QUOTAS.sick * remainingMonths / 12), used: 0 },
+      earned: { total: Math.round(DEFAULT_QUOTAS.earned * remainingMonths / 12), used: 0 },
+    });
+
+    const rawToken = crypto.randomBytes(24).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 1);
+    await PasswordResetToken.create({ userId: user._id, tokenHash, expiresAt: tokenExpiry });
+
+    c.convertedUser = user._id;
+    c.status = 'INDUCTION';
+    await c.save();
+
+    res.json({ case: c, user, passwordSetLink: `/auth/local/reset-password?token=${rawToken}` });
+  }));
+
+  // --- Confirmation ---
+
+  router.post('/:id/confirm', requireAuth, requireRole('admin', 'hr', 'reporting_manager'), asyncHandler(async (req, res) => {
+    const c = await OnboardingCase.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: 'not found' });
+    if (c.status !== 'PROBATION') return res.status(400).json({ error: 'case must be in PROBATION state' });
+    if (!c.convertedUser) return res.status(400).json({ error: 'no converted user' });
+
+    const { action, extensionMonths, notes } = req.body;
+
+    if (action === 'confirm') {
+      c.status = 'CONFIRMED';
+      c.confirmedAt = new Date();
+      await c.save();
+      await User.updateOne({ _id: c.convertedUser }, { $unset: { probationEndDate: '' } });
+      res.json(c);
+    } else if (action === 'extend') {
+      const months = extensionMonths || 3;
+      const user = await User.findById(c.convertedUser);
+      const newEnd = new Date(user.probationEndDate || new Date());
+      newEnd.setMonth(newEnd.getMonth() + months);
+      await User.updateOne({ _id: c.convertedUser }, { $set: { probationEndDate: newEnd } });
+      res.json({ case: c, newProbationEndDate: newEnd });
+    } else if (action === 'terminate') {
+      c.status = 'TERMINATED';
+      await c.save();
+      await User.updateOne({ _id: c.convertedUser }, { $set: { active: false } });
+      res.json(c);
+    } else {
+      res.status(400).json({ error: 'action must be confirm, extend, or terminate' });
+    }
+  }));
+
+  return router;
+}
+
+// --- Helpers ---
+
+async function instantiateTasks(onboardingCase) {
+  if (!onboardingCase.workflowTemplate) return;
+  const template = await OnboardingTemplate.findById(onboardingCase.workflowTemplate);
+  if (!template) return;
+
+  const roleToUser = {
+    manager: onboardingCase.reportingManager,
+    hr: onboardingCase.createdBy,
+    admin: onboardingCase.createdBy,
+  };
+
+  const tasksToCreate = template.tasks.map(t => ({
+    onboardingCase: onboardingCase._id,
+    templateKey: t.key,
+    title: t.title,
+    ownerRole: t.ownerRole,
+    assignedTo: roleToUser[t.ownerRole] || null,
+    dueDate: t.offsetDays != null
+      ? new Date(onboardingCase.joiningDate.getTime() + t.offsetDays * 86400000)
+      : null,
+    dependsOn: t.dependsOn || [],
+    mandatory: t.mandatory,
+  }));
+  await OnboardingTask.insertMany(tasksToCreate);
+}
+
+async function createDefaultDocRequests(onboardingCase) {
+  const existing = await DocumentRequest.countDocuments({ onboardingCase: onboardingCase._id });
+  if (existing > 0) return;
+  const defaultDocs = [
+    { docType: 'pan', mandatory: true },
+    { docType: 'aadhaar', mandatory: true },
+    { docType: 'bank_proof', mandatory: true },
+    { docType: 'photo', mandatory: true },
+    { docType: 'education', mandatory: false },
+    { docType: 'prev_payslip', mandatory: false },
+    { docType: 'relieving_letter', mandatory: false },
+    { docType: 'experience_letter', mandatory: false },
+    { docType: 'address_proof', mandatory: false },
+  ];
+  await DocumentRequest.insertMany(
+    defaultDocs.map(d => ({ ...d, onboardingCase: onboardingCase._id }))
+  );
+}
