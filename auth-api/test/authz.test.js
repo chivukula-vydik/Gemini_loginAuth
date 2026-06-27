@@ -1,20 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveRole, canViewProject, canEditProject, canCreateTask, canLogProgress } from '../src/services/authz.js';
+import { resolveRoles, canViewProject, canEditProject, canCreateTask, canLogProgress } from '../src/services/authz.js';
 
-test('resolveRole: promotes the configured ADMIN_EMAIL', () => {
+test('resolveRoles: promotes the configured ADMIN_EMAIL', () => {
   const user = { email: 'boss@acme.com', role: 'employee' };
-  assert.equal(resolveRole(user, { ADMIN_EMAIL: 'boss@acme.com' }), 'admin');
+  const roles = resolveRoles(user, { ADMIN_EMAIL: 'boss@acme.com' });
+  assert.ok(roles.includes('admin'));
 });
 
-test('resolveRole: case-insensitive email match', () => {
+test('resolveRoles: case-insensitive email match', () => {
   const user = { email: 'Boss@Acme.com', role: 'employee' };
-  assert.equal(resolveRole(user, { ADMIN_EMAIL: 'boss@acme.com' }), 'admin');
+  const roles = resolveRoles(user, { ADMIN_EMAIL: 'boss@acme.com' });
+  assert.ok(roles.includes('admin'));
 });
 
-test('resolveRole: keeps stored role when no match', () => {
-  assert.equal(resolveRole({ email: 'a@b.com', role: 'pm' }, { ADMIN_EMAIL: 'boss@acme.com' }), 'pm');
-  assert.equal(resolveRole({ email: 'a@b.com' }, {}), 'employee');
+test('resolveRoles: keeps stored role when no match', () => {
+  const roles1 = resolveRoles({ email: 'a@b.com', role: 'pm' }, { ADMIN_EMAIL: 'boss@acme.com' });
+  assert.ok(roles1.includes('pm'));
+  assert.ok(!roles1.includes('admin'));
+  const roles2 = resolveRoles({ email: 'a@b.com' }, {});
+  assert.ok(roles2.includes('employee'));
 });
 
 test('canViewProject: admin, owner, and members can view; others cannot', () => {
