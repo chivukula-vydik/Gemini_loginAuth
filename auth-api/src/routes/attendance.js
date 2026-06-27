@@ -17,6 +17,7 @@ import { Holiday } from '../models/Holiday.js';
 import { Project } from '../models/Project.js';
 import { Overtime } from '../models/Overtime.js';
 import { Shift } from '../models/Shift.js';
+import { isRmGateActive } from '../middleware/requireScope.js';
 
 // Synthetic, unsaved "holiday" entries for dates in range that have no real
 // attendance doc — lets the calendar render a HOLIDAY badge without ever
@@ -572,7 +573,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/regularise/:id/decide — reporting line approval
-  router.patch('/regularise/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
+  router.patch('/regularise/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -585,6 +586,13 @@ export function createAttendanceRouter(shiftConfig) {
       const member = await User.findById(doc.userId);
       if (!member || String(member.reportingManagerId) !== req.user.sub) {
         return res.status(404).json({ error: 'not found' });
+      }
+    }
+    if (roles.includes('hr') && !roles.includes('admin')) {
+      const member = await User.findById(doc.userId).select('reportingManagerId');
+      const gateActive = await isRmGateActive(member?.reportingManagerId);
+      if (!gateActive) {
+        return res.status(403).json({ error: 'RM is active — HR approval not available' });
       }
     }
     if (doc.regularise.status !== 'pending') return res.status(409).json({ error: 'already decided' });

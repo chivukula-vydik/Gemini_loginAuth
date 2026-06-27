@@ -7,6 +7,7 @@ import { Attendance } from '../models/Attendance.js';
 import { getOrCreateBalance, remaining, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
 import { User } from '../models/User.js';
 import { sendLeaveDecision, sendLeaveRequest } from '../services/mailer.js';
+import { isRmGateActive } from '../middleware/requireScope.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -145,6 +146,13 @@ export function createLeaveRouter() {
     const roles = req.user.roles || [req.user.role];
     if ((roles.includes('reporting_manager') || roles.includes('team_lead')) && String(doc.assignedApprover) !== req.user.sub) {
       return res.status(404).json({ error: 'not found' });
+    }
+    if (roles.includes('hr') && !roles.includes('admin')) {
+      const requesterUser = await User.findById(doc.userId).select('reportingManagerId');
+      const gateActive = await isRmGateActive(requesterUser?.reportingManagerId);
+      if (!gateActive) {
+        return res.status(403).json({ error: 'RM is active — HR approval not available' });
+      }
     }
 
     doc.status = decision;
