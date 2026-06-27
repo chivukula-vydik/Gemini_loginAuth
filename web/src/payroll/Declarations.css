@@ -1,0 +1,12 @@
+/* web/src/payroll/Declarations.css */
+.dec-page { padding: 28px 32px; max-width: 700px; }
+.dec-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.dec-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 28px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.dec-regime { display: flex; gap: 10px; margin-bottom: 16px; }
+.dec-regime-btn { padding: 8px 20px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: var(--surface); color: var(--muted); }
+.dec-regime-btn.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.dec-item { display: grid; grid-template-columns: 1.5fr 1fr 40px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface); }
+.dec-item:last-child { border-bottom: none; }
+.dec-add { display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; font-size: 12px; color: var(--primary); background: var(--primary-soft); border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; }
+.dec-actions { display: flex; gap: 10px; margin-top: 16px; }
+.dec-info { font-size: 12px; color: var(--muted); margin-top: 8px; }

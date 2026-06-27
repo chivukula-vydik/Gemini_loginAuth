@@ -1,0 +1,9 @@
+/* web/src/payroll/TaxSummary.css */
+.ts-page { padding: 28px 32px; max-width: 600px; }
+.ts-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.ts-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 28px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.ts-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--surface); }
+.ts-row:last-child { border-bottom: none; }
+.ts-row-label { color: var(--text); }
+.ts-row-value { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.ts-highlight { font-size: 15px; font-weight: 700; color: var(--primary); padding: 12px 0; border-top: 2px solid var(--border); margin-top: 8px; }
