@@ -32,7 +32,7 @@ function bearer(user) {
 }
 
 test('POST /attendance/checkin creates a doc with partial status', async () => {
-  const emp = await User.create({ email: 'att-ci@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'att-ci@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).post('/attendance/checkin')
     .set('Authorization', bearer(emp)).send({ punchType: 'office' });
   assert.equal(res.status, 200);
@@ -44,7 +44,7 @@ test('POST /attendance/checkin creates a doc with partial status', async () => {
 });
 
 test('POST /attendance/checkin twice in a row returns 409', async () => {
-  const emp = await User.create({ email: 'att-dbl@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'att-dbl@x.com', displayName: 'E', roles: ['employee'] });
   const first = await request(app).post('/attendance/checkin')
     .set('Authorization', bearer(emp)).send({ punchType: 'office' });
   assert.equal(first.status, 200);
@@ -54,7 +54,7 @@ test('POST /attendance/checkin twice in a row returns 409', async () => {
 });
 
 test('POST /attendance/checkout recalculates minutes and derives status', async () => {
-  const emp = await User.create({ email: 'att-co@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'att-co@x.com', displayName: 'E', roles: ['employee'] });
   await request(app).post('/attendance/checkin')
     .set('Authorization', bearer(emp)).send({ punchType: 'office' });
 
@@ -67,7 +67,7 @@ test('POST /attendance/checkout recalculates minutes and derives status', async 
 });
 
 test('POST /attendance/regularise creates a pending request', async () => {
-  const emp = await User.create({ email: 'att-reg@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'att-reg@x.com', displayName: 'E', roles: ['employee'] });
   const date = todayStr();
   const res = await request(app).post('/attendance/regularise')
     .set('Authorization', bearer(emp)).send({ date, reason: 'forgot to punch', correctedCheckIn: '09:30', correctedCheckOut: '18:30' });
@@ -77,8 +77,8 @@ test('POST /attendance/regularise creates a pending request', async () => {
 });
 
 test('PATCH /attendance/regularise/:id/decide approved applies corrected times', async () => {
-  const pm = await User.create({ email: 'att-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'att-emp2@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'att-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'att-emp2@x.com', displayName: 'E', roles: ['employee'] });
   const date = todayStr();
   const submitted = await request(app).post('/attendance/regularise')
     .set('Authorization', bearer(emp)).send({ date, reason: 'missed punch', correctedCheckIn: '09:30', correctedCheckOut: '18:30' });
@@ -94,13 +94,13 @@ test('PATCH /attendance/regularise/:id/decide approved applies corrected times',
 });
 
 test('GET /attendance/regularise/pending is forbidden for employees', async () => {
-  const emp = await User.create({ email: 'att-forb@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'att-forb@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/attendance/regularise/pending').set('Authorization', bearer(emp));
   assert.equal(res.status, 403);
 });
 
 test('POST /leave validates date format and rejects endDate before startDate', async () => {
-  const emp = await User.create({ email: 'lv-fmt@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'lv-fmt@x.com', displayName: 'E', roles: ['employee'] });
   const badFormat = await request(app).post('/leave')
     .set('Authorization', bearer(emp)).send({ type: 'casual', startDate: '22-06-2026', endDate: '23-06-2026', reason: 'x' });
   assert.equal(badFormat.status, 400);
@@ -111,8 +111,8 @@ test('POST /leave validates date format and rejects endDate before startDate', a
 });
 
 test('PATCH /leave/:id/decide approved stamps attendance days as leave', async () => {
-  const pm = await User.create({ email: 'lv-pm@x.com', displayName: 'PM', role: 'pm' });
-  const emp = await User.create({ email: 'lv-emp@x.com', displayName: 'E', role: 'employee' });
+  const pm = await User.create({ email: 'lv-pm@x.com', displayName: 'PM', roles: ['pm'] });
+  const emp = await User.create({ email: 'lv-emp@x.com', displayName: 'E', roles: ['employee'] });
   // 2026-06-22 is a Monday; range covers Mon..Tue (two weekdays).
   const applied = await request(app).post('/leave')
     .set('Authorization', bearer(emp)).send({ type: 'casual', startDate: '2026-06-22', endDate: '2026-06-23', reason: 'trip' });
@@ -130,7 +130,7 @@ test('PATCH /leave/:id/decide approved stamps attendance days as leave', async (
 });
 
 test('GET /leave/pending is forbidden for employees', async () => {
-  const emp = await User.create({ email: 'lv-forb@x.com', displayName: 'E', role: 'employee' });
+  const emp = await User.create({ email: 'lv-forb@x.com', displayName: 'E', roles: ['employee'] });
   const res = await request(app).get('/leave/pending').set('Authorization', bearer(emp));
   assert.equal(res.status, 403);
 });
