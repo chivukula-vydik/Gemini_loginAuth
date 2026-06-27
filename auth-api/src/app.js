@@ -29,6 +29,7 @@ import { createSalaryRouter } from './routes/salary.js';
 import { createPayslipsRouter } from './routes/payslips.js';
 import { createReimbursementsRouter } from './routes/reimbursements.js';
 import { createLoansRouter } from './routes/loans.js';
+import { createDeclarationsRouter } from './routes/declarations.js';
 
 export function createApp(config) {
   const app = express();
@@ -114,6 +115,7 @@ export function createApp(config) {
   app.use('/payslips', createPayslipsRouter());
   app.use('/reimbursements', createReimbursementsRouter());
   app.use('/loans', createLoansRouter());
+  app.use('/declarations', createDeclarationsRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
