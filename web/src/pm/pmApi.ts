@@ -219,6 +219,9 @@ export const claimTask = (id: string) => authed(`/tasks/${id}/claim`, 'POST');
 export const listClaimRequests = () => authed('/claim-requests?status=pending') as Promise<ClaimReq[]>;
 export const decideClaimRequest = (id: string, decision: 'approved' | 'denied') =>
   authed(`/claim-requests/${id}`, 'PATCH', { decision });
+export const listManagerApprovedClaims = () => authed('/claim-requests?status=manager_approved') as Promise<ClaimReq[]>;
+export const financeDecideClaimRequest = (id: string, decision: 'approved' | 'denied') =>
+  authed(`/claim-requests/${id}/finance-decide`, 'PATCH', { decision });
 
 export type EstimateUnit = 'hours' | 'days' | 'weeks';
 export const proposeEstimate = (id: string, value: number, unit: EstimateUnit) =>
