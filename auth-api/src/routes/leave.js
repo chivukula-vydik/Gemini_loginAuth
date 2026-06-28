@@ -7,6 +7,7 @@ import { Attendance } from '../models/Attendance.js';
 import { getOrCreateBalance, remaining, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
 import { User } from '../models/User.js';
 import { sendLeaveDecision, sendLeaveRequest } from '../services/mailer.js';
+import { Notification } from '../models/Notification.js';
 import { isRmGateActive } from '../middleware/requireScope.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -159,6 +160,15 @@ export function createLeaveRouter() {
     doc.decidedBy = req.user.sub;
     doc.decidedAt = new Date();
     await doc.save();
+
+    const notifType = decision === 'approved' ? 'leave_approved' : 'leave_rejected';
+    Notification.create({
+      recipient: doc.userId,
+      actor: req.user.sub,
+      type: notifType,
+      refItem: doc._id,
+      refModel: 'Leave',
+    }).catch((e) => console.error('[notify] leave error:', e.message));
 
     const requester = await User.findById(doc.userId).select('email');
     if (requester?.email) {

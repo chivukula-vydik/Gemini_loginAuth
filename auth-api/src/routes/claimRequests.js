@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { ClaimRequest } from '../models/ClaimRequest.js';
+import { Notification } from '../models/Notification.js';
 import { Task } from '../models/Task.js';
 import { Project } from '../models/Project.js';
 import { canEditProject } from '../services/authz.js';
@@ -65,6 +66,14 @@ export function createClaimRequestsRouter() {
       await claim.save();
     }
     res.json(claim);
+
+    Notification.create({
+      recipient: claim.userId,
+      actor: req.user.sub,
+      type: decision === 'approved' ? 'claim_approved' : 'claim_denied',
+      refItem: claim._id,
+      refModel: 'ClaimRequest',
+    }).catch((e) => console.error('[notify] claim error:', e.message));
   }));
 
   // Finance final sign-off
@@ -102,6 +111,14 @@ export function createClaimRequestsRouter() {
       await claim.save();
     }
     res.json(claim);
+
+    Notification.create({
+      recipient: claim.userId,
+      actor: req.user.sub,
+      type: decision === 'approved' ? 'claim_approved' : 'claim_denied',
+      refItem: claim._id,
+      refModel: 'ClaimRequest',
+    }).catch((e) => console.error('[notify] claim-finance error:', e.message));
   }));
 
   return router;

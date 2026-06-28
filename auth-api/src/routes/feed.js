@@ -5,6 +5,8 @@ import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { FeedItem, FEED_TYPES, PRAISE_CATEGORIES } from '../models/FeedItem.js';
 import { PollVote } from '../models/PollVote.js';
+import { InboxMessage } from '../models/InboxMessage.js';
+import { Notification } from '../models/Notification.js';
 
 async function tallyVotes(pollId) {
   const votes = await PollVote.find({ pollId });
@@ -87,6 +89,26 @@ export function createFeedRouter() {
     res.json({ items: result, cursor });
   }));
 
+  // GET /feed/mine — caller's own posts
+  router.get('/mine', asyncHandler(async (req, res) => {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
+    const filter = { author: req.user.sub, status: 'active' };
+    if (req.query.cursor) filter._id = { $lt: req.query.cursor };
+
+    const items = await FeedItem.find(filter)
+      .populate('author', 'displayName email')
+      .populate('praiseTarget', 'displayName email')
+      .populate('comments.author', 'displayName email')
+      .sort({ createdAt: -1 })
+      .limit(limit);
+
+    const userId = req.user.sub;
+    const result = items.map((item) => sanitiseItem(item, userId));
+
+    const cursor = items.length === limit ? String(items[items.length - 1]._id) : null;
+    res.json({ items: result, cursor });
+  }));
+
   // GET /feed/:id
   router.get('/:id', asyncHandler(async (req, res) => {
     const item = await FeedItem.findOne({ _id: req.params.id, status: 'active' })
@@ -146,6 +168,19 @@ export function createFeedRouter() {
     }
 
     const item = await FeedItem.create(doc);
+
+    // Fire-and-forget praise notification — started before the populate await so
+    // it runs concurrently and is guaranteed to land before the response is sent.
+    if (type === 'praise' && praiseTarget) {
+      InboxMessage.create({
+        recipient: praiseTarget,
+        sender: req.user.sub,
+        type: 'praise',
+        body: body.trim(),
+        refItem: item._id,
+      }).catch((e) => console.error('[notify] praise error:', e.message));
+    }
+
     const populated = await FeedItem.findById(item._id)
       .populate('author', 'displayName email')
       .populate('praiseTarget', 'displayName email');
@@ -185,6 +220,14 @@ export function createFeedRouter() {
     }
     const updated = await FeedItem.findById(item._id);
     res.json({ liked: !already, likeCount: updated.likes.length });
+
+    if (!already && String(item.author) !== String(uid)) {
+      Notification.findOneAndUpdate(
+        { recipient: item.author, actor: uid, type: 'like', refItem: item._id, read: false },
+        { recipient: item.author, actor: uid, type: 'like', refItem: item._id, refModel: 'FeedItem' },
+        { upsert: true },
+      ).catch((e) => console.error('[notify] like error:', e.message));
+    }
   }));
 
   // POST /feed/:id/comment
@@ -198,6 +241,19 @@ export function createFeedRouter() {
 
     item.comments.push({ author: req.user.sub, body: body.trim() });
     await item.save();
+
+    // Fire-and-forget notification — started before the populate await so it
+    // runs concurrently and is guaranteed to land before the response is sent.
+    if (String(item.author) !== String(req.user.sub)) {
+      InboxMessage.create({
+        recipient: item.author,
+        sender: req.user.sub,
+        type: 'comment',
+        body: body.trim(),
+        refItem: item._id,
+      }).catch((e) => console.error('[notify] comment error:', e.message));
+    }
+
     const populated = await FeedItem.findById(item._id)
       .populate('comments.author', 'displayName email');
     const obj = sanitiseItem(populated, req.user.sub);
