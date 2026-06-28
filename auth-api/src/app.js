@@ -34,6 +34,8 @@ import { createReimbursementsRouter } from './routes/reimbursements.js';
 import { createLoansRouter } from './routes/loans.js';
 import { createDeclarationsRouter } from './routes/declarations.js';
 import { createFeedRouter } from './routes/feed.js';
+import { createInboxRouter } from './routes/inbox.js';
+import { createNotificationsRouter } from './routes/notifications.js';
 
 export function createApp(config) {
   const app = express();
@@ -124,6 +126,8 @@ export function createApp(config) {
   app.use('/loans', createLoansRouter());
   app.use('/declarations', createDeclarationsRouter());
   app.use('/feed', createFeedRouter());
+  app.use('/inbox', createInboxRouter());
+  app.use('/notifications', createNotificationsRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);
