@@ -46,7 +46,7 @@ interface PeopleEntry {
   joined?: string;
 }
 
-type FeedTab = 'Organization' | 'Product Design' | 'My Posts';
+type FeedTab = 'Organization' | 'My Posts';
 
 const AVATAR_COLORS = ['#4f6ef7', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#6b7280', '#ec4899', '#14b8a6'];
 function colorFor(id: string): string {
@@ -395,7 +395,7 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
   return (
     <div className="hp-right-col">
       <div className="hp-feed-tabs">
-        {(['Organization', 'Product Design', 'My Posts'] as FeedTab[]).map((t) => (
+        {(['Organization', 'My Posts'] as FeedTab[]).map((t) => (
           <button key={t} className={`hp-feed-tab ${feedTab === t ? 'active' : ''}`} onClick={() => handleTabChange(t)}>{t}</button>
         ))}
       </div>
@@ -404,7 +404,12 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
 
       <div className="hp-announcements">
         {announcements.length === 0 ? (
-          <span className="hp-announcements-empty">No announcements</span>
+          <span className="hp-announcements-empty">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, verticalAlign: -2 }}>
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            No announcements yet
+          </span>
         ) : (
           <div className="hp-announcements-list">
             {announcements.map((a) => (
@@ -447,7 +452,9 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
           </button>
         )}
         {!feedLoading && regularItems.length === 0 && (
-          <div className="hp-empty"><p>No posts yet. Be the first!</p></div>
+          <div className="hp-empty">
+            <p>{feedTab === 'My Posts' ? "You haven't posted anything yet." : 'No posts yet. Be the first!'}</p>
+          </div>
         )}
       </div>
 

@@ -13,8 +13,8 @@
 .ob-stat--purple { color: #8b5cf6; }
 
 /* ─── Board ────────────────────────────────────────────────────────────── */
-.ob-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; }
-.ob-column { min-width: 260px; max-width: 280px; flex-shrink: 0; }
+.ob-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+.ob-column { min-width: 0; }
 .ob-col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
 .ob-col-count { background: var(--border); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 600; color: var(--muted); }
 .ob-col-cards { display: flex; flex-direction: column; gap: 8px; }

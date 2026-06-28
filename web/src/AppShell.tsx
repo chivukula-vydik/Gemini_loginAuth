@@ -223,25 +223,7 @@ export function AppShell() {
           ))}
         </nav>
         <div className="shell-foot">
-          <ThemeToggle />
-          <div className="shell-user">
-            <div className="shell-avatar" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>{initial}</div>
-            <div className="shell-user-meta" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
-              <div className="shell-user-email">{name}</div>
-              {user?.roles && <div className="shell-user-role">{user.roles.join(', ')}</div>}
-            </div>
-            <button className="shell-signout" onClick={signOut} title="Sign out" aria-label="Sign out">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </aside>
-      <main className="shell-content">
-        <div className="shell-topbar">
-          <div className="shell-topbar-right">
+          <div className="shell-notif-row">
             <div className="shell-notif-wrapper">
               <button className="shell-notif-btn" onClick={openInbox} aria-label="Inbox">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -280,8 +262,24 @@ export function AppShell() {
                 />
               )}
             </div>
+            <ThemeToggle />
+          </div>
+          <div className="shell-user">
+            <div className="shell-avatar" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>{initial}</div>
+            <div className="shell-user-meta" style={{ cursor: 'pointer' }} onClick={() => navigate('/profile')}>
+              <div className="shell-user-email">{name}</div>
+              {user?.roles && <div className="shell-user-role">{user.roles.join(', ')}</div>}
+            </div>
+            <button className="shell-signout" onClick={signOut} title="Sign out" aria-label="Sign out">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+            </button>
           </div>
         </div>
+      </aside>
+      <main className="shell-content">
         <Routes>
           <Route path="/" element={<RoleHome />} />
           <Route path="/users" element={<AdminUsers />} />

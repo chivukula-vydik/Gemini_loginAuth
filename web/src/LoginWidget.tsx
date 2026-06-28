@@ -14,7 +14,11 @@ export function LoginWidget() {
   const [busy, setBusy] = useState(false);
   const { reload } = useAuth();
 
-  useEffect(() => { fetchProviders().then(setProviders); }, []);
+  useEffect(() => {
+    fetchProviders()
+      .then(setProviders)
+      .catch(() => setProviders([{ id: 'local', displayName: 'Local', kind: 'password', startUrl: null }]));
+  }, []);
 
   function switchMode(next: Mode) {
     setMode(next);
