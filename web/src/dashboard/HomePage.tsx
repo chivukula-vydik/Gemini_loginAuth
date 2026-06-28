@@ -17,6 +17,9 @@ import { authed } from '../fetchHelper';
 import { personName } from '../pm/personName';
 import { pathForKey } from '../pm/nav';
 import { getDashboard, DashboardData } from './dashboardApi';
+import { FeedComposer } from './FeedComposer';
+import { FeedCard } from './FeedCard';
+import { getFeed, createFeedItem, FeedItem as FeedItemType } from './feedApi';
 import './HomePage.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,7 +46,6 @@ interface PeopleEntry {
 }
 
 type FeedTab = 'Organization' | 'Product Design';
-type PostTab = 'Post' | 'Poll' | 'Praise';
 
 const AVATAR_COLORS = ['#4f6ef7', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#6b7280', '#ec4899', '#14b8a6'];
 function colorFor(id: string): string {
@@ -300,43 +302,129 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
   newJoinees: PeopleEntry[];
   onWish: (emp: PeopleEntry) => void;
 }) {
+  const { user } = useAuth();
   const [feedTab, setFeedTab] = useState<FeedTab>('Organization');
-  const [postTab, setPostTab] = useState<PostTab>('Post');
   type CelTab = 'birthdays' | 'anniversaries' | 'joinees';
   const [celTab, setCelTab] = useState<CelTab>('birthdays');
+
+  const [feedItems, setFeedItems] = useState<FeedItemType[]>([]);
+  const [feedCursor, setFeedCursor] = useState<string | null>(null);
+  const [feedLoading, setFeedLoading] = useState(false);
+
+  const roles: string[] = (user as any)?.roles || [];
+  const isAdminHr = roles.includes('admin') || roles.includes('hr');
+
+  useEffect(() => {
+    setFeedLoading(true);
+    getFeed().then((res) => {
+      setFeedItems(res.items);
+      setFeedCursor(res.cursor);
+    }).catch(() => {}).finally(() => setFeedLoading(false));
+  }, []);
+
+  function handleNewPost(item: FeedItemType) {
+    setFeedItems((prev) => [item, ...prev]);
+  }
+
+  function handleUpdate(update: Partial<FeedItemType> & { _id: string }) {
+    setFeedItems((prev) => prev.map((item) =>
+      item._id === update._id ? { ...item, ...update } : item
+    ));
+  }
+
+  function handleDeleteItem(id: string) {
+    setFeedItems((prev) => prev.filter((item) => item._id !== id));
+  }
+
+  async function loadMore() {
+    if (!feedCursor || feedLoading) return;
+    setFeedLoading(true);
+    try {
+      const res = await getFeed(feedCursor);
+      setFeedItems((prev) => [...prev, ...res.items]);
+      setFeedCursor(res.cursor);
+    } finally {
+      setFeedLoading(false);
+    }
+  }
+
+  const announcements = feedItems.filter((i) => i.type === 'announcement');
+  const regularItems = feedItems.filter((i) => i.type !== 'announcement');
+
+  const [showAnnModal, setShowAnnModal] = useState(false);
+  const [annBody, setAnnBody] = useState('');
+  const [annBusy, setAnnBusy] = useState(false);
+
+  async function handleCreateAnnouncement() {
+    if (!annBody.trim()) return;
+    setAnnBusy(true);
+    try {
+      const item = await createFeedItem({ type: 'announcement', body: annBody });
+      setFeedItems((prev) => [item, ...prev]);
+      setAnnBody('');
+      setShowAnnModal(false);
+    } finally {
+      setAnnBusy(false);
+    }
+  }
 
   return (
     <div className="hp-right-col">
       <div className="hp-feed-tabs">
         {(['Organization', 'Product Design'] as FeedTab[]).map((t) => (
-          <button
-            key={t}
-            className={`hp-feed-tab ${feedTab === t ? 'active' : ''}`}
-            onClick={() => setFeedTab(t)}
-          >
-            {t}
-          </button>
+          <button key={t} className={`hp-feed-tab ${feedTab === t ? 'active' : ''}`} onClick={() => setFeedTab(t)}>{t}</button>
         ))}
       </div>
 
-      <div className="hp-subcard">
-        <div className="hp-composer-tabs">
-          {(['Post', 'Poll', 'Praise'] as PostTab[]).map((t) => (
-            <button
-              key={t}
-              className={`hp-composer-tab ${postTab === t ? 'active' : ''}`}
-              onClick={() => setPostTab(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <textarea className="hp-composer-input" placeholder="Write your post here and mention your peer" />
-      </div>
+      <FeedComposer onPost={handleNewPost} />
 
       <div className="hp-announcements">
-        <span className="hp-announcements-empty">No announcements</span>
-        <button className="hp-add-btn" aria-label="Add"><IconPlus size={16} /></button>
+        {announcements.length === 0 ? (
+          <span className="hp-announcements-empty">No announcements</span>
+        ) : (
+          <div className="hp-announcements-list">
+            {announcements.map((a) => (
+              <div key={a._id} className="hp-announcement-item">
+                <span className="hp-announcement-body">{a.body}</span>
+                <span className="hp-announcement-time">{new Date(a.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {isAdminHr && (
+          <button className="hp-add-btn" aria-label="Add announcement" onClick={() => setShowAnnModal(true)}>
+            <IconPlus size={16} />
+          </button>
+        )}
+      </div>
+
+      {showAnnModal && (
+        <div className="hp-modal-overlay" onClick={() => setShowAnnModal(false)}>
+          <div className="hp-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>New Announcement</h3>
+            <textarea value={annBody} onChange={(e) => setAnnBody(e.target.value)} placeholder="Write announcement..." />
+            <div className="hp-modal-actions">
+              <button onClick={() => setShowAnnModal(false)}>Cancel</button>
+              <button onClick={handleCreateAnnouncement} disabled={annBusy || !annBody.trim()}>
+                {annBusy ? 'Posting...' : 'Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="hp-feed-list">
+        {regularItems.map((item) => (
+          <FeedCard key={item._id} item={item} onUpdate={handleUpdate} onDelete={handleDeleteItem} />
+        ))}
+        {feedCursor && (
+          <button className="hp-load-more" onClick={loadMore} disabled={feedLoading}>
+            {feedLoading ? 'Loading...' : 'Load more'}
+          </button>
+        )}
+        {!feedLoading && regularItems.length === 0 && (
+          <div className="hp-empty"><p>No posts yet. Be the first!</p></div>
+        )}
       </div>
 
       <div className="hp-subcard">
