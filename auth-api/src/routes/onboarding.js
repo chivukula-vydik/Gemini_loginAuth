@@ -125,7 +125,53 @@ export function createOnboardingRouter() {
       .populate('department', 'name')
       .populate('reportingManager', 'displayName email')
       .sort('-createdAt');
-    res.json(cases);
+
+    const caseIds = cases.map(c => c._id);
+    const progressAgg = await OnboardingTask.aggregate([
+      { $match: { onboardingCase: { $in: caseIds } } },
+      { $group: {
+        _id: '$onboardingCase',
+        total: { $sum: 1 },
+        done: { $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] } },
+      }},
+    ]);
+    const progressMap = new Map(progressAgg.map(p => [String(p._id), { done: p.done, total: p.total }]));
+
+    const result = cases.map(c => ({
+      ...c.toObject(),
+      taskProgress: progressMap.get(String(c._id)) || { done: 0, total: 0 },
+    }));
+
+    res.json(result);
+  }));
+
+  router.get('/stats', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const now = new Date();
+    const sevenDays = new Date(now);
+    sevenDays.setDate(sevenDays.getDate() + 7);
+
+    const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+    const quarterStart = new Date(now.getFullYear(), quarterMonth, 1);
+
+    const terminalStatuses = ['OFFER_DECLINED', 'CANCELLED', 'TERMINATED', 'CONFIRMED'];
+
+    const [activeCases, joiningSoon, completedThisQuarter, overdueResult] = await Promise.all([
+      OnboardingCase.countDocuments({ status: { $nin: terminalStatuses } }),
+      OnboardingCase.countDocuments({
+        status: { $nin: terminalStatuses },
+        joiningDate: { $gte: now, $lte: sevenDays },
+      }),
+      OnboardingCase.countDocuments({
+        status: 'CONFIRMED',
+        confirmedAt: { $gte: quarterStart },
+      }),
+      OnboardingTask.countDocuments({
+        status: { $in: ['pending', 'in_progress'] },
+        dueDate: { $lt: now, $ne: null },
+      }),
+    ]);
+
+    res.json({ activeCases, joiningSoon, overdueTasks: overdueResult, completedThisQuarter });
   }));
 
   router.get('/:id', requireAuth, asyncHandler(async (req, res) => {
