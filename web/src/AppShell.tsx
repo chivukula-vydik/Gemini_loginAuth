@@ -1,4 +1,4 @@
-import { type ReactElement, useState, useCallback } from 'react';
+import { type ReactElement, useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
@@ -25,6 +25,12 @@ import { ThemeToggle } from './ThemeToggle';
 import { personName } from './pm/personName';
 import { OnboardingBoard, CaseDetail, MyOnboardingTasks, TemplateBuilder } from './onboarding/index';
 import { MyRequests } from './pm/MyRequests';
+import { NotificationDropdown, DropdownItem } from './dashboard/NotificationDropdown';
+import {
+  getInbox, getInboxUnreadCount, markInboxRead, markAllInboxRead,
+  getNotifications, getNotificationsUnreadCount, markNotificationRead, markAllNotificationsRead,
+  InboxItem, NotificationItem,
+} from './dashboard/inboxApi';
 import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals } from './payroll/index';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
@@ -81,6 +87,114 @@ export function AppShell() {
     setCollapsed(prev => ({ ...prev, [title]: !prev[title] }));
   }, []);
 
+  const [inboxCount, setInboxCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
+  const [showInbox, setShowInbox] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [notifItems, setNotifItems] = useState<NotificationItem[]>([]);
+
+  useEffect(() => {
+    function poll() {
+      getInboxUnreadCount().then((r) => setInboxCount(r.count)).catch(() => {});
+      getNotificationsUnreadCount().then((r) => setNotifCount(r.count)).catch(() => {});
+    }
+    poll();
+    const id = setInterval(poll, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function openInbox() {
+    setShowNotifs(false);
+    setShowInbox(!showInbox);
+    if (!showInbox) {
+      const res = await getInbox();
+      setInboxItems(res.items);
+    }
+  }
+
+  async function openNotifs() {
+    setShowInbox(false);
+    setShowNotifs(!showNotifs);
+    if (!showNotifs) {
+      const res = await getNotifications();
+      setNotifItems(res.items);
+    }
+  }
+
+  function inboxDropdownItems(): DropdownItem[] {
+    return inboxItems.map((item) => {
+      const name = item.sender?.displayName || 'Former Employee';
+      const textMap: Record<string, string> = {
+        birthday_wish: `${name} sent you a birthday wish: ${item.body}`,
+        praise: `${name} praised you: ${item.body.slice(0, 60)}`,
+        comment: `${name} commented on your post: ${item.body.slice(0, 60)}`,
+      };
+      return {
+        _id: item._id,
+        person: item.sender,
+        text: textMap[item.type] || item.body,
+        read: item.read,
+        createdAt: item.createdAt,
+        onClick: () => {
+          markInboxRead(item._id).then(() => {
+            setInboxItems((prev) => prev.map((i) => i._id === item._id ? { ...i, read: true } : i));
+            setInboxCount((c) => Math.max(0, c - (item.read ? 0 : 1)));
+          });
+          if (item.refItem && item.type !== 'birthday_wish') navigate('/');
+        },
+      };
+    });
+  }
+
+  function notifDropdownItems(): DropdownItem[] {
+    return notifItems.map((item) => {
+      const name = item.actor?.displayName || 'Former Employee';
+      const textMap: Record<string, string> = {
+        like: `${name} liked your post`,
+        leave_approved: 'Your leave request was approved',
+        leave_rejected: 'Your leave request was rejected',
+        timesheet_approved: 'Your timesheet was approved',
+        claim_approved: 'Your claim was approved',
+        claim_denied: 'Your claim was denied',
+      };
+      const navMap: Record<string, string> = {
+        like: '/',
+        leave_approved: '/attendance',
+        leave_rejected: '/attendance',
+        claim_approved: '/my-requests',
+        claim_denied: '/my-requests',
+      };
+      return {
+        _id: item._id,
+        person: item.actor,
+        text: textMap[item.type] || `${name} — ${item.type}`,
+        read: item.read,
+        createdAt: item.createdAt,
+        onClick: () => {
+          markNotificationRead(item._id).then(() => {
+            setNotifItems((prev) => prev.map((n) => n._id === item._id ? { ...n, read: true } : n));
+            setNotifCount((c) => Math.max(0, c - (item.read ? 0 : 1)));
+          });
+          const target = navMap[item.type];
+          if (target) navigate(target);
+        },
+      };
+    });
+  }
+
+  async function handleMarkAllInboxRead() {
+    await markAllInboxRead();
+    setInboxItems((prev) => prev.map((i) => ({ ...i, read: true })));
+    setInboxCount(0);
+  }
+
+  async function handleMarkAllNotifsRead() {
+    await markAllNotificationsRead();
+    setNotifItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifCount(0);
+  }
+
   return (
     <div className="shell">
       <aside className="shell-sidebar">
@@ -126,6 +240,48 @@ export function AppShell() {
         </div>
       </aside>
       <main className="shell-content">
+        <div className="shell-topbar">
+          <div className="shell-topbar-right">
+            <div className="shell-notif-wrapper">
+              <button className="shell-notif-btn" onClick={openInbox} aria-label="Inbox">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                {inboxCount > 0 && <span className="shell-notif-badge">{inboxCount > 99 ? '99+' : inboxCount}</span>}
+              </button>
+              {showInbox && (
+                <NotificationDropdown
+                  title="Inbox"
+                  icon={null}
+                  badge={inboxCount}
+                  items={inboxDropdownItems()}
+                  onMarkAllRead={handleMarkAllInboxRead}
+                  onClose={() => setShowInbox(false)}
+                />
+              )}
+            </div>
+            <div className="shell-notif-wrapper">
+              <button className="shell-notif-btn" onClick={openNotifs} aria-label="Notifications">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {notifCount > 0 && <span className="shell-notif-badge">{notifCount > 99 ? '99+' : notifCount}</span>}
+              </button>
+              {showNotifs && (
+                <NotificationDropdown
+                  title="Notifications"
+                  icon={null}
+                  badge={notifCount}
+                  items={notifDropdownItems()}
+                  onMarkAllRead={handleMarkAllNotifsRead}
+                  onClose={() => setShowNotifs(false)}
+                />
+              )}
+            </div>
+          </div>
+        </div>
         <Routes>
           <Route path="/" element={<RoleHome />} />
           <Route path="/users" element={<AdminUsers />} />

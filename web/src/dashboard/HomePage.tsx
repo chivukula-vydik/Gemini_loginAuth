@@ -19,7 +19,8 @@ import { pathForKey } from '../pm/nav';
 import { getDashboard, DashboardData } from './dashboardApi';
 import { FeedComposer } from './FeedComposer';
 import { FeedCard } from './FeedCard';
-import { getFeed, createFeedItem, FeedItem as FeedItemType } from './feedApi';
+import { getFeed, getMyFeed, createFeedItem, FeedItem as FeedItemType } from './feedApi';
+import { sendWish } from './inboxApi';
 import './HomePage.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ interface PeopleEntry {
   joined?: string;
 }
 
-type FeedTab = 'Organization' | 'Product Design';
+type FeedTab = 'Organization' | 'Product Design' | 'My Posts';
 
 const AVATAR_COLORS = ['#4f6ef7', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#6b7280', '#ec4899', '#14b8a6'];
 function colorFor(id: string): string {
@@ -336,11 +337,34 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
     setFeedItems((prev) => prev.filter((item) => item._id !== id));
   }
 
+  async function handleTabChange(tab: FeedTab) {
+    setFeedTab(tab);
+    if (tab === 'My Posts') {
+      setFeedLoading(true);
+      try {
+        const res = await getMyFeed();
+        setFeedItems(res.items);
+        setFeedCursor(res.cursor);
+      } finally {
+        setFeedLoading(false);
+      }
+    } else {
+      setFeedLoading(true);
+      try {
+        const res = await getFeed();
+        setFeedItems(res.items);
+        setFeedCursor(res.cursor);
+      } finally {
+        setFeedLoading(false);
+      }
+    }
+  }
+
   async function loadMore() {
     if (!feedCursor || feedLoading) return;
     setFeedLoading(true);
     try {
-      const res = await getFeed(feedCursor);
+      const res = feedTab === 'My Posts' ? await getMyFeed(feedCursor) : await getFeed(feedCursor);
       setFeedItems((prev) => [...prev, ...res.items]);
       setFeedCursor(res.cursor);
     } finally {
@@ -371,8 +395,8 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
   return (
     <div className="hp-right-col">
       <div className="hp-feed-tabs">
-        {(['Organization', 'Product Design'] as FeedTab[]).map((t) => (
-          <button key={t} className={`hp-feed-tab ${feedTab === t ? 'active' : ''}`} onClick={() => setFeedTab(t)}>{t}</button>
+        {(['Organization', 'Product Design', 'My Posts'] as FeedTab[]).map((t) => (
+          <button key={t} className={`hp-feed-tab ${feedTab === t ? 'active' : ''}`} onClick={() => handleTabChange(t)}>{t}</button>
         ))}
       </div>
 
@@ -526,10 +550,26 @@ export function HomePage() {
     authed('/people/new-joinees').then(setNewJoinees).catch(() => {});
   }, []);
 
+  const [wishTarget, setWishTarget] = useState<PeopleEntry | null>(null);
+  const [wishBody, setWishBody] = useState('Happy Birthday!');
+  const [wishBusy, setWishBusy] = useState(false);
+
   function handleWish(emp: PeopleEntry) {
     if (wishSent.has(emp._id)) return;
-    setWishSent((prev) => new Set(prev).add(emp._id));
-    alert(`🎂 Birthday wish sent to ${emp.name}!`);
+    setWishTarget(emp);
+    setWishBody('Happy Birthday!');
+  }
+
+  async function submitWish() {
+    if (!wishTarget || wishBusy) return;
+    setWishBusy(true);
+    try {
+      await sendWish(wishTarget._id, wishBody);
+      setWishSent((prev) => new Set(prev).add(wishTarget._id));
+      setWishTarget(null);
+    } finally {
+      setWishBusy(false);
+    }
   }
 
   const dateStr = new Date().toLocaleDateString(undefined, {
@@ -588,6 +628,20 @@ export function HomePage() {
           />
         </div>
       </div>
+      {wishTarget && (
+        <div className="hp-modal-overlay" onClick={() => setWishTarget(null)}>
+          <div className="hp-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Send Birthday Wish to {wishTarget.name}</h3>
+            <textarea value={wishBody} onChange={(e) => setWishBody(e.target.value)} />
+            <div className="hp-modal-actions">
+              <button onClick={() => setWishTarget(null)}>Cancel</button>
+              <button onClick={submitWish} disabled={wishBusy || !wishBody.trim()}>
+                {wishBusy ? 'Sending...' : 'Send Wish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -87,3 +87,8 @@ export async function deleteComment(itemId: string, commentId: string): Promise<
 export async function votePoll(id: string, optionIndices: number[]): Promise<{ voteTally: Record<string, number>; myVote: number[] }> {
   return authed(`/feed/${id}/vote`, 'POST', { optionIndices });
 }
+
+export async function getMyFeed(cursor?: string): Promise<FeedResponse> {
+  const q = cursor ? `?cursor=${cursor}` : '';
+  return authed(`/feed/mine${q}`);
+}
