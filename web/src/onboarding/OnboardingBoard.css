@@ -1,21 +1,61 @@
 .ob-page { padding: 28px 32px; }
 .ob-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+
+/* ─── Stats Row ────────────────────────────────────────────────────────── */
+.ob-stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.ob-stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; display: flex; flex-direction: column; gap: 2px; }
+.ob-stat-value { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.ob-stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.ob-stat--blue { color: #3b82f6; }
+.ob-stat--green { color: #22c55e; }
+.ob-stat--red { color: #ef4444; }
+.ob-stat--grey { color: #9ca3af; }
+.ob-stat--purple { color: #8b5cf6; }
+
+/* ─── Board ────────────────────────────────────────────────────────────── */
 .ob-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; }
 .ob-column { min-width: 260px; max-width: 280px; flex-shrink: 0; }
 .ob-col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
 .ob-col-count { background: var(--border); border-radius: 10px; padding: 1px 8px; font-size: 10px; font-weight: 600; color: var(--muted); }
 .ob-col-cards { display: flex; flex-direction: column; gap: 8px; }
+.ob-col-empty { font-size: 12px; color: var(--faint, var(--muted)); padding: 12px; }
+
+/* ─── Card ─────────────────────────────────────────────────────────────── */
 .ob-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); cursor: pointer; transition: border-color 0.12s; }
 .ob-card:hover { border-color: var(--accent); }
-.ob-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-.ob-card-role { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-.ob-card-meta { display: flex; align-items: center; justify-content: space-between; }
-.ob-card-date { font-size: 11px; color: var(--muted); }
-.ob-card-progress { font-size: 11px; font-weight: 600; }
-.ob-card-progress.ready { color: #15803d; }
-.ob-card-progress.partial { color: #b45309; }
-.ob-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }
+.ob-card-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.ob-card-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.ob-card-info { flex: 1; min-width: 0; }
+.ob-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ob-card-role { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ob-status-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
 
+/* ─── Progress ─────────────────────────────────────────────────────────── */
+.ob-card-progress { margin-bottom: 10px; }
+.ob-progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+.ob-progress-fill { height: 100%; background: #22c55e; border-radius: 2px; transition: width 0.2s; }
+.ob-progress-text { font-size: 11px; color: var(--muted); float: right; }
+
+/* ─── Card Footer ──────────────────────────────────────────────────────── */
+.ob-card-footer { display: flex; align-items: center; justify-content: space-between; clear: both; }
+.ob-card-date-pill { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; padding: 1px 8px; }
+.ob-card-rm { font-size: 11px; color: var(--muted); }
+
+/* ─── Empty State ──────────────────────────────────────────────────────── */
+.ob-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; max-width: 400px; margin: 0 auto; text-align: center; }
+.ob-empty-icon { color: var(--muted); margin-bottom: 16px; }
+.ob-empty-heading { font-size: 18px; font-weight: 600; color: var(--text); margin: 0 0 28px; }
+.ob-empty-steps { display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px; width: 100%; text-align: left; }
+.ob-empty-step { display: flex; align-items: flex-start; gap: 14px; }
+.ob-step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent, #4f6ef7); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.ob-step-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.ob-step-desc { font-size: 12px; color: var(--muted); }
+.ob-empty-cta { margin-top: 4px; }
+
+/* ─── Loading / Empty ──────────────────────────────────────────────────── */
+.ob-empty { text-align: center; color: var(--faint, var(--muted)); padding: 40px; font-size: 13px; }
+
+/* ─── Create Modal ─────────────────────────────────────────────────────── */
 .ob-create-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .ob-create-card { background: var(--card); border-radius: var(--radius); padding: 28px 32px; width: 520px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
 .ob-create-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 18px; }
@@ -23,3 +63,12 @@
 .ob-form-group { display: flex; flex-direction: column; gap: 5px; }
 .ob-form-label { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ob-form-full { grid-column: 1 / -1; }
+
+/* ─── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .ob-stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .ob-stats-row { grid-template-columns: 1fr; }
+  .ob-page { padding: 16px; }
+}
