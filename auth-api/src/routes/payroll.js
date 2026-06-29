@@ -19,7 +19,8 @@ import { Timesheet } from '../models/Timesheet.js';
 import { User } from '../models/User.js';
 import { StatutoryReport } from '../models/StatutoryReport.js';
 import { computePayrollInput } from '../services/payrollBridge.js';
-import { buildPayslip } from '../services/payrollEngine.js';
+import { buildPayslip, resolveMonthlyAmounts } from '../services/payrollEngine.js';
+import { computeAnnualTax } from '../services/statutoryEngine.js';
 
 function getFY(month, year) {
   const fy = month <= 3 ? year - 1 : year;
@@ -257,6 +258,52 @@ export function createPayrollRouter() {
     if (req.query.fy) filter['period.fy'] = req.query.fy;
     const reports = await StatutoryReport.find(filter).sort('-createdAt');
     res.json(reports);
+  }));
+
+  // --- Tax Regime Comparison (employee self-service) ---
+  router.post('/tax-comparison', requireAuth, asyncHandler(async (req, res) => {
+    const userId = req.user.sub;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const salary = await SalaryStructure.findOne({ user: userId, effectiveFrom: { $lte: today } }).sort('-effectiveFrom');
+    if (!salary) return res.status(400).json({ error: 'no salary structure found' });
+
+    const fy = getFY(new Date().getMonth() + 1, new Date().getFullYear());
+    const config = await StatutoryConfig.findOne({ effectiveFrom: { $lte: today } }).sort('-effectiveFrom');
+    if (!config) return res.status(400).json({ error: 'no statutory config found' });
+
+    const resolved = resolveMonthlyAmounts(salary.components, salary.ctcAnnual);
+    let grossMonthly = 0;
+    for (const comp of resolved) {
+      if (comp.type === 'earning' && !comp.employerSide) grossMonthly += comp.monthlyAmount;
+    }
+    const grossAnnual = Math.round(grossMonthly * 12 * 100) / 100;
+
+    const declaration = await InvestmentDeclaration.findOne({ user: userId, financialYear: fy });
+    const savedRegime = declaration?.regime || 'new';
+    const savedDeclarations = declaration?.items || [];
+    const previewDeclarations = req.body.declarations ?? savedDeclarations;
+
+    const oldRegime = config.tds?.old;
+    const newRegime = config.tds?.new;
+    if (!oldRegime || !newRegime) return res.status(400).json({ error: 'config missing regime data' });
+
+    const oldResult = computeAnnualTax(grossAnnual, oldRegime, previewDeclarations);
+    const newResult = computeAnnualTax(grossAnnual, newRegime, []);
+
+    const savings = oldResult.tax - newResult.tax;
+    const recommendation = savings > 0 ? 'new' : savings < 0 ? 'old' : 'either';
+
+    res.json({
+      fy,
+      configId: config._id,
+      grossAnnual,
+      savedRegime,
+      old: { ...oldResult, approxMonthly: Math.round(oldResult.tax / 12) },
+      new: { ...newResult, approxMonthly: Math.round(newResult.tax / 12) },
+      recommendation,
+      savingsDelta: Math.abs(savings),
+    });
   }));
 
   return router;

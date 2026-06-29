@@ -31,7 +31,7 @@ import {
   getNotifications, getNotificationsUnreadCount, markNotificationRead, markAllNotificationsRead,
   InboxItem, NotificationItem,
 } from './dashboard/inboxApi';
-import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals } from './payroll/index';
+import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals, RegimeComparison } from './payroll/index';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -311,6 +311,7 @@ export function AppShell() {
           <Route path="/my-payslips" element={<MyPayslips />} />
           <Route path="/my-payslips/:year/:month" element={<MyPayslips />} />
           <Route path="/declarations" element={<Declarations />} />
+          <Route path="/declarations/compare" element={<RegimeComparison />} />
           <Route path="/tax-summary" element={<TaxSummary />} />
           <Route path="/reimbursements" element={<Reimbursements />} />
           <Route path="/reimbursement-approvals" element={<ReimbursementApprovals />} />

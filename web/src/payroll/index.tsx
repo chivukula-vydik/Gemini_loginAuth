@@ -6,3 +6,4 @@ export { Declarations } from './Declarations';
 export { TaxSummary } from './TaxSummary';
 export { Reimbursements } from './Reimbursements';
 export { ReimbursementApprovals } from './ReimbursementApprovals';
+export { RegimeComparison } from './RegimeComparison';

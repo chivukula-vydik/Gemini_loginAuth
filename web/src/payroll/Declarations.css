@@ -10,3 +10,5 @@
 .dec-add { display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; font-size: 12px; color: var(--primary); background: var(--primary-soft); border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; }
 .dec-actions { display: flex; gap: 10px; margin-top: 16px; }
 .dec-info { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.dec-compare-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 10px 20px; font-size: 13px; font-weight: 600; background: var(--primary-soft, color-mix(in srgb, var(--primary) 12%, transparent)); color: var(--primary); border: 1px solid var(--primary); border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+.dec-compare-btn:hover { background: var(--primary); color: var(--on-primary); }

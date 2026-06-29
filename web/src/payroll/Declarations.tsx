@@ -1,5 +1,6 @@
 // web/src/payroll/Declarations.tsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authed } from '../fetchHelper';
 import './Declarations.css';
 
@@ -14,6 +15,7 @@ function currentFY() {
 }
 
 export function Declarations() {
+  const navigate = useNavigate();
   const fy = currentFY();
   const [regime, setRegime] = useState<'old' | 'new'>('new');
   const [items, setItems] = useState<Item[]>([]);
@@ -55,6 +57,7 @@ export function Declarations() {
           <button className={`dec-regime-btn ${regime === 'new' ? 'active' : ''}`} onClick={() => setRegime('new')}>New Regime</button>
           <button className={`dec-regime-btn ${regime === 'old' ? 'active' : ''}`} onClick={() => setRegime('old')}>Old Regime</button>
         </div>
+        <button className="dec-compare-btn" onClick={() => navigate('/declarations/compare')}>Compare & Choose Regime →</button>
         {regime === 'new' && <div className="dec-info">Under new regime, no deductions apply. Your declarations are recorded but won't reduce TDS.</div>}
       </div>
 
