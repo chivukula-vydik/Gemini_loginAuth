@@ -109,10 +109,15 @@ export function CaseDetail() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const [conversionResult, setConversionResult] = useState<{ setup: { userCreated?: boolean; salaryStructure?: boolean; payGroup?: boolean; leaveBalance?: boolean; declaration?: string; profileCopied?: boolean; welcomeEmailSent?: boolean } } | null>(null);
+
   async function convert() {
     if (!confirm('This will create a real employee account. Proceed?')) return;
     setBusy(true);
-    await authed(`/onboarding/${id}/convert`, 'POST');
+    try {
+      const result = await authed(`/onboarding/${id}/convert`, 'POST');
+      setConversionResult(result);
+    } catch { /* handled by load */ }
     await load();
     setBusy(false);
   }
@@ -269,6 +274,18 @@ export function CaseDetail() {
                       </div>
                     </div>
                     <button className="cd-btn primary" disabled={!data.readyToConvert || busy} onClick={convert}>Convert to Employee</button>
+                    {conversionResult?.setup && (
+                      <div className="cd-convert-summary">
+                        <div className="cd-convert-summary-title">Conversion Complete</div>
+                        {conversionResult.setup.userCreated && <div className="cd-convert-check">✓ Employee account created</div>}
+                        {conversionResult.setup.salaryStructure && <div className="cd-convert-check">✓ Salary structure set from offer</div>}
+                        {conversionResult.setup.payGroup && <div className="cd-convert-check">✓ Added to pay group</div>}
+                        {conversionResult.setup.leaveBalance && <div className="cd-convert-check">✓ Leave balance provisioned</div>}
+                        {conversionResult.setup.declaration && <div className="cd-convert-check">✓ Tax declaration seeded ({String(conversionResult.setup.declaration)})</div>}
+                        {conversionResult.setup.profileCopied && <div className="cd-convert-check">✓ Candidate profile copied</div>}
+                        {conversionResult.setup.welcomeEmailSent && <div className="cd-convert-check">✓ Welcome email sent</div>}
+                      </div>
+                    )}
                   </div>
                 )}
 

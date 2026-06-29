@@ -15,6 +15,7 @@ import { SalaryStructure } from '../models/SalaryStructure.js';
 import { PayGroup } from '../models/PayGroup.js';
 import { LeaveBalance, DEFAULT_QUOTAS } from '../models/LeaveBalance.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
+import { InvestmentDeclaration } from '../models/InvestmentDeclaration.js';
 import crypto from 'crypto';
 import { sendOfferEmail } from '../services/mailer.js';
 
@@ -348,11 +349,22 @@ export function createOnboardingRouter() {
     const probEnd = new Date(c.joiningDate);
     probEnd.setMonth(probEnd.getMonth() + (c.probationMonths || 3));
 
-    const panDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'pan', verifyStatus: 'verified' });
-    const aadhaarDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'aadhaar', verifyStatus: 'verified' });
-    const bankDoc = await DocumentRequest.findOne({ onboardingCase: c._id, docType: 'bank_proof', verifyStatus: 'verified' });
-
+    const profile = c.candidateProfile || {};
     const empType = c.employmentType === 'full_time' ? 'full-time' : c.employmentType;
+
+    const profileFields = {
+      dateOfBirth: profile.dateOfBirth || null,
+      gender: profile.gender || '',
+      bloodGroup: profile.bloodGroup || '',
+      emergencyContactName: profile.emergencyContactName || '',
+      emergencyContactPhone: profile.emergencyContactPhone || '',
+      emergencyContactRelation: profile.emergencyContactRelation || '',
+      pan: profile.pan || '',
+      aadhaar: profile.aadhaar || '',
+      bankName: profile.bankName || '',
+      bankAccount: profile.bankAccount || '',
+      ifsc: profile.ifsc || '',
+    };
 
     let user = await User.findOne({ email: c.candidate.personalEmail });
     if (user) {
@@ -365,6 +377,7 @@ export function createOnboardingRouter() {
         dateOfJoining: c.joiningDate,
         employmentType: empType,
         probationEndDate: probEnd,
+        ...profileFields,
       }});
       if (!user.roles.includes('employee')) {
         await User.updateOne({ _id: user._id }, { $addToSet: { roles: 'employee' } });
@@ -384,11 +397,7 @@ export function createOnboardingRouter() {
         employmentType: empType,
         probationEndDate: probEnd,
         phone: c.candidate.phone || '',
-        pan: panDoc?.submission?.extractedFields?.panNumber || '',
-        aadhaar: aadhaarDoc?.submission?.extractedFields?.aadhaarNumber || '',
-        bankName: bankDoc?.submission?.extractedFields?.bankName || '',
-        bankAccount: bankDoc?.submission?.extractedFields?.accountNumber || '',
-        ifsc: bankDoc?.submission?.extractedFields?.ifsc || '',
+        ...profileFields,
       });
     }
 
@@ -419,6 +428,19 @@ export function createOnboardingRouter() {
 
     await reassignTasksOnConvert(c, user._id);
 
+    const joiningFY = joiningMonth < 3
+      ? `FY${joiningYear - 1}-${String(joiningYear).slice(2)}`
+      : `FY${joiningYear}-${String(joiningYear + 1).slice(2)}`;
+    const existingDec = await InvestmentDeclaration.findOne({ user: user._id, financialYear: joiningFY });
+    if (!existingDec) {
+      await InvestmentDeclaration.create({
+        user: user._id,
+        financialYear: joiningFY,
+        regime: 'new',
+        items: [],
+      });
+    }
+
     const rawToken = crypto.randomBytes(24).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const tokenExpiry = new Date();
@@ -436,7 +458,20 @@ export function createOnboardingRouter() {
       resetLink,
     }).catch(() => {});
 
-    res.json({ case: c, user, passwordSetLink: resetLink });
+    res.json({
+      case: c,
+      user,
+      passwordSetLink: resetLink,
+      setup: {
+        userCreated: true,
+        salaryStructure: true,
+        payGroup: !!c.payGroup,
+        leaveBalance: true,
+        declaration: joiningFY,
+        profileCopied: Object.values(profileFields).some(v => v),
+        welcomeEmailSent: true,
+      },
+    });
   }));
 
   // --- Confirmation ---

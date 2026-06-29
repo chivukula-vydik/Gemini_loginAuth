@@ -358,6 +358,25 @@
 .cd-gate-icon.pass { background: color-mix(in srgb, #22c55e 12%, transparent); color: #15803d; }
 .cd-gate-icon.fail { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 
+.cd-convert-summary {
+  margin-top: 14px;
+  padding: 16px 20px;
+  background: color-mix(in srgb, #22c55e 8%, transparent);
+  border: 1px solid color-mix(in srgb, #22c55e 30%, transparent);
+  border-radius: 10px;
+}
+.cd-convert-summary-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #15803d;
+  margin-bottom: 10px;
+}
+.cd-convert-check {
+  font-size: 13px;
+  color: #166534;
+  padding: 3px 0;
+}
+
 /* ─── Offer ────────────────────────────────────────────────────────────── */
 .cd-offer-hero {
   padding: 20px 0;
