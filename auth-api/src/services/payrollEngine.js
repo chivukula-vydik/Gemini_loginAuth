@@ -27,7 +27,7 @@ export function resolveMonthlyAmounts(components, ctcAnnual) {
   });
 }
 
-export function buildPayslip({ components, ctcAnnual, input, statutoryConfig, regime, declarations, reimbursements, loanEmis }) {
+export function buildPayslip({ components, ctcAnnual, input, statutoryConfig, regime, declarations, reimbursements, loanEmis, tdsPaidYTD, monthsRemaining }) {
   const resolved = resolveMonthlyAmounts(components, ctcAnnual);
   const { payableDays, lopDays, otHours, billableHours } = input;
   const paidDays = payableDays - lopDays;
@@ -60,13 +60,14 @@ export function buildPayslip({ components, ctcAnnual, input, statutoryConfig, re
   const ptSlabs = statutoryConfig.pt || [];
   const pt = computePT(grossEarnings, ptSlabs);
 
-  const tdsConfig = regime === 'old' ? statutoryConfig.tds.old : statutoryConfig.tds.new;
+  const ruleset = { fy: statutoryConfig.fy || '', regimes: { old: statutoryConfig.tds.old, new: statutoryConfig.tds.new } };
   const tds = computeMonthlyTDS({
-    annualGross: grossEarnings * 12,
+    grossAnnual: grossEarnings * 12,
     regime,
-    slabs: tdsConfig?.slabs || [],
-    standardDeduction: tdsConfig?.standardDeduction || 0,
+    ruleset,
     declarations: declarations || [],
+    tdsPaidYTD: tdsPaidYTD || 0,
+    monthsRemaining: monthsRemaining || 12,
   });
 
   const deductions = [];

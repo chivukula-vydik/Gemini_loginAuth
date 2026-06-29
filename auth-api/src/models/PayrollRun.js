@@ -16,6 +16,8 @@ const PayrollRunSchema = new mongoose.Schema({
     netPay:     { type: Number, default: 0 },
     headcount:  { type: Number, default: 0 },
   },
+  taxRulesetId:  { type: mongoose.Schema.Types.ObjectId, ref: 'StatutoryConfig', default: null },
+  taxRulesetFY:  { type: String, default: '' },
 }, { timestamps: true });
 
 PayrollRunSchema.index({ 'period.year': 1, 'period.month': 1, payGroup: 1 });

@@ -120,9 +120,29 @@ export function createPayrollRouter() {
       const salary = await SalaryStructure.findOne({ user: userId, effectiveTo: null }).sort('-effectiveFrom');
       if (!salary) continue;
 
-      const declaration = await InvestmentDeclaration.findOne({ user: userId, financialYear: getFY(month, year) });
+      const fy = getFY(month, year);
+      const declaration = await InvestmentDeclaration.findOne({ user: userId, financialYear: fy });
       const regime = declaration?.regime || 'new';
       const declarations = declaration?.items || [];
+
+      // YTD TDS: sum of TDS already deducted this FY for this employee
+      const fyStart = month <= 3 ? { month: 4, year: year - 1 } : { month: 4, year };
+      const priorSlips = await Payslip.find({
+        user: userId,
+        payrollRun: { $ne: run._id },
+        $or: [
+          { 'period.year': fyStart.year, 'period.month': { $gte: fyStart.month } },
+          ...(fyStart.year < year ? [{ 'period.year': year, 'period.month': { $lte: month } }] : []),
+        ],
+      });
+      const tdsPaidYTD = priorSlips.reduce((sum, s) => sum + (s.statutory?.tds || 0), 0);
+      const fyEndMonth = month <= 3 ? 3 : 3;
+      const fyEndYear = month <= 3 ? year : year + 1;
+      const totalMonthsInFY = 12;
+      const monthsElapsed = month <= 3
+        ? (12 - 4 + 1) + month
+        : month - 4 + 1;
+      const monthsRemaining = totalMonthsInFY - monthsElapsed + 1;
 
       const loans = await Loan.find({ user: userId, status: 'active' });
       const loanEmis = [];
@@ -143,6 +163,8 @@ export function createPayrollRouter() {
         declarations,
         reimbursements,
         loanEmis,
+        tdsPaidYTD,
+        monthsRemaining,
       });
 
       await Payslip.findOneAndUpdate(
