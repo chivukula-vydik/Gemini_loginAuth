@@ -3,6 +3,20 @@ import { useParams } from 'react-router-dom';
 import './CandidatePortal.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+
+interface BreakdownLine { key: string; label: string; amount: number; isEstimate?: boolean }
+interface Breakdown {
+  ctcAnnual: number;
+  grossMonthly: number;
+  grossAnnual: number;
+  monthlyEarnings: BreakdownLine[];
+  employerContributions: BreakdownLine[];
+  estimatedDeductions: BreakdownLine[];
+  estimatedInHandMonthly: number;
+  estimatedInHandAnnual: number;
+  disclaimer: string;
+}
 
 interface Checklist {
   status: string;
@@ -10,6 +24,7 @@ interface Checklist {
   designation: string;
   joiningDate: string;
   offer: { ctcAnnual: number; status: string; joiningDate: string; expiryDate: string } | null;
+  breakdown: Breakdown | null;
   tasks: { key: string; title: string; status: string; dueDate: string }[];
   documents: { _id: string; docType: string; mandatory: boolean; verifyStatus: string; hasSubmission: boolean }[];
 }
@@ -187,7 +202,53 @@ export function CandidatePortal() {
               <div className="cp-card-title">Your Offer</div>
               <span className={`cp-status-pill ${data.offer.status}`}>{data.offer.status}</span>
             </div>
-            <div className="cp-offer-amount">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(data.offer.ctcAnnual)}<span className="cp-offer-per"> / year</span></div>
+            <div className="cp-offer-amount">{fmt(data.offer.ctcAnnual)}<span className="cp-offer-per"> / year</span></div>
+
+            {data.breakdown ? (
+              <div className="cp-breakdown">
+                <div className="cp-breakdown-section">
+                  <div className="cp-breakdown-heading">Monthly Earnings</div>
+                  {data.breakdown.monthlyEarnings.map(e => (
+                    <div key={e.key} className="cp-breakdown-row">
+                      <span>{e.label}</span><span>{fmt(e.amount)}</span>
+                    </div>
+                  ))}
+                  <div className="cp-breakdown-row cp-breakdown-subtotal">
+                    <span>Gross Monthly</span><span>{fmt(data.breakdown.grossMonthly)}</span>
+                  </div>
+                </div>
+
+                {data.breakdown.employerContributions.length > 0 && (
+                  <div className="cp-breakdown-section">
+                    <div className="cp-breakdown-heading">Employer Contributions <span className="cp-breakdown-hint">(not paid in hand)</span></div>
+                    {data.breakdown.employerContributions.map(e => (
+                      <div key={e.key} className="cp-breakdown-row">
+                        <span>{e.label}</span><span>{fmt(e.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="cp-breakdown-section">
+                  <div className="cp-breakdown-heading">Estimated Monthly Deductions</div>
+                  {data.breakdown.estimatedDeductions.map(d => (
+                    <div key={d.key} className="cp-breakdown-row">
+                      <span>{d.label}{d.isEstimate ? ' *' : ''}</span><span>{fmt(d.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="cp-breakdown-inhand">
+                  <span>Estimated Monthly In-Hand</span>
+                  <span>{fmt(data.breakdown.estimatedInHandMonthly)}</span>
+                </div>
+                <div className="cp-breakdown-inhand-annual">
+                  Estimated Annual In-Hand: {fmt(data.breakdown.estimatedInHandAnnual)}
+                </div>
+                <div className="cp-breakdown-disclaimer">{data.breakdown.disclaimer}</div>
+              </div>
+            ) : null}
+
             {data.offer.status === 'sent' && (
               <div className="cp-offer-actions">
                 <button className="cp-btn cp-btn-accept" disabled={busy} onClick={acceptOffer}>

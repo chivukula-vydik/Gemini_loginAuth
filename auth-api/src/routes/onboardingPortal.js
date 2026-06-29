@@ -7,6 +7,8 @@ import { OnboardingCase } from '../models/OnboardingCase.js';
 import { Offer } from '../models/Offer.js';
 import { OnboardingTask } from '../models/OnboardingTask.js';
 import { DocumentRequest } from '../models/DocumentRequest.js';
+import { StatutoryConfig } from '../models/StatutoryConfig.js';
+import { computeOfferBreakdown } from '../services/payrollEngine.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -30,12 +32,27 @@ export function createOnboardingPortalRouter() {
     const tasks = await OnboardingTask.find({ onboardingCase: c._id, runsOn: 'candidate' });
     const docs = await DocumentRequest.find({ onboardingCase: c._id });
 
+    let breakdown = null;
+    if (offer?.componentsPreview?.length && offer.ctcAnnual > 0) {
+      const joiningDate = offer.joiningDate || c.joiningDate;
+      const startDate = joiningDate ? joiningDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const config = await StatutoryConfig.findOne({ effectiveFrom: { $lte: startDate } }).sort('-effectiveFrom');
+      if (config) {
+        const ptSlabs = config.pt?.[0]?.slabs || [];
+        breakdown = computeOfferBreakdown(offer.componentsPreview, offer.ctcAnnual, {
+          ...config.toObject(),
+          pt: ptSlabs,
+        });
+      }
+    }
+
     res.json({
       status: c.status,
       candidate: c.candidate,
       designation: c.designation,
       joiningDate: c.joiningDate,
       offer: offer ? { ctcAnnual: offer.ctcAnnual, status: offer.status, joiningDate: offer.joiningDate, expiryDate: offer.expiryDate } : null,
+      breakdown,
       tasks: tasks.map(t => ({ key: t.templateKey, title: t.title, status: t.status, dueDate: t.dueDate })),
       documents: docs.map(d => ({ _id: d._id, docType: d.docType, mandatory: d.mandatory, verifyStatus: d.verifyStatus, hasSubmission: !!d.submission?.fileId })),
     });

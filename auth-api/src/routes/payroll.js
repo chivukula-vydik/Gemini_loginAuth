@@ -99,6 +99,9 @@ export function createPayrollRouter() {
     const config = await StatutoryConfig.findOne({ effectiveFrom: { $lte: startDate } }).sort('-effectiveFrom');
     if (!config) return res.status(400).json({ error: 'no statutory config found' });
 
+    run.taxRulesetId = config._id;
+    run.taxRulesetFY = config.fy;
+
     await PayrollInput.deleteMany({ payrollRun: run._id });
     await Payslip.deleteMany({ payrollRun: run._id });
 

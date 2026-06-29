@@ -1,13 +1,15 @@
 import mongoose from 'mongoose';
 
 const SalaryComponentSchema = new mongoose.Schema({
-  key:        { type: String, required: true },
-  label:      { type: String, required: true },
-  type:       { type: String, enum: ['earning', 'deduction'], required: true },
-  calc:       { type: String, enum: ['fixed', 'percent_of_basic', 'percent_of_ctc'], required: true },
-  value:      { type: Number, required: true },
-  taxable:    { type: Boolean, default: true },
-  proratable: { type: Boolean, default: true },
+  key:          { type: String, required: true },
+  label:        { type: String, required: true },
+  type:         { type: String, enum: ['earning', 'deduction'], required: true },
+  calc:         { type: String, enum: ['fixed', 'percent_of_basic', 'percent_of_ctc', 'balancing'], required: true },
+  value:        { type: Number, default: 0 },
+  taxable:      { type: Boolean, default: true },
+  proratable:   { type: Boolean, default: true },
+  employerSide: { type: Boolean, default: false },
+  partOfPfWage: { type: Boolean, default: false },
 }, { _id: false });
 
 const OfferSchema = new mongoose.Schema({
