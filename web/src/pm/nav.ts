@@ -1,11 +1,16 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'declaration-review' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
 export type NavItem = { key: NavKey; label: string; path: string };
 export type NavSection = { title: string; items: NavItem[] };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'declaration-review', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
+
+const CUSTOM_PATHS: Partial<Record<NavKey, string>> = {
+  'declaration-review': '/declarations/review',
+};
 
 export function pathForKey(key: NavKey): string {
+  if (CUSTOM_PATHS[key]) return CUSTOM_PATHS[key];
   return key === 'home' ? '/' : `/${key}`;
 }
 
@@ -15,7 +20,7 @@ export function keyForPath(pathname: string): NavKey {
   return ALL_NAV_KEYS.includes(seg as NavKey) ? (seg as NavKey) : 'home';
 }
 
-const I = (key: NavKey, label: string): NavItem => ({ key, label, path: key === 'home' ? '/' : `/${key}` });
+const I = (key: NavKey, label: string): NavItem => ({ key, label, path: pathForKey(key) });
 
 function sectionsForRole(role: Role): NavSection[] {
   const sections: NavSection[] = [];
@@ -60,9 +65,9 @@ function sectionsForRole(role: Role): NavSection[] {
   sections.push({ title: 'Attendance & Leave', items: attLeave });
 
   if (['admin', 'finance'].includes(role)) {
-    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips')] });
+    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('declaration-review', 'Declaration Review')] });
   } else {
-    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips')] });
+    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary')] });
   }
 
   {

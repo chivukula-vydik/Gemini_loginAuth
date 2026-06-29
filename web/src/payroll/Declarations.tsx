@@ -1,12 +1,38 @@
-// web/src/payroll/Declarations.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authed } from '../fetchHelper';
+import { authed, authedRaw } from '../fetchHelper';
 import './Declarations.css';
 
-interface Item { section: string; declaredAmount: number; }
+interface Proof { fileId: string; filename: string; contentType: string; size: number }
+interface Item { section: string; declaredAmount: number; proofAmount: number | null; proofs: Proof[]; verifyStatus: string; rejectReason: string }
+interface HraDetail { monthlyRent: number; isMetro: boolean; landlordPan: string }
+interface Declaration {
+  _id: string;
+  regime: 'old' | 'new';
+  items: Item[];
+  hraDetail: HraDetail | null;
+  hraExemption: number;
+  phase: string;
+  lockedForTds: boolean;
+}
 
-const SECTIONS = ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA'];
+type Limits = Record<string, number>;
+
+const SECTIONS = ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA', '80DDB', '80U'];
+const SECTION_LABELS: Record<string, string> = {
+  '80C': '80C — PPF, ELSS, LIC, etc.',
+  '80D': '80D — Medical insurance',
+  '80E': '80E — Education loan interest',
+  '80G': '80G — Donations',
+  'HRA': 'HRA — House Rent Allowance',
+  '24B': '24B — Home loan interest',
+  '80CCD(1B)': '80CCD(1B) — NPS (additional)',
+  '80TTA': '80TTA — Savings interest',
+  '80DDB': '80DDB — Medical treatment',
+  '80U': '80U — Disability',
+};
+
+const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 
 function currentFY() {
   const now = new Date();
@@ -14,20 +40,41 @@ function currentFY() {
   return `FY${y}-${String(y + 1).slice(2)}`;
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const cls = status === 'verified' ? 'dec-badge-ok' : status === 'rejected' ? 'dec-badge-err' : 'dec-badge-pending';
+  return <span className={`dec-badge ${cls}`}>{status}</span>;
+}
+
 export function Declarations() {
   const navigate = useNavigate();
   const fy = currentFY();
   const [regime, setRegime] = useState<'old' | 'new'>('new');
   const [items, setItems] = useState<Item[]>([]);
+  const [hraDetail, setHraDetail] = useState<HraDetail>({ monthlyRent: 0, isMetro: false, landlordPan: '' });
+  const [hraExemption, setHraExemption] = useState(0);
+  const [phase, setPhase] = useState('declaration');
+  const [locked, setLocked] = useState(false);
+  const [limits, setLimits] = useState<Limits>({});
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadIdx, setUploadIdx] = useState(-1);
 
   useEffect(() => {
-    authed(`/declarations/${fy}/me`).then(d => {
+    Promise.all([
+      authed(`/declarations/${fy}/me`),
+      authed('/declarations/limits'),
+    ]).then(([d, l]) => {
       if (d) {
         setRegime(d.regime);
-        setItems(d.items.map((i: Item) => ({ section: i.section, declaredAmount: i.declaredAmount })));
+        setItems(d.items || []);
+        setHraDetail(d.hraDetail || { monthlyRent: 0, isMetro: false, landlordPan: '' });
+        setHraExemption(d.hraExemption || 0);
+        setPhase(d.phase);
+        setLocked(d.lockedForTds);
       }
+      setLimits(l || {});
       setLoaded(true);
     });
   }, []);
@@ -35,48 +82,176 @@ export function Declarations() {
   function updateItem(idx: number, field: string, val: unknown) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
   }
-
   function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
-
-  function addItem() { setItems(prev => [...prev, { section: '80C', declaredAmount: 0 }]); }
+  function addItem() { setItems(prev => [...prev, { section: '80C', declaredAmount: 0, proofAmount: null, proofs: [], verifyStatus: 'pending', rejectReason: '' }]); }
 
   async function save() {
     setSaving(true);
-    await authed(`/declarations/${fy}`, 'POST', { regime, items });
+    setMsg('');
+    try {
+      const d = await authed(`/declarations/${fy}`, 'POST', { regime, items, hraDetail: regime === 'old' ? hraDetail : null });
+      setItems(d.items || []);
+      setPhase(d.phase);
+      setMsg('Saved');
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : 'Save failed');
+    }
     setSaving(false);
+  }
+
+  async function submitProofs() {
+    try {
+      const d = await authed(`/declarations/${fy}/submit-proofs`, 'POST');
+      setPhase(d.phase);
+      setMsg('Proofs submitted for verification');
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : 'Submit failed');
+    }
+  }
+
+  function triggerUpload(idx: number) {
+    setUploadIdx(idx);
+    setTimeout(() => fileRef.current?.click(), 0);
+  }
+
+  async function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || uploadIdx < 0) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await authedRaw(`/declarations/${fy}/proof/${uploadIdx}`, 'POST', fd);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'upload failed');
+      setItems(d.items || []);
+      setMsg('Proof uploaded');
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : 'Upload failed');
+    }
+    e.target.value = '';
+    setUploadIdx(-1);
   }
 
   if (!loaded) return <div className="dec-page">Loading...</div>;
 
+  const isReadOnly = locked || phase === 'closed';
+  const hasHra = regime === 'old' && items.some(it => it.section === 'HRA');
+  const totalDeclared = items.reduce((s, it) => s + (it.declaredAmount || 0), 0);
+
   return (
     <div className="dec-page">
+      <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={onFileSelect} accept=".pdf,.jpg,.jpeg,.png" />
+
       <h1 className="dec-title">Investment Declaration — {fy}</h1>
+      {phase !== 'declaration' && (
+        <div className={`dec-phase-bar dec-phase-${phase}`}>
+          Phase: <strong>{phase}</strong>{locked ? ' (locked for TDS)' : ''}
+        </div>
+      )}
+
+      {/* Regime selection */}
       <div className="dec-card">
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 10 }}>Tax Regime</div>
+        <div className="dec-section-label">Tax Regime</div>
         <div className="dec-regime">
-          <button className={`dec-regime-btn ${regime === 'new' ? 'active' : ''}`} onClick={() => setRegime('new')}>New Regime</button>
-          <button className={`dec-regime-btn ${regime === 'old' ? 'active' : ''}`} onClick={() => setRegime('old')}>Old Regime</button>
+          <button className={`dec-regime-btn ${regime === 'new' ? 'active' : ''}`} disabled={isReadOnly} onClick={() => setRegime('new')}>New Regime</button>
+          <button className={`dec-regime-btn ${regime === 'old' ? 'active' : ''}`} disabled={isReadOnly} onClick={() => setRegime('old')}>Old Regime</button>
         </div>
         <button className="dec-compare-btn" onClick={() => navigate('/declarations/compare')}>Compare & Choose Regime →</button>
-        {regime === 'new' && <div className="dec-info">Under new regime, no deductions apply. Your declarations are recorded but won't reduce TDS.</div>}
+        {regime === 'new' && <div className="dec-info">Under new regime, most deductions don't apply. Your declarations are recorded but won't reduce TDS.</div>}
       </div>
 
+      {/* Declarations */}
       <div className="dec-card">
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 10 }}>Declarations</div>
-        {items.map((item, i) => (
-          <div key={i} className="dec-item">
-            <select className="se-select" value={item.section} onChange={e => updateItem(i, 'section', e.target.value)}>
-              {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <input className="se-input" type="number" value={item.declaredAmount} onChange={e => updateItem(i, 'declaredAmount', Number(e.target.value))} placeholder="Amount" />
-            <button className="se-remove" onClick={() => removeItem(i)}>×</button>
-          </div>
-        ))}
-        <button className="dec-add" onClick={addItem}>+ Add Declaration</button>
+        <div className="dec-section-label">Declarations</div>
+        {items.length === 0 && <div className="dec-empty">No declarations yet. Add one below.</div>}
+        {items.map((item, i) => {
+          const limit = limits[item.section];
+          const overLimit = limit && limit !== Infinity && item.declaredAmount > limit;
+          return (
+            <div key={i} className={`dec-item-card ${item.verifyStatus === 'rejected' ? 'dec-item-rejected' : ''}`}>
+              <div className="dec-item-row">
+                <select className="dec-select" value={item.section} disabled={isReadOnly} onChange={e => updateItem(i, 'section', e.target.value)}>
+                  {SECTIONS.map(s => <option key={s} value={s}>{SECTION_LABELS[s] || s}</option>)}
+                </select>
+                <div className="dec-amount-wrap">
+                  <input className={`dec-input ${overLimit ? 'dec-input-err' : ''}`} type="number" value={item.declaredAmount} disabled={isReadOnly}
+                    onChange={e => updateItem(i, 'declaredAmount', Number(e.target.value))} placeholder="Amount" />
+                  {limit && limit !== Infinity && <span className="dec-limit">Max: {fmt(limit)}</span>}
+                </div>
+                {!isReadOnly && <button className="dec-remove" onClick={() => removeItem(i)}>×</button>}
+              </div>
+              {overLimit && <div className="dec-warn">Exceeds section limit of {fmt(limit!)}</div>}
+              {item.rejectReason && <div className="dec-warn">Rejected: {item.rejectReason}</div>}
+
+              {/* Proof section */}
+              <div className="dec-proof-row">
+                <StatusBadge status={item.verifyStatus} />
+                {item.proofs.length > 0 && (
+                  <span className="dec-proof-count">{item.proofs.length} proof{item.proofs.length > 1 ? 's' : ''}</span>
+                )}
+                {item.proofAmount !== null && item.verifyStatus === 'verified' && (
+                  <span className="dec-proof-amt">Verified: {fmt(item.proofAmount)}</span>
+                )}
+                {!isReadOnly && (
+                  <button className="dec-upload-btn" onClick={() => triggerUpload(i)}>Upload proof</button>
+                )}
+              </div>
+              {item.proofs.length > 0 && (
+                <div className="dec-proof-list">
+                  {item.proofs.map((p, pi) => (
+                    <span key={pi} className="dec-proof-file">{p.filename}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {!isReadOnly && <button className="dec-add" onClick={addItem}>+ Add Declaration</button>}
       </div>
+
+      {/* HRA detail (old regime only, if HRA section exists) */}
+      {hasHra && (
+        <div className="dec-card">
+          <div className="dec-section-label">HRA Exemption Details</div>
+          <div className="dec-hra-grid">
+            <label>Monthly Rent
+              <input className="dec-input" type="number" value={hraDetail.monthlyRent} disabled={isReadOnly}
+                onChange={e => setHraDetail(p => ({ ...p, monthlyRent: Number(e.target.value) }))} />
+            </label>
+            <label>Landlord PAN {hraDetail.monthlyRent * 12 > 100000 ? '(required)' : ''}
+              <input className="dec-input" type="text" value={hraDetail.landlordPan} disabled={isReadOnly}
+                placeholder="AAAAA0000A" maxLength={10}
+                onChange={e => setHraDetail(p => ({ ...p, landlordPan: e.target.value.toUpperCase() }))} />
+            </label>
+            <label className="dec-hra-metro">
+              <input type="checkbox" checked={hraDetail.isMetro} disabled={isReadOnly}
+                onChange={e => setHraDetail(p => ({ ...p, isMetro: e.target.checked }))} />
+              Metro city (Delhi, Mumbai, Chennai, Kolkata)
+            </label>
+          </div>
+          {hraExemption > 0 && (
+            <div className="dec-hra-result">Computed HRA exemption: {fmt(hraExemption)} / year</div>
+          )}
+        </div>
+      )}
+
+      {/* Summary */}
+      <div className="dec-card">
+        <div className="dec-section-label">Summary</div>
+        <div className="dec-summary-row"><span>Total Declared</span><span>{fmt(totalDeclared)}</span></div>
+        {hasHra && hraExemption > 0 && <div className="dec-summary-row"><span>HRA Exemption</span><span>{fmt(hraExemption)}</span></div>}
+        <div className="dec-summary-row dec-summary-total"><span>Total Deductions</span><span>{fmt(totalDeclared + (hasHra ? hraExemption : 0))}</span></div>
+      </div>
+
+      {msg && <div className="dec-msg">{msg}</div>}
 
       <div className="dec-actions">
-        <button className="pr-btn" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Declaration'}</button>
+        {!isReadOnly && (
+          <button className="dec-btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Declaration'}</button>
+        )}
+        {phase === 'declaration' && items.some(it => it.proofs.length > 0) && (
+          <button className="dec-btn-secondary" onClick={submitProofs}>Submit Proofs for Verification</button>
+        )}
       </div>
     </div>
   );
