@@ -31,7 +31,7 @@ import {
   getNotifications, getNotificationsUnreadCount, markNotificationRead, markAllNotificationsRead,
   InboxItem, NotificationItem,
 } from './dashboard/inboxApi';
-import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals, RegimeComparison, DeclarationReview } from './payroll/index';
+import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals, RegimeComparison, DeclarationReview, MyLoans, LoanManagement } from './payroll/index';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -63,6 +63,8 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'tax-summary': <path d="M4 7h16M4 11h16M4 15h10M4 19h6" />,
   'reimbursement-approvals': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   'declaration-review': <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M12 12l2 2 4-4" />,
+  'my-loans': <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
+  'loan-management': <path d="M2 17h2.4L6 13l4 8 4-12 2 4h6" />,
 };
 
 function NavIcon({ name }: { name: NavKey }) {
@@ -314,6 +316,8 @@ export function AppShell() {
           <Route path="/declarations" element={<Declarations />} />
           <Route path="/declarations/compare" element={<RegimeComparison />} />
           <Route path="/declarations/review" element={<DeclarationReview />} />
+          <Route path="/my-loans" element={<MyLoans />} />
+          <Route path="/loan-management" element={<LoanManagement />} />
           <Route path="/tax-summary" element={<TaxSummary />} />
           <Route path="/reimbursements" element={<Reimbursements />} />
           <Route path="/reimbursement-approvals" element={<ReimbursementApprovals />} />

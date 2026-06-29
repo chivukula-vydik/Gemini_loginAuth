@@ -1,9 +1,9 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'declaration-review' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
+export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'declaration-review' | 'my-loans' | 'loan-management' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
 export type NavItem = { key: NavKey; label: string; path: string };
 export type NavSection = { title: string; items: NavItem[] };
 
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'declaration-review', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
+const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
 
 const CUSTOM_PATHS: Partial<Record<NavKey, string>> = {
   'declaration-review': '/declarations/review',
@@ -65,9 +65,9 @@ function sectionsForRole(role: Role): NavSection[] {
   sections.push({ title: 'Attendance & Leave', items: attLeave });
 
   if (['admin', 'finance'].includes(role)) {
-    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('declaration-review', 'Declaration Review')] });
+    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('declaration-review', 'Declaration Review'), I('my-loans', 'My Loans'), I('loan-management', 'Loan Management')] });
   } else {
-    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary')] });
+    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('my-loans', 'My Loans')] });
   }
 
   {

@@ -215,6 +215,7 @@ export function createPayrollRouter() {
         );
         if (emi) {
           emi.status = 'paid';
+          loan.checkAutoClose();
           await loan.save();
         }
       }
@@ -304,6 +305,98 @@ export function createPayrollRouter() {
       recommendation,
       savingsDelta: Math.abs(savings),
     });
+  }));
+
+  // --- Arrears: compute diff-based arrears for salary revision ---
+  router.post('/arrears/compute', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+    const { userId, periods, newCtcAnnual, newComponents } = req.body;
+    if (!userId || !periods?.length) return res.status(400).json({ error: 'userId and periods required' });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const salary = newCtcAnnual
+      ? { ctcAnnual: newCtcAnnual, components: newComponents }
+      : await SalaryStructure.findOne({ user: userId, effectiveFrom: { $lte: today } }).sort('-effectiveFrom');
+    if (!salary) return res.status(400).json({ error: 'no salary structure found' });
+
+    const arrears = [];
+    for (const { month, year } of periods) {
+      const originalSlip = await Payslip.findOne({ user: userId, 'period.month': month, 'period.year': year });
+      if (!originalSlip) continue;
+
+      const newResolved = resolveMonthlyAmounts(salary.components, salary.ctcAnnual);
+      let newGross = 0;
+      for (const comp of newResolved) {
+        if (comp.type === 'earning' && !comp.employerSide) newGross += comp.monthlyAmount;
+      }
+
+      const oldGross = originalSlip.gross - (originalSlip.reimbursements?.reduce((s, r) => s + r.amount, 0) || 0);
+      const diff = Math.round((newGross - oldGross) * 100) / 100;
+
+      if (diff > 0) {
+        arrears.push({
+          month, year,
+          originalGross: oldGross,
+          revisedGross: newGross,
+          arrearAmount: diff,
+          earningsDiff: newResolved
+            .filter(c => c.type === 'earning' && !c.employerSide)
+            .map(c => {
+              const orig = originalSlip.earnings?.find(e => e.key === c.key);
+              const delta = Math.round((c.monthlyAmount - (orig?.amount || 0)) * 100) / 100;
+              return { key: c.key, label: c.label, original: orig?.amount || 0, revised: c.monthlyAmount, delta };
+            })
+            .filter(d => d.delta !== 0),
+        });
+      }
+    }
+
+    const totalArrear = arrears.reduce((s, a) => s + a.arrearAmount, 0);
+    res.json({ userId, arrears, totalArrear, periodsComputed: arrears.length });
+  }));
+
+  // --- Arrears: create arrear payroll run from computed arrears ---
+  router.post('/arrears/create-run', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+    const { userId, payGroupId, arrears, month, year } = req.body;
+    if (!userId || !payGroupId || !arrears?.length) return res.status(400).json({ error: 'userId, payGroupId, arrears required' });
+
+    const runMonth = month || new Date().getMonth() + 1;
+    const runYear = year || new Date().getFullYear();
+
+    const run = await PayrollRun.create({
+      period: { month: runMonth, year: runYear },
+      payGroup: payGroupId,
+      runType: 'arrear',
+      scope: 'adhoc',
+      adhocMembers: [userId],
+    });
+
+    const totalArrear = arrears.reduce((s, a) => s + a.arrearAmount, 0);
+    const earnings = arrears.flatMap(a => a.earningsDiff.map(d => ({
+      key: `arrear_${d.key}_${a.month}_${a.year}`,
+      label: `${d.label} arrear (${a.month}/${a.year})`,
+      amount: d.delta,
+    })));
+
+    await Payslip.create({
+      payrollRun: run._id,
+      user: userId,
+      period: { month: runMonth, year: runYear },
+      earnings,
+      deductions: [],
+      reimbursements: [],
+      statutory: { pf: 0, esic: 0, pt: 0, tds: 0 },
+      gross: totalArrear,
+      totalDeductions: 0,
+      netPay: totalArrear,
+      lopDays: 0,
+      paidDays: 0,
+    });
+
+    run.status = 'REVIEW';
+    run.totals = { gross: totalArrear, deductions: 0, netPay: totalArrear, headcount: 1 };
+    await run.save();
+
+    res.status(201).json(run);
   }));
 
   return router;

@@ -8,3 +8,5 @@ export { Reimbursements } from './Reimbursements';
 export { ReimbursementApprovals } from './ReimbursementApprovals';
 export { RegimeComparison } from './RegimeComparison';
 export { DeclarationReview } from './DeclarationReview';
+export { MyLoans } from './MyLoans';
+export { LoanManagement } from './LoanManagement';
