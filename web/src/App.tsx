@@ -18,7 +18,7 @@ export default function App() {
   const path = window.location.pathname;
   if (path === '/forgot') return <AuthLayout><ForgotPassword /></AuthLayout>;
   if (path === '/reset') return <AuthLayout><ResetPassword /></AuthLayout>;
-  if (path.startsWith('/portal/')) return <Routes><Route path="/portal/:token" element={<CandidatePortal />} /></Routes>;
+  if (path.startsWith('/portal/') || path.startsWith('/onboarding/portal/')) return <Routes><Route path="/portal/:token" element={<CandidatePortal />} /><Route path="/onboarding/portal/:token" element={<CandidatePortal />} /></Routes>;
   return (
     <AuthProvider>
       <Gate />

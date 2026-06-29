@@ -65,8 +65,13 @@ function sectionsForRole(role: Role): NavSection[] {
     sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips')] });
   }
 
-  if (['admin', 'hr'].includes(role)) {
-    sections.push({ title: 'Onboarding', items: [I('onboarding', 'Onboarding'), I('onboarding-tasks', 'Onboarding Tasks'), I('onboarding-templates', 'Onboarding Templates')] });
+  {
+    const onb: NavItem[] = [];
+    if (['admin', 'hr'].includes(role)) {
+      onb.push(I('onboarding', 'Onboarding'), I('onboarding-templates', 'Onboarding Templates'));
+    }
+    onb.push(I('onboarding-tasks', 'My Onboarding'));
+    sections.push({ title: 'Onboarding', items: onb });
   }
 
   const growth: NavItem[] = [I('my-skills', 'My Skills'), I('marketplace', 'Marketplace')];

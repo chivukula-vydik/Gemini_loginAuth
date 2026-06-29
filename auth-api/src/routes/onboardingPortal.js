@@ -27,7 +27,7 @@ export function createOnboardingPortalRouter() {
   router.get('/:token/checklist', asyncHandler(resolveCase), asyncHandler(async (req, res) => {
     const c = req.onboardingCase;
     const offer = await Offer.findOne({ onboardingCase: c._id, status: { $ne: 'revised' } }).sort('-version');
-    const tasks = await OnboardingTask.find({ onboardingCase: c._id, ownerRole: 'candidate' });
+    const tasks = await OnboardingTask.find({ onboardingCase: c._id, runsOn: 'candidate' });
     const docs = await DocumentRequest.find({ onboardingCase: c._id });
 
     res.json({
@@ -122,7 +122,7 @@ export function createOnboardingPortalRouter() {
 
   router.post('/:token/tasks/:key/complete', asyncHandler(resolveCase), asyncHandler(async (req, res) => {
     const c = req.onboardingCase;
-    const task = await OnboardingTask.findOne({ onboardingCase: c._id, templateKey: req.params.key, ownerRole: 'candidate' });
+    const task = await OnboardingTask.findOne({ onboardingCase: c._id, templateKey: req.params.key, runsOn: 'candidate' });
     if (!task) return res.status(404).json({ error: 'task not found' });
     task.status = 'done';
     task.completedAt = new Date();

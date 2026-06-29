@@ -1,9 +1,328 @@
-.mot-page { padding: 28px 32px; max-width: 800px; }
-.mot-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
-.mot-list { display: flex; flex-direction: column; gap: 8px; }
-.mot-item { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; box-shadow: var(--shadow); }
-.mot-item-info { flex: 1; }
-.mot-item-title { font-size: 14px; font-weight: 600; color: var(--text); }
-.mot-item-case { font-size: 12px; color: var(--muted); }
-.mot-item-due { font-size: 11px; color: var(--muted); }
-.mot-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   My Onboarding Tasks — Grouped checklist with progress
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.mot-page {
+  padding: 28px 32px 48px;
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────── */
+.mot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 4px;
+}
+
+.mot-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--primary);
+}
+
+.mot-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.mot-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+.mot-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+
+.mot-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.mot-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.mot-progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ─── Cards ───────────────────────────────────────────────────────────── */
+.mot-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ─── Group header ────────────────────────────────────────────────────── */
+.mot-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+}
+
+.mot-group-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.mot-group-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ─── Task rows ───────────────────────────────────────────────────────── */
+.mot-task-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.mot-task-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.mot-task-row:hover { background: var(--surface); }
+.mot-task-row.done { opacity: 0.6; }
+
+/* ─── Checkbox ────────────────────────────────────────────────────────── */
+.mot-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  padding: 0;
+  color: transparent;
+}
+
+.mot-check:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.mot-check.checked {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  border-color: #22c55e;
+  color: #15803d;
+  cursor: default;
+}
+
+/* ─── Task body ───────────────────────────────────────────────────────── */
+.mot-task-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mot-task-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mot-task-title.done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.mot-task-case {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.mot-task-case:hover {
+  color: var(--primary);
+}
+
+/* ─── Due date ────────────────────────────────────────────────────────── */
+.mot-task-due {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.mot-task-due.soon {
+  background: rgba(234,179,8,0.12);
+  color: #b45309;
+}
+
+.mot-task-due.overdue {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+/* ─── Action button ───────────────────────────────────────────────────── */
+.mot-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--primary-soft);
+  color: var(--primary);
+  transition: all 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mot-action-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.mot-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Done state ──────────────────────────────────────────────────────── */
+.mot-done-card,
+.mot-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 32px;
+}
+
+.mot-done-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.mot-done-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.mot-done-sub {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 340px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.mot-empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.mot-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.mot-empty-sub {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 340px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Loading ─────────────────────────────────────────────────────────── */
+.mot-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 120px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mot-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  animation: mot-spin 0.7s linear infinite;
+}
+
+@keyframes mot-spin { to { transform: rotate(360deg); } }
+
+/* ─── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .mot-page { padding: 20px 16px 40px; }
+  .mot-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .mot-progress { width: 100%; }
+  .mot-task-row { flex-wrap: wrap; gap: 10px; }
+  .mot-action-btn { width: 100%; justify-content: center; }
+}

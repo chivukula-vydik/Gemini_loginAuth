@@ -55,6 +55,78 @@ export async function sendTimesheetReturned(email, { weekStart, reason }) {
   });
 }
 
+export async function sendOfferEmail(email, { candidateName, designation, ctcAnnual, joiningDate, portalLink }) {
+  const t = getTransport();
+  const ctcFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(ctcAnnual);
+  const joinFormatted = new Date(joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const subject = `Offer Letter — ${designation}`;
+  const text = [
+    `Hi ${candidateName},`,
+    '',
+    `We are pleased to extend an offer for the position of ${designation}.`,
+    '',
+    `CTC (Annual): ${ctcFormatted}`,
+    `Joining Date: ${joinFormatted}`,
+    '',
+    `Please review and respond to your offer using the link below:`,
+    portalLink,
+    '',
+    `This link is valid until 7 days after your joining date.`,
+    '',
+    'Regards,',
+    'HR Team',
+  ].join('\n');
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h2 style="color:#4338ca;margin:0 0 20px">Offer Letter</h2>
+      <p>Hi ${candidateName},</p>
+      <p>We are pleased to extend an offer for the position of <strong>${designation}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;color:#475569">CTC (Annual)</td><td style="padding:8px 12px;border:1px solid #e2e8f0">${ctcFormatted}</td></tr>
+        <tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;color:#475569">Joining Date</td><td style="padding:8px 12px;border:1px solid #e2e8f0">${joinFormatted}</td></tr>
+      </table>
+      <p>Please review and respond to your offer:</p>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${portalLink}" style="display:inline-block;padding:12px 32px;background:#4338ca;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">View & Respond to Offer</a>
+      </p>
+      <p style="font-size:13px;color:#64748b">This link is valid until 7 days after your joining date.</p>
+      <p>Regards,<br/>HR Team</p>
+    </div>`;
+  if (!t) { console.log(`[mailer:dev] offer email for ${email}: ${portalLink}`); return; }
+  await t.sendMail({ from: process.env.MAIL_FROM, to: email, subject, text, html });
+}
+
+export async function sendWelcomeEmail(email, { name, resetLink }) {
+  const t = getTransport();
+  const subject = `Welcome aboard — set up your account`;
+  const text = [
+    `Hi ${name},`,
+    '',
+    'Welcome to the team! Your account has been created.',
+    '',
+    'Set your password and log in using the link below:',
+    resetLink,
+    '',
+    'This link expires in 72 hours.',
+    '',
+    'Regards,',
+    'HR Team',
+  ].join('\n');
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+      <h2 style="margin:0 0 20px">Welcome aboard!</h2>
+      <p>Hi ${name},</p>
+      <p>Your account has been created. Set your password to get started:</p>
+      <p style="text-align:center;margin:24px 0">
+        <a href="${resetLink}" style="display:inline-block;padding:12px 32px;background:#334155;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Set Password & Log In</a>
+      </p>
+      <p style="font-size:13px;color:#64748b">This link expires in 72 hours.</p>
+      <p>Regards,<br/>HR Team</p>
+    </div>`;
+  if (!t) { console.log(`[mailer:dev] welcome email for ${email}: ${resetLink}`); return; }
+  await t.sendMail({ from: process.env.MAIL_FROM, to: email, subject, text, html });
+}
+
 export async function sendLeaveRequest(managerEmail, { employeeName, type, startDate, endDate }) {
   const t = getTransport();
   const body = `${employeeName} has submitted a ${type} leave request from ${startDate} to ${endDate}. Please review it in the Requests tab.`;

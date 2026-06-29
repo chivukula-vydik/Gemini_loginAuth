@@ -1,12 +1,570 @@
-.tb-page { padding: 28px 32px; max-width: 900px; }
-.tb-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
-.tb-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-.tb-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); cursor: pointer; transition: border-color 0.12s; }
-.tb-card:hover { border-color: var(--accent); }
-.tb-card-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.tb-card-count { font-size: 12px; color: var(--muted); }
+/* ═══════════════════════════════════════════════════════════════════════════
+   Onboarding Templates — Card grid + Editor
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-.tb-editor { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); }
-.tb-task-row { display: grid; grid-template-columns: 1fr 1fr 100px 70px 70px 30px; gap: 8px; align-items: center; margin-bottom: 8px; }
-.tb-task-row input, .tb-task-row select { font-size: 12px; }
-.tb-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }
+.tb-page {
+  padding: 28px 32px 48px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────── */
+.tb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+}
+
+.tb-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.tb-page-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────── */
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--card);
+  color: var(--text);
+  transition: all 0.12s;
+}
+
+.tb-btn:hover { border-color: var(--text); }
+.tb-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tb-btn.primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.tb-btn.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.tb-btn.secondary {
+  background: var(--card);
+  color: var(--text);
+}
+
+/* ─── Template card grid ──────────────────────────────────────────────── */
+.tb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.tb-template-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.12s;
+}
+
+.tb-template-card:hover { border-color: var(--primary); }
+
+.tb-tcard-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tb-tcard-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tb-tcard-info { flex: 1; min-width: 0; }
+
+.tb-tcard-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tb-tcard-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tb-tcard-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tb-tcard-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tb-tcard-usage {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ─── Kebab menu ──────────────────────────────────────────────────────── */
+.tb-tcard-menu-wrap { position: relative; }
+
+.tb-tcard-menu-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tb-tcard-menu-btn:hover { background: var(--surface); color: var(--text); }
+
+.tb-tcard-menu {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 10;
+  min-width: 140px;
+  padding: 4px;
+}
+
+.tb-tcard-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.tb-tcard-menu button:hover { background: var(--surface); }
+.tb-tcard-menu button.danger { color: var(--danger); }
+.tb-tcard-menu button.danger:hover { background: var(--danger-soft); }
+
+/* ─── Empty state ─────────────────────────────────────────────────────── */
+.tb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px 32px;
+}
+
+.tb-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.tb-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.tb-empty-sub {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 420px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+/* ─── Presets ─────────────────────────────────────────────────────────── */
+.tb-presets {
+  padding-top: 8px;
+}
+
+.tb-presets-inline {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.tb-presets-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 12px;
+}
+
+.tb-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.tb-preset-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tb-preset-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.tb-preset-card.compact { padding: 14px 16px; gap: 4px; }
+
+.tb-preset-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.tb-preset-card.compact .tb-preset-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 2px;
+}
+
+.tb-preset-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tb-preset-card.compact .tb-preset-name { font-size: 13px; }
+
+.tb-preset-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.tb-preset-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ─── Editor ──────────────────────────────────────────────────────────── */
+.tb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.tb-back:hover { color: var(--text); }
+
+.tb-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tb-editor-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.tb-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+}
+
+.tb-form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.tb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tb-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tb-input {
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.tb-input:focus { border-color: var(--primary); }
+
+.tb-select {
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.tb-select:focus { border-color: var(--primary); }
+
+.tb-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.tb-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.tb-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--primary-soft);
+  color: var(--primary);
+  transition: all 0.12s;
+}
+
+.tb-add-btn:hover { background: color-mix(in srgb, var(--primary) 18%, transparent); }
+
+/* ─── Phase groups in editor ──────────────────────────────────────────── */
+.tb-phase-group {
+  margin-bottom: 16px;
+}
+
+.tb-phase-group:last-child { margin-bottom: 0; }
+
+.tb-phase-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-phase-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+/* ─── Task row in editor ──────────────────────────────────────────────── */
+.tb-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tb-task-row:last-child { border-bottom: none; }
+
+.tb-task-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.tb-task-key { width: 80px; font-size: 12px; }
+.tb-task-title { flex: 1; min-width: 140px; }
+
+.tb-offset-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tb-offset { width: 52px; text-align: center; }
+
+.tb-offset-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tb-mandatory-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tb-mandatory-check input { accent-color: var(--primary); }
+
+.tb-remove-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tb-remove-btn:hover { background: var(--danger-soft); color: var(--danger); }
+
+.tb-no-tasks {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 28px 0;
+}
+
+.tb-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+/* ─── Loading ─────────────────────────────────────────────────────────── */
+.tb-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 120px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tb-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  animation: tb-spin 0.7s linear infinite;
+}
+
+@keyframes tb-spin { to { transform: rotate(360deg); } }
+
+/* ─── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .tb-page { padding: 20px 16px 40px; }
+  .tb-grid { grid-template-columns: 1fr; }
+  .tb-preset-grid { grid-template-columns: 1fr; }
+  .tb-form-row { flex-direction: column; }
+  .tb-task-fields { flex-direction: column; align-items: stretch; }
+  .tb-task-key { width: 100%; }
+  .tb-task-title { min-width: 0; }
+}

@@ -254,7 +254,18 @@ function DashboardCards({ data, navigate }: { data: DashboardData; navigate: (p:
   );
 }
 
-function PeopleSection({ onLeave, workingToday }: { onLeave: PeopleEntry[]; workingToday: PeopleEntry[] }) {
+function PeopleSection({ onLeave, workingToday, birthdaysToday, upcomingBirthdays, anniversaries, newJoinees, onWish }: {
+  onLeave: PeopleEntry[];
+  workingToday: PeopleEntry[];
+  birthdaysToday: PeopleEntry[];
+  upcomingBirthdays: PeopleEntry[];
+  anniversaries: PeopleEntry[];
+  newJoinees: PeopleEntry[];
+  onWish: (emp: PeopleEntry) => void;
+}) {
+  type CelTab = 'birthdays' | 'anniversaries' | 'joinees';
+  const [celTab, setCelTab] = useState<CelTab>('birthdays');
+
   return (
     <div className="hp-lower-left">
       <HolidayCarousel />
@@ -292,21 +303,82 @@ function PeopleSection({ onLeave, workingToday }: { onLeave: PeopleEntry[]; work
           </div>
         )}
       </div>
+
+      <div className="hp-subcard hp-lower-left-full">
+        <div className="hp-cel-tabs-row">
+          <button className={`hp-cel-tab ${celTab === 'birthdays' ? 'active' : ''}`} onClick={() => setCelTab('birthdays')}>
+            <IconGift size={13} />{birthdaysToday.length} Birthday{birthdaysToday.length !== 1 ? 's' : ''}
+          </button>
+          <button className={`hp-cel-tab ${celTab === 'anniversaries' ? 'active' : ''}`} onClick={() => setCelTab('anniversaries')}>
+            <IconConfetti size={13} />{anniversaries.length} Work Anniversar{anniversaries.length !== 1 ? 'ies' : 'y'}
+          </button>
+          <button className={`hp-cel-tab ${celTab === 'joinees' ? 'active' : ''}`} onClick={() => setCelTab('joinees')}>
+            <IconUserPlus size={13} />{newJoinees.length} New Joinee{newJoinees.length !== 1 ? 's' : ''}
+          </button>
+          <button className="hp-cel-collapse" aria-label="Collapse">
+            <IconChevronLeft size={14} style={{ transform: 'rotate(90deg)' }} />
+          </button>
+        </div>
+
+        {celTab === 'birthdays' && (
+          <>
+            {birthdaysToday.length > 0 && (
+              <>
+                <div className="hp-cel-section-label">Birthdays today</div>
+                <div className="hp-avatar-row">
+                  {birthdaysToday.map((e) => <AvatarCard key={e._id} emp={e} showWhen={false} onWish={onWish} />)}
+                </div>
+              </>
+            )}
+            {upcomingBirthdays.length > 0 && (
+              <>
+                <div className="hp-cel-section-label" style={{ marginTop: 14 }}>Upcoming Birthdays</div>
+                <div className="hp-avatar-row hp-avatar-row--wrap">
+                  {upcomingBirthdays.map((e) => <AvatarCard key={e._id} emp={e} showWhen />)}
+                </div>
+              </>
+            )}
+            {birthdaysToday.length === 0 && upcomingBirthdays.length === 0 && (
+              <div className="hp-empty"><p>No upcoming birthdays.</p></div>
+            )}
+          </>
+        )}
+
+        {celTab === 'anniversaries' && (
+          <>
+            {anniversaries.length > 0 ? (
+              <div className="hp-avatar-row hp-avatar-row--wrap">
+                {anniversaries.map((e) => (
+                  <AvatarCard key={e._id} emp={{ ...e, when: `${e.years} yr${(e.years ?? 0) !== 1 ? 's' : ''}` }} showWhen />
+                ))}
+              </div>
+            ) : (
+              <div className="hp-empty"><p>No work anniversaries today.</p></div>
+            )}
+          </>
+        )}
+
+        {celTab === 'joinees' && (
+          <>
+            {newJoinees.length > 0 ? (
+              <div className="hp-avatar-row hp-avatar-row--wrap">
+                {newJoinees.map((e) => (
+                  <AvatarCard key={e._id} emp={{ ...e, when: e.joined ? new Date(e.joined).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '' }} showWhen />
+                ))}
+              </div>
+            ) : (
+              <div className="hp-empty"><p>No new joinees this month.</p></div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinees, onWish }: {
-  birthdaysToday: PeopleEntry[];
-  upcomingBirthdays: PeopleEntry[];
-  anniversaries: PeopleEntry[];
-  newJoinees: PeopleEntry[];
-  onWish: (emp: PeopleEntry) => void;
-}) {
+function RightFeed() {
   const { user } = useAuth();
   const [feedTab, setFeedTab] = useState<FeedTab>('Organization');
-  type CelTab = 'birthdays' | 'anniversaries' | 'joinees';
-  const [celTab, setCelTab] = useState<CelTab>('birthdays');
 
   const [feedItems, setFeedItems] = useState<FeedItemType[]>([]);
   const [feedCursor, setFeedCursor] = useState<string | null>(null);
@@ -458,74 +530,6 @@ function RightFeed({ birthdaysToday, upcomingBirthdays, anniversaries, newJoinee
         )}
       </div>
 
-      <div className="hp-subcard">
-        <div className="hp-cel-tabs-row">
-          <button className={`hp-cel-tab ${celTab === 'birthdays' ? 'active' : ''}`} onClick={() => setCelTab('birthdays')}>
-            <IconGift size={13} />{birthdaysToday.length} Birthday{birthdaysToday.length !== 1 ? 's' : ''}
-          </button>
-          <button className={`hp-cel-tab ${celTab === 'anniversaries' ? 'active' : ''}`} onClick={() => setCelTab('anniversaries')}>
-            <IconConfetti size={13} />{anniversaries.length} Work Anniversar{anniversaries.length !== 1 ? 'ies' : 'y'}
-          </button>
-          <button className={`hp-cel-tab ${celTab === 'joinees' ? 'active' : ''}`} onClick={() => setCelTab('joinees')}>
-            <IconUserPlus size={13} />{newJoinees.length} New Joinee{newJoinees.length !== 1 ? 's' : ''}
-          </button>
-          <button className="hp-cel-collapse" aria-label="Collapse">
-            <IconChevronLeft size={14} style={{ transform: 'rotate(90deg)' }} />
-          </button>
-        </div>
-
-        {celTab === 'birthdays' && (
-          <>
-            {birthdaysToday.length > 0 && (
-              <>
-                <div className="hp-cel-section-label">Birthdays today</div>
-                <div className="hp-avatar-row">
-                  {birthdaysToday.map((e) => <AvatarCard key={e._id} emp={e} showWhen={false} onWish={onWish} />)}
-                </div>
-              </>
-            )}
-            {upcomingBirthdays.length > 0 && (
-              <>
-                <div className="hp-cel-section-label" style={{ marginTop: 14 }}>Upcoming Birthdays</div>
-                <div className="hp-avatar-row hp-avatar-row--wrap">
-                  {upcomingBirthdays.map((e) => <AvatarCard key={e._id} emp={e} showWhen />)}
-                </div>
-              </>
-            )}
-            {birthdaysToday.length === 0 && upcomingBirthdays.length === 0 && (
-              <div className="hp-empty"><p>No upcoming birthdays.</p></div>
-            )}
-          </>
-        )}
-
-        {celTab === 'anniversaries' && (
-          <>
-            {anniversaries.length > 0 ? (
-              <div className="hp-avatar-row hp-avatar-row--wrap">
-                {anniversaries.map((e) => (
-                  <AvatarCard key={e._id} emp={{ ...e, when: `${e.years} yr${(e.years ?? 0) !== 1 ? 's' : ''}` }} showWhen />
-                ))}
-              </div>
-            ) : (
-              <div className="hp-empty"><p>No work anniversaries today.</p></div>
-            )}
-          </>
-        )}
-
-        {celTab === 'joinees' && (
-          <>
-            {newJoinees.length > 0 ? (
-              <div className="hp-avatar-row hp-avatar-row--wrap">
-                {newJoinees.map((e) => (
-                  <AvatarCard key={e._id} emp={{ ...e, when: e.joined ? new Date(e.joined).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '' }} showWhen />
-                ))}
-              </div>
-            ) : (
-              <div className="hp-empty"><p>No new joinees this month.</p></div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }
@@ -625,14 +629,16 @@ export function HomePage() {
         {data && <DashboardCards data={data} navigate={navigate} />}
 
         <div className="hp-lower">
-          <PeopleSection onLeave={onLeave} workingToday={workingToday} />
-          <RightFeed
+          <PeopleSection
+            onLeave={onLeave}
+            workingToday={workingToday}
             birthdaysToday={birthdaysToday}
             upcomingBirthdays={upcomingBirthdays}
             anniversaries={anniversaries}
             newJoinees={newJoinees}
             onWish={handleWish}
           />
+          <RightFeed />
         </div>
       </div>
       {wishTarget && (

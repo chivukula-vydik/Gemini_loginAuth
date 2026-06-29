@@ -26,6 +26,26 @@ async function portalUpload(token: string, path: string, formData: FormData) {
   return r.json();
 }
 
+function CheckIcon() {
+  return <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
+
+function BriefcaseIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>;
+}
+
+function CalendarIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+}
+
+function DocIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>;
+}
+
+function UploadIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+}
+
 export function CandidatePortal() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<Checklist | null>(null);
@@ -83,70 +103,169 @@ export function CandidatePortal() {
     await load();
   }
 
-  if (error) return <div className="cp-page"><div className="cp-error">{error}</div></div>;
-  if (!data) return <div className="cp-page"><div className="cp-loading">Loading...</div></div>;
+  if (error) return (
+    <div className="cp-page">
+      <div className="cp-error-card">
+        <div className="cp-error-icon">!</div>
+        <div className="cp-error-title">Link expired or invalid</div>
+        <div className="cp-error-sub">{error}</div>
+      </div>
+    </div>
+  );
+
+  if (!data) return (
+    <div className="cp-page">
+      <div className="cp-loader">
+        <div className="cp-spinner" />
+        <span>Loading your portal...</span>
+      </div>
+    </div>
+  );
 
   const isTerminal = ['OFFER_DECLINED', 'CANCELLED'].includes(data.status);
+  const joinDate = new Date(data.joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const doneTaskCount = data.tasks.filter(t => t.status === 'done').length;
+  const verifiedDocCount = data.documents.filter(d => d.verifyStatus === 'verified').length;
 
   return (
     <div className="cp-page">
-      <div className="cp-brand">Onboarding Portal</div>
       <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={onFileSelect} />
 
-      <div className="cp-card">
-        <div className="cp-welcome">Welcome, {data.candidate.firstName}!</div>
-        <div className="cp-sub">{data.designation} — Joining {new Date(data.joiningDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-        {isTerminal && <div style={{ color: '#dc2626', fontWeight: 600, fontSize: 14 }}>This case is {data.status.replace(/_/g, ' ').toLowerCase()}.</div>}
-      </div>
-
-      {data.offer && !isTerminal && (
-        <div className="cp-card">
-          <div className="cp-card-title">Offer</div>
-          <div className="cp-offer-ctc">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(data.offer.ctcAnnual)} / year</div>
-          <div className="cp-field"><div className="cp-field-label">Status</div><div className="cp-field-value" style={{ textTransform: 'uppercase' }}>{data.offer.status}</div></div>
-          {data.offer.status === 'sent' && (
-            <div className="cp-offer-actions" style={{ marginTop: 14 }}>
-              <button className="pr-btn" disabled={busy} onClick={acceptOffer}>Accept Offer</button>
-              <button className="cd-btn-sm danger" disabled={busy} onClick={declineOffer}>Decline</button>
-            </div>
+      {/* Hero banner */}
+      <div className="cp-hero">
+        <div className="cp-hero-bg" />
+        <div className="cp-hero-content">
+          <div className="cp-hero-avatar">{data.candidate.firstName[0]}{data.candidate.lastName[0]}</div>
+          <h1 className="cp-hero-title">Welcome, {data.candidate.firstName}!</h1>
+          <p className="cp-hero-sub">
+            <BriefcaseIcon /> {data.designation}
+            <span className="cp-hero-dot" />
+            <CalendarIcon /> Joining {joinDate}
+          </p>
+          {isTerminal && (
+            <div className="cp-hero-terminal">This case is {data.status.replace(/_/g, ' ').toLowerCase()}.</div>
           )}
         </div>
-      )}
+      </div>
 
-      {!isTerminal && data.documents.length > 0 && (
-        <div className="cp-card">
-          <div className="cp-card-title">Documents</div>
-          {data.documents.map(d => (
-            <div key={d._id} className="cp-doc-row">
-              <div>
-                <span className="cp-doc-type">{d.docType.replace(/_/g, ' ')}</span>
-                {d.mandatory && <span style={{ fontSize: 10, color: '#dc2626', marginLeft: 6 }}>Required</span>}
+      <div className="cp-body">
+        {/* Progress overview */}
+        {!isTerminal && (data.tasks.length > 0 || data.documents.length > 0) && (
+          <div className="cp-progress-strip">
+            {data.offer && (
+              <div className="cp-progress-item">
+                <div className={`cp-progress-circle ${data.offer.status === 'accepted' ? 'done' : data.offer.status === 'sent' ? 'active' : ''}`}>
+                  {data.offer.status === 'accepted' ? <CheckIcon /> : '1'}
+                </div>
+                <span>Offer</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className={`cp-doc-badge ${d.verifyStatus}`}>{d.verifyStatus}</span>
-                {(d.verifyStatus === 'awaiting' || d.verifyStatus === 'rejected') && (
-                  <button className="cd-btn-sm" onClick={() => triggerUpload(d._id)}>Upload</button>
-                )}
+            )}
+            {data.documents.length > 0 && (
+              <div className="cp-progress-item">
+                <div className={`cp-progress-circle ${verifiedDocCount === data.documents.length ? 'done' : verifiedDocCount > 0 ? 'active' : ''}`}>
+                  {verifiedDocCount === data.documents.length ? <CheckIcon /> : '2'}
+                </div>
+                <span>Documents</span>
               </div>
+            )}
+            {data.tasks.length > 0 && (
+              <div className="cp-progress-item">
+                <div className={`cp-progress-circle ${doneTaskCount === data.tasks.length ? 'done' : doneTaskCount > 0 ? 'active' : ''}`}>
+                  {doneTaskCount === data.tasks.length ? <CheckIcon /> : '3'}
+                </div>
+                <span>Tasks</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Offer card */}
+        {data.offer && !isTerminal && (
+          <div className="cp-card cp-offer-card">
+            <div className="cp-card-header">
+              <div className="cp-card-icon offer"><BriefcaseIcon /></div>
+              <div className="cp-card-title">Your Offer</div>
+              <span className={`cp-status-pill ${data.offer.status}`}>{data.offer.status}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="cp-offer-amount">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(data.offer.ctcAnnual)}<span className="cp-offer-per"> / year</span></div>
+            {data.offer.status === 'sent' && (
+              <div className="cp-offer-actions">
+                <button className="cp-btn cp-btn-accept" disabled={busy} onClick={acceptOffer}>
+                  <CheckIcon /> Accept Offer
+                </button>
+                <button className="cp-btn cp-btn-decline" disabled={busy} onClick={declineOffer}>Decline</button>
+              </div>
+            )}
+            {data.offer.status === 'accepted' && (
+              <div className="cp-offer-accepted">
+                <CheckIcon /> You have accepted this offer
+              </div>
+            )}
+          </div>
+        )}
 
-      {!isTerminal && data.tasks.length > 0 && (
-        <div className="cp-card">
-          <div className="cp-card-title">Tasks</div>
-          <ul className="cp-checklist">
-            {data.tasks.map(t => (
-              <li key={t.key}>
-                <div className={`cp-check ${t.status === 'done' ? 'done' : 'pending'}`}>{t.status === 'done' ? 'Y' : ' '}</div>
-                <span style={{ flex: 1 }}>{t.title}</span>
-                {t.status !== 'done' && <button className="cd-btn-sm" onClick={() => completeTask(t.key)}>Complete</button>}
-              </li>
-            ))}
-          </ul>
+        {/* Documents card */}
+        {!isTerminal && data.documents.length > 0 && (
+          <div className="cp-card">
+            <div className="cp-card-header">
+              <div className="cp-card-icon doc"><DocIcon /></div>
+              <div className="cp-card-title">Documents</div>
+              <span className="cp-counter">{verifiedDocCount}/{data.documents.length}</span>
+            </div>
+            <div className="cp-doc-list">
+              {data.documents.map(d => (
+                <div key={d._id} className={`cp-doc-row ${d.verifyStatus}`}>
+                  <div className="cp-doc-left">
+                    <div className={`cp-doc-icon ${d.verifyStatus}`}>
+                      {d.verifyStatus === 'verified' ? <CheckIcon /> : <DocIcon />}
+                    </div>
+                    <div>
+                      <div className="cp-doc-name">{d.docType.replace(/_/g, ' ')}</div>
+                      {d.mandatory && <span className="cp-doc-req">Required</span>}
+                    </div>
+                  </div>
+                  <div className="cp-doc-right">
+                    <span className={`cp-doc-badge ${d.verifyStatus}`}>{d.verifyStatus}</span>
+                    {(d.verifyStatus === 'awaiting' || d.verifyStatus === 'rejected') && (
+                      <button className="cp-btn cp-btn-upload" onClick={() => triggerUpload(d._id)}>
+                        <UploadIcon /> Upload
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tasks card */}
+        {!isTerminal && data.tasks.length > 0 && (
+          <div className="cp-card">
+            <div className="cp-card-header">
+              <div className="cp-card-icon task"><CheckIcon /></div>
+              <div className="cp-card-title">Tasks</div>
+              <span className="cp-counter">{doneTaskCount}/{data.tasks.length}</span>
+            </div>
+            <div className="cp-task-list">
+              {data.tasks.map(t => (
+                <div key={t.key} className={`cp-task-row ${t.status}`}>
+                  <div className={`cp-task-check ${t.status}`}>
+                    {t.status === 'done' && <CheckIcon />}
+                  </div>
+                  <span className={`cp-task-title ${t.status}`}>{t.title}</span>
+                  {t.status !== 'done' && (
+                    <button className="cp-btn cp-btn-complete" onClick={() => completeTask(t.key)}>Mark done</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="cp-footer">
+          Questions? Reach out to your HR contact for assistance.
         </div>
-      )}
+      </div>
     </div>
   );
 }

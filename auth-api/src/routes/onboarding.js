@@ -16,6 +16,7 @@ import { PayGroup } from '../models/PayGroup.js';
 import { LeaveBalance, DEFAULT_QUOTAS } from '../models/LeaveBalance.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import crypto from 'crypto';
+import { sendOfferEmail } from '../services/mailer.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -42,9 +43,9 @@ export function createOnboardingRouter() {
   }));
 
   router.get('/tasks/mine', requireAuth, asyncHandler(async (req, res) => {
-    const tasks = await OnboardingTask.find({ assignedTo: req.user.sub, status: { $ne: 'done' } })
+    const tasks = await OnboardingTask.find({ assignedTo: req.user.sub })
       .populate({ path: 'onboardingCase', select: 'candidate designation status joiningDate' })
-      .sort('dueDate');
+      .sort({ phase: 1, dueDate: 1 });
     res.json(tasks);
   }));
 
@@ -81,15 +82,23 @@ export function createOnboardingRouter() {
   }));
 
   router.get('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const templates = await OnboardingTemplate.find().sort('-createdAt');
+    const templates = await OnboardingTemplate.find({ archived: { $ne: true } }).sort('-createdAt');
     res.json(templates);
   }));
 
   router.post('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
-    const { name, appliesTo, tasks } = req.body;
+    const { name, description, icon, appliesTo, tasks } = req.body;
     if (!name || !tasks?.length) return res.status(400).json({ error: 'name and tasks required' });
-    const template = await OnboardingTemplate.create({ name, appliesTo, tasks });
+    const template = await OnboardingTemplate.create({ name, description, icon, appliesTo, tasks, createdBy: req.user.sub });
     res.status(201).json(template);
+  }));
+
+  router.delete('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+    const template = await OnboardingTemplate.findById(req.params.id);
+    if (!template) return res.status(404).json({ error: 'not found' });
+    template.archived = true;
+    await template.save();
+    res.json({ ok: true });
   }));
 
   router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
@@ -193,9 +202,9 @@ export function createOnboardingRouter() {
 
     const mandatoryDocs = docs.filter(d => d.mandatory);
     const allMandatoryDocsVerified = mandatoryDocs.length > 0 && mandatoryDocs.every(d => d.verifyStatus === 'verified');
-    const mandatoryTasks = tasks.filter(t => t.mandatory);
-    const allMandatoryTasksDone = mandatoryTasks.every(t => t.status === 'done');
-    const readyToConvert = allMandatoryDocsVerified && allMandatoryTasksDone && offer?.status === 'accepted';
+    const candidateGateTasks = tasks.filter(t => t.mandatory && t.runsOn === 'candidate');
+    const allCandidateTasksDone = candidateGateTasks.every(t => t.status === 'done');
+    const readyToConvert = allMandatoryDocsVerified && allCandidateTasksDone && offer?.status === 'accepted';
 
     res.json({ ...c.toObject(), offer, tasks: enrichedTasks, documents: docs, readyToConvert });
   }));
@@ -254,6 +263,14 @@ export function createOnboardingRouter() {
       c.status = 'OFFER_SENT';
       await c.save();
     }
+    const portalLink = `${process.env.WEB_URL || 'http://localhost:5173'}/onboarding/portal/${token}`;
+    sendOfferEmail(c.candidate.personalEmail, {
+      candidateName: `${c.candidate.firstName} ${c.candidate.lastName}`,
+      designation: c.designation,
+      ctcAnnual: offer.ctcAnnual,
+      joiningDate: c.joiningDate,
+      portalLink,
+    }).catch(err => console.error('[mailer] offer email failed:', err));
     res.json({ offer, portalLink: `/onboarding/portal/${token}` });
   }));
 
@@ -321,6 +338,12 @@ export function createOnboardingRouter() {
       return res.status(400).json({ error: 'mandatory docs not verified', unverified: unverified.map(d => d.docType) });
     }
 
+    const candidateTasks = await OnboardingTask.find({ onboardingCase: c._id, runsOn: 'candidate', mandatory: true });
+    const incompleteCandidateTasks = candidateTasks.filter(t => t.status !== 'done');
+    if (incompleteCandidateTasks.length) {
+      return res.status(400).json({ error: 'mandatory candidate tasks not complete', tasks: incompleteCandidateTasks.map(t => t.title) });
+    }
+
     const joiningStr = c.joiningDate.toISOString().slice(0, 10);
     const probEnd = new Date(c.joiningDate);
     probEnd.setMonth(probEnd.getMonth() + (c.probationMonths || 3));
@@ -331,25 +354,43 @@ export function createOnboardingRouter() {
 
     const empType = c.employmentType === 'full_time' ? 'full-time' : c.employmentType;
 
-    const user = await User.create({
-      email: c.candidate.personalEmail,
-      displayName: `${c.candidate.firstName} ${c.candidate.lastName}`,
-      roles: ['employee'],
-      active: true,
-      departmentId: c.department,
-      reportingManagerId: c.reportingManager,
-      payGrade: c.payGrade,
-      payGroup: c.payGroup,
-      dateOfJoining: c.joiningDate,
-      employmentType: empType,
-      probationEndDate: probEnd,
-      phone: c.candidate.phone || '',
-      pan: panDoc?.submission?.extractedFields?.panNumber || '',
-      aadhaar: aadhaarDoc?.submission?.extractedFields?.aadhaarNumber || '',
-      bankName: bankDoc?.submission?.extractedFields?.bankName || '',
-      bankAccount: bankDoc?.submission?.extractedFields?.accountNumber || '',
-      ifsc: bankDoc?.submission?.extractedFields?.ifsc || '',
-    });
+    let user = await User.findOne({ email: c.candidate.personalEmail });
+    if (user) {
+      await User.updateOne({ _id: user._id }, { $set: {
+        active: true,
+        departmentId: c.department,
+        reportingManagerId: c.reportingManager,
+        payGrade: c.payGrade,
+        payGroup: c.payGroup,
+        dateOfJoining: c.joiningDate,
+        employmentType: empType,
+        probationEndDate: probEnd,
+      }});
+      if (!user.roles.includes('employee')) {
+        await User.updateOne({ _id: user._id }, { $addToSet: { roles: 'employee' } });
+      }
+      user = await User.findById(user._id);
+    } else {
+      user = await User.create({
+        email: c.candidate.personalEmail,
+        displayName: `${c.candidate.firstName} ${c.candidate.lastName}`,
+        roles: ['employee'],
+        active: true,
+        departmentId: c.department,
+        reportingManagerId: c.reportingManager,
+        payGrade: c.payGrade,
+        payGroup: c.payGroup,
+        dateOfJoining: c.joiningDate,
+        employmentType: empType,
+        probationEndDate: probEnd,
+        phone: c.candidate.phone || '',
+        pan: panDoc?.submission?.extractedFields?.panNumber || '',
+        aadhaar: aadhaarDoc?.submission?.extractedFields?.aadhaarNumber || '',
+        bankName: bankDoc?.submission?.extractedFields?.bankName || '',
+        bankAccount: bankDoc?.submission?.extractedFields?.accountNumber || '',
+        ifsc: bankDoc?.submission?.extractedFields?.ifsc || '',
+      });
+    }
 
     await SalaryStructure.create({
       user: user._id,
@@ -365,25 +406,37 @@ export function createOnboardingRouter() {
     const joiningYear = c.joiningDate.getFullYear();
     const joiningMonth = c.joiningDate.getMonth();
     const remainingMonths = 12 - joiningMonth;
-    await LeaveBalance.create({
-      userId: user._id,
-      year: joiningYear,
-      casual: { total: Math.round(DEFAULT_QUOTAS.casual * remainingMonths / 12), used: 0 },
-      sick:   { total: Math.round(DEFAULT_QUOTAS.sick * remainingMonths / 12), used: 0 },
-      earned: { total: Math.round(DEFAULT_QUOTAS.earned * remainingMonths / 12), used: 0 },
-    });
+    const existingBalance = await LeaveBalance.findOne({ userId: user._id, year: joiningYear });
+    if (!existingBalance) {
+      await LeaveBalance.create({
+        userId: user._id,
+        year: joiningYear,
+        casual: { total: Math.round(DEFAULT_QUOTAS.casual * remainingMonths / 12), used: 0 },
+        sick:   { total: Math.round(DEFAULT_QUOTAS.sick * remainingMonths / 12), used: 0 },
+        earned: { total: Math.round(DEFAULT_QUOTAS.earned * remainingMonths / 12), used: 0 },
+      });
+    }
+
+    await reassignTasksOnConvert(c, user._id);
 
     const rawToken = crypto.randomBytes(24).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const tokenExpiry = new Date();
-    tokenExpiry.setHours(tokenExpiry.getHours() + 1);
+    tokenExpiry.setHours(tokenExpiry.getHours() + 72);
     await PasswordResetToken.create({ userId: user._id, tokenHash, expiresAt: tokenExpiry });
 
     c.convertedUser = user._id;
     c.status = 'INDUCTION';
     await c.save();
 
-    res.json({ case: c, user, passwordSetLink: `/auth/local/reset-password?token=${rawToken}` });
+    const { sendWelcomeEmail } = await import('../services/mailer.js');
+    const resetLink = `${process.env.WEB_URL || 'http://localhost:5173'}/auth/local/reset-password?token=${rawToken}`;
+    sendWelcomeEmail(user.email, {
+      name: user.displayName,
+      resetLink,
+    }).catch(() => {});
+
+    res.json({ case: c, user, passwordSetLink: resetLink });
   }));
 
   // --- Confirmation ---
@@ -429,25 +482,42 @@ async function instantiateTasks(onboardingCase) {
   const template = await OnboardingTemplate.findById(onboardingCase.workflowTemplate);
   if (!template) return;
 
+  const existing = await OnboardingTask.countDocuments({ onboardingCase: onboardingCase._id });
+  if (existing > 0) return;
+
   const roleToUser = {
     manager: onboardingCase.reportingManager,
     hr: onboardingCase.createdBy,
     admin: onboardingCase.createdBy,
   };
 
-  const tasksToCreate = template.tasks.map(t => ({
-    onboardingCase: onboardingCase._id,
-    templateKey: t.key,
-    title: t.title,
-    ownerRole: t.ownerRole,
-    assignedTo: roleToUser[t.ownerRole] || null,
-    dueDate: t.offsetDays != null
-      ? new Date(onboardingCase.joiningDate.getTime() + t.offsetDays * 86400000)
-      : null,
-    dependsOn: t.dependsOn || [],
-    mandatory: t.mandatory,
-  }));
+  const tasksToCreate = template.tasks.map(t => {
+    const runsOn = t.runsOn || (t.ownerRole === 'candidate' ? 'candidate' : 'employee');
+    return {
+      onboardingCase: onboardingCase._id,
+      templateKey: t.key,
+      title: t.title,
+      ownerRole: t.ownerRole,
+      taskType: t.taskType || 'manual',
+      phase: t.phase || 'first_day',
+      runsOn,
+      assignedTo: runsOn === 'candidate' ? null : (roleToUser[t.ownerRole] || null),
+      dueDate: t.offsetDays != null
+        ? new Date(onboardingCase.joiningDate.getTime() + t.offsetDays * 86400000)
+        : null,
+      dependsOn: t.dependsOn || [],
+      mandatory: t.mandatory,
+    };
+  });
   await OnboardingTask.insertMany(tasksToCreate);
+  await OnboardingTemplate.updateOne({ _id: template._id }, { $inc: { usageCount: 1 } });
+}
+
+async function reassignTasksOnConvert(onboardingCase, userId) {
+  await OnboardingTask.updateMany(
+    { onboardingCase: onboardingCase._id, runsOn: 'employee', ownerRole: 'candidate', assignedTo: null },
+    { $set: { assignedTo: userId } }
+  );
 }
 
 async function createDefaultDocRequests(onboardingCase) {
