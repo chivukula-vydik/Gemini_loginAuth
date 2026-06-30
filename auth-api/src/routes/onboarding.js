@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { OnboardingCase, VALID_TRANSITIONS, TERMINAL_STATES } from '../models/OnboardingCase.js';
 import { Offer } from '../models/Offer.js';
 import { OnboardingTemplate } from '../models/OnboardingTemplate.js';
@@ -50,7 +51,7 @@ export function createOnboardingRouter() {
     res.json(tasks);
   }));
 
-  router.post('/documents/:docId/verify', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/documents/:docId/verify', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const doc = await DocumentRequest.findById(req.params.docId);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
@@ -62,7 +63,7 @@ export function createOnboardingRouter() {
     res.json(doc);
   }));
 
-  router.post('/documents/:docId/reject', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/documents/:docId/reject', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const doc = await DocumentRequest.findById(req.params.docId);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (doc.verifyStatus !== 'submitted') return res.status(400).json({ error: 'not in submitted state' });
@@ -87,14 +88,14 @@ export function createOnboardingRouter() {
     res.json(templates);
   }));
 
-  router.post('/templates', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/templates', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding-templates', { write: true }), asyncHandler(async (req, res) => {
     const { name, description, icon, appliesTo, tasks } = req.body;
     if (!name || !tasks?.length) return res.status(400).json({ error: 'name and tasks required' });
     const template = await OnboardingTemplate.create({ name, description, icon, appliesTo, tasks, createdBy: req.user.sub });
     res.status(201).json(template);
   }));
 
-  router.delete('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.delete('/templates/:id', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding-templates', { write: true }), asyncHandler(async (req, res) => {
     const template = await OnboardingTemplate.findById(req.params.id);
     if (!template) return res.status(404).json({ error: 'not found' });
     template.archived = true;
@@ -102,7 +103,7 @@ export function createOnboardingRouter() {
     res.json({ ok: true });
   }));
 
-  router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.put('/templates/:id', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding-templates', { write: true }), asyncHandler(async (req, res) => {
     const template = await OnboardingTemplate.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!template) return res.status(404).json({ error: 'not found' });
     res.json(template);
@@ -110,7 +111,7 @@ export function createOnboardingRouter() {
 
   // --- Cases ---
 
-  router.post('/', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const { candidate, designation, department, reportingManager, payGrade, payGroup,
             workLocation, employmentType, joiningDate, probationMonths, workflowTemplate } = req.body;
     if (!candidate?.firstName || !candidate?.lastName || !candidate?.personalEmail || !joiningDate) {
@@ -212,7 +213,7 @@ export function createOnboardingRouter() {
 
   // --- Transitions ---
 
-  router.post('/:id/transition', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/:id/transition', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const { to } = req.body;
     const c = await OnboardingCase.findById(req.params.id);
     if (!c) return res.status(404).json({ error: 'not found' });
@@ -232,7 +233,7 @@ export function createOnboardingRouter() {
 
   // --- Offers ---
 
-  router.post('/:id/offer', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/:id/offer', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const c = await OnboardingCase.findById(req.params.id);
     if (!c) return res.status(404).json({ error: 'not found' });
     const { ctcAnnual, componentsPreview, expiryDate, letterUrl } = req.body;
@@ -250,7 +251,7 @@ export function createOnboardingRouter() {
     res.status(201).json(offer);
   }));
 
-  router.post('/:id/offer/send', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/:id/offer/send', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const c = await OnboardingCase.findById(req.params.id);
     if (!c) return res.status(404).json({ error: 'not found' });
     const offer = await Offer.findOne({ onboardingCase: c._id, status: 'draft' }).sort('-version');
@@ -295,7 +296,7 @@ export function createOnboardingRouter() {
     res.json(docs);
   }));
 
-  router.post('/:id/documents', requireAuth, requireRole('admin', 'hr'), upload.single('file'), asyncHandler(async (req, res) => {
+  router.post('/:id/documents', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), upload.single('file'), asyncHandler(async (req, res) => {
     const { docId } = req.body;
     const doc = await DocumentRequest.findById(docId);
     if (!doc) return res.status(404).json({ error: 'document request not found' });
@@ -324,7 +325,7 @@ export function createOnboardingRouter() {
 
   // --- Conversion ---
 
-  router.post('/:id/convert', requireAuth, requireRole('admin', 'hr'), asyncHandler(async (req, res) => {
+  router.post('/:id/convert', requireAuth, requireRole('admin', 'hr'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const c = await OnboardingCase.findById(req.params.id);
     if (!c) return res.status(404).json({ error: 'not found' });
     if (c.status !== 'JOINED') return res.status(400).json({ error: 'case must be in JOINED state' });
@@ -476,7 +477,7 @@ export function createOnboardingRouter() {
 
   // --- Confirmation ---
 
-  router.post('/:id/confirm', requireAuth, requireRole('admin', 'hr', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.post('/:id/confirm', requireAuth, requireRole('admin', 'hr', 'reporting_manager'), requireFeature('onboarding', { write: true }), asyncHandler(async (req, res) => {
     const c = await OnboardingCase.findById(req.params.id);
     if (!c) return res.status(404).json({ error: 'not found' });
     if (c.status !== 'PROBATION') return res.status(400).json({ error: 'case must be in PROBATION state' });

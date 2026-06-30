@@ -28,7 +28,7 @@ export function createProjectsRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
-  router.post('/', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.post('/', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const { name, description, members, startDate, targetDate, requiredSkills, clientName, billingType, billingRate, currency, milestones, phases } = req.body || {};
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
     if (!clientName || !String(clientName).trim()) return res.status(400).json({ error: 'clientName required' });
@@ -162,7 +162,7 @@ export function createProjectsRouter() {
     res.json({ capacity: CAPACITY_HOURS, requiredSkills, candidates });
   }));
 
-  router.patch('/:id', asyncHandler(async (req, res) => {
+  router.patch('/:id', requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -182,7 +182,7 @@ export function createProjectsRouter() {
     res.json(project);
   }));
 
-  router.delete('/:id', asyncHandler(async (req, res) => {
+  router.delete('/:id', requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -192,7 +192,7 @@ export function createProjectsRouter() {
   }));
 
   // --- Phase management ---
-  router.post('/:id/phases', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.post('/:id/phases', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -205,7 +205,7 @@ export function createProjectsRouter() {
     res.status(201).json(project.phases);
   }));
 
-  router.patch('/:id/phases/:phaseId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.patch('/:id/phases/:phaseId', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -221,7 +221,7 @@ export function createProjectsRouter() {
     res.json(project.phases);
   }));
 
-  router.post('/:id/phases/advance', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.post('/:id/phases/advance', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -235,7 +235,7 @@ export function createProjectsRouter() {
     res.json(project.phases);
   }));
 
-  router.delete('/:id/phases/:phaseId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.delete('/:id/phases/:phaseId', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -251,7 +251,7 @@ export function createProjectsRouter() {
   }));
 
   // --- Milestone management ---
-  router.patch('/:id/milestones/:milestoneId', requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.patch('/:id/milestones/:milestoneId', requireRole('pm', 'admin'), requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canEditProject(req.user, project)) return res.status(403).json({ error: 'forbidden' });
@@ -267,7 +267,7 @@ export function createProjectsRouter() {
     res.json(project.milestones);
   }));
 
-  router.post('/:id/tasks', asyncHandler(async (req, res) => {
+  router.post('/:id/tasks', requireFeature('projects', { write: true }), asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
     if (!project) return res.status(404).json({ error: 'not found' });
     if (!canCreateTask(req.user, project)) return res.status(403).json({ error: 'forbidden' });

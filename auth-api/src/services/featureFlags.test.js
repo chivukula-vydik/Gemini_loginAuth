@@ -9,7 +9,6 @@ const flags = {
   timesheet: { featureKey: 'timesheet', enabled: true,  roleGrants: ['admin', 'employee'], readonlyRoles: ['finance'] },
 };
 
-beforeEach(() => { delete process.env.ADMIN_EMAIL; });
 
 test('grants full when role matches roleGrants', () => {
   assert.equal(resolveFeature('timesheet', { email: 'a@b.com', roles: ['employee'] }, flags), 'full');
@@ -35,9 +34,9 @@ test('global kill-switch beats user override', () => {
   assert.equal(resolveFeature('payroll', { email: 'a@b.com', roles: ['admin'], featureOverrides: { payroll: 'full' } }, flags), false);
 });
 
-test('super-admin gets full access', () => {
-  process.env.ADMIN_EMAIL = 'super@b.com';
-  assert.equal(resolveFeature('payroll', { email: 'super@b.com', roles: ['employee'] }, flags), 'full');
+test('admin role respects role grants — no super-admin bypass', () => {
+  assert.equal(resolveFeature('projects', { email: 'a@b.com', roles: ['admin'] }, flags), 'full');
+  assert.equal(resolveFeature('projects', { email: 'a@b.com', roles: ['employee'] }, flags), false);
 });
 
 test('unknown feature returns false', () => {

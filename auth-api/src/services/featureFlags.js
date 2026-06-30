@@ -43,10 +43,6 @@ export function resolveFeature(featureKey, user, flags) {
   const reg = FEATURE_REGISTRY[featureKey];
   if (!reg) return false;
 
-  const adminEmail = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim();
-  const isSuperAdmin = adminEmail && String(user.email || '').toLowerCase().trim() === adminEmail;
-  if (isSuperAdmin) return 'full';
-
   const flag = flags[featureKey];
   if (!flag?.enabled) return false;
 

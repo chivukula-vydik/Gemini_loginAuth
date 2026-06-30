@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { User } from '../models/User.js';
 import { Skill } from '../models/Skill.js';
 import { Project } from '../models/Project.js';
@@ -79,7 +80,7 @@ export function createAdminRouter() {
     });
   }));
 
-  router.patch('/users/:id/roles', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/roles', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const { roles } = req.body || {};
     if (!Array.isArray(roles) || roles.length === 0) return res.status(400).json({ error: 'roles must be a non-empty array' });
     const validRoles = await Role.find({ active: true }).distinct('name');
@@ -91,7 +92,7 @@ export function createAdminRouter() {
     res.json(user);
   }));
 
-  router.patch('/users/:id/active', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/active', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const active = !!req.body?.active;
     if (!active && String(req.user.sub) === String(req.params.id)) {
       return res.status(400).json({ error: 'you cannot deactivate yourself' });
@@ -109,7 +110,7 @@ export function createAdminRouter() {
     res.json({ _id: target._id, email: target.email, displayName: target.displayName, roles: target.roles?.length ? target.roles : [target.role || 'employee'], active: target.active });
   }));
 
-  router.patch('/users/:id/reporting-manager', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/reporting-manager', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const { reportingManagerId } = req.body || {};
     if (reportingManagerId !== null) {
       if (!reportingManagerId || !mongoose.isValidObjectId(reportingManagerId)) {
@@ -129,7 +130,7 @@ export function createAdminRouter() {
     res.json({ ...user.toObject(), roles: user.roles?.length ? user.roles : [user.role || 'employee'] });
   }));
 
-  router.delete('/users/:id', asyncHandler(async (req, res) => {
+  router.delete('/users/:id', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const id = req.params.id;
     if (String(req.user.sub) === String(id)) {
       return res.status(400).json({ error: 'you cannot delete yourself' });
@@ -153,7 +154,7 @@ export function createAdminRouter() {
     res.json({ ok: true });
   }));
 
-  router.post('/skills', asyncHandler(async (req, res) => {
+  router.post('/skills', requireFeature('skills', { write: true }), asyncHandler(async (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name required' });
     const exists = await Skill.findOne({ name: new RegExp(`^${escapeRegex(name)}$`, 'i') });
@@ -162,7 +163,7 @@ export function createAdminRouter() {
     res.status(201).json(skill);
   }));
 
-  router.patch('/skills/:id', asyncHandler(async (req, res) => {
+  router.patch('/skills/:id', requireFeature('skills', { write: true }), asyncHandler(async (req, res) => {
     const update = {};
     if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
     if (typeof req.body?.active === 'boolean') update.active = req.body.active;
@@ -177,14 +178,14 @@ export function createAdminRouter() {
     res.json(deps);
   }));
 
-  router.post('/departments', asyncHandler(async (req, res) => {
+  router.post('/departments', requireFeature('departments', { write: true }), asyncHandler(async (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name required' });
     const dep = await Department.create({ name, description: req.body?.description || '' });
     res.status(201).json(dep);
   }));
 
-  router.patch('/departments/:id', asyncHandler(async (req, res) => {
+  router.patch('/departments/:id', requireFeature('departments', { write: true }), asyncHandler(async (req, res) => {
     const update = {};
     if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
     if (typeof req.body?.description === 'string') update.description = req.body.description;
@@ -194,7 +195,7 @@ export function createAdminRouter() {
     res.json(dep);
   }));
 
-  router.delete('/departments/:id', asyncHandler(async (req, res) => {
+  router.delete('/departments/:id', requireFeature('departments', { write: true }), asyncHandler(async (req, res) => {
     const count = await User.countDocuments({ departmentId: req.params.id });
     if (count > 0) return res.status(409).json({ error: `${count} user(s) still in this department` });
     await Department.findByIdAndDelete(req.params.id);
@@ -207,7 +208,7 @@ export function createAdminRouter() {
     res.json(shifts);
   }));
 
-  router.post('/shifts', asyncHandler(async (req, res) => {
+  router.post('/shifts', requireFeature('shifts', { write: true }), asyncHandler(async (req, res) => {
     const { name, startHour, startMinute, endHour, endMinute, isDefault } = req.body || {};
     if (!name?.trim()) return res.status(400).json({ error: 'name required' });
     if (startHour == null || endHour == null) return res.status(400).json({ error: 'start/end hours required' });
@@ -216,7 +217,7 @@ export function createAdminRouter() {
     res.status(201).json(shift);
   }));
 
-  router.patch('/shifts/:id', asyncHandler(async (req, res) => {
+  router.patch('/shifts/:id', requireFeature('shifts', { write: true }), asyncHandler(async (req, res) => {
     const update = {};
     if (typeof req.body?.name === 'string') update.name = req.body.name.trim();
     if (req.body?.startHour != null) update.startHour = req.body.startHour;
@@ -233,7 +234,7 @@ export function createAdminRouter() {
     res.json(shift);
   }));
 
-  router.delete('/shifts/:id', asyncHandler(async (req, res) => {
+  router.delete('/shifts/:id', requireFeature('shifts', { write: true }), asyncHandler(async (req, res) => {
     const count = await User.countDocuments({ shiftId: req.params.id });
     if (count > 0) return res.status(409).json({ error: `${count} user(s) still on this shift` });
     await Shift.findByIdAndDelete(req.params.id);
@@ -249,7 +250,7 @@ export function createAdminRouter() {
     res.json(balance);
   }));
 
-  router.patch('/users/:id/leave-balance', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/leave-balance', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.id).select('_id');
     if (!user) return res.status(404).json({ error: 'not found' });
     const year = Number(req.body?.year) || new Date().getFullYear();
@@ -271,7 +272,7 @@ export function createAdminRouter() {
   }));
 
   // --- Assign department/shift to user ---
-  router.patch('/users/:id/department', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/department', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const { departmentId } = req.body || {};
     const user = await User.findByIdAndUpdate(req.params.id, { departmentId: departmentId || null }, { new: true })
       .select('email displayName roles active departmentId shiftId');
@@ -279,7 +280,7 @@ export function createAdminRouter() {
     res.json(user);
   }));
 
-  router.patch('/users/:id/shift', asyncHandler(async (req, res) => {
+  router.patch('/users/:id/shift', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const { shiftId } = req.body || {};
     const user = await User.findByIdAndUpdate(req.params.id, { shiftId: shiftId || null }, { new: true })
       .select('email displayName roles active departmentId shiftId');
@@ -293,7 +294,7 @@ export function createAdminRouter() {
     res.json(roles);
   }));
 
-  router.post('/roles', asyncHandler(async (req, res) => {
+  router.post('/roles', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const name = String(req.body?.name || '').trim().toLowerCase().replace(/\s+/g, '_');
     const label = String(req.body?.label || req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'name required' });
@@ -303,7 +304,7 @@ export function createAdminRouter() {
     res.status(201).json(role);
   }));
 
-  router.patch('/roles/:id', asyncHandler(async (req, res) => {
+  router.patch('/roles/:id', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const role = await Role.findById(req.params.id);
     if (!role) return res.status(404).json({ error: 'not found' });
     const update = {};
@@ -313,7 +314,7 @@ export function createAdminRouter() {
     res.json(updated);
   }));
 
-  router.delete('/roles/:id', asyncHandler(async (req, res) => {
+  router.delete('/roles/:id', requireFeature('users', { write: true }), asyncHandler(async (req, res) => {
     const role = await Role.findById(req.params.id);
     if (!role) return res.status(404).json({ error: 'not found' });
     const count = await User.countDocuments({ roles: role.name });

@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { Task } from '../models/Task.js';
 import { Project } from '../models/Project.js';
 import { Skill } from '../models/Skill.js';
@@ -51,7 +52,7 @@ export function createTasksRouter() {
     }));
   }));
 
-  router.post('/:id/claim', asyncHandler(async (req, res) => {
+  router.post('/:id/claim', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (task.assignees.length > 0 || task.status === 'done') return res.status(400).json({ error: 'task is not claimable' });
@@ -66,7 +67,7 @@ export function createTasksRouter() {
     res.status(201).json(claim);
   }));
 
-  router.patch('/:id/progress', asyncHandler(async (req, res) => {
+  router.patch('/:id/progress', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
@@ -86,7 +87,7 @@ export function createTasksRouter() {
     res.json(task);
   }));
 
-  router.patch('/:id/estimate', asyncHandler(async (req, res) => {
+  router.patch('/:id/estimate', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
@@ -102,7 +103,7 @@ export function createTasksRouter() {
   }));
 
   // Assignee requests an estimate (or a change to it); recorded as pending until a PM decides.
-  router.patch('/:id/my-estimate', asyncHandler(async (req, res) => {
+  router.patch('/:id/my-estimate', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     const mine = task.assignees.find((a) => String(a.user) === String(req.user.sub));
@@ -133,7 +134,7 @@ export function createTasksRouter() {
   }));
 
   // Assignee sets/updates/clears their own personal estimated completion datetime (advisory, no approval).
-  router.patch('/:id/my-eta', asyncHandler(async (req, res) => {
+  router.patch('/:id/my-eta', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     const mine = task.assignees.find((a) => String(a.user) === String(req.user.sub));
@@ -151,7 +152,7 @@ export function createTasksRouter() {
   }));
 
   // PM/owner approves or rejects an assignee's pending estimate request.
-  router.patch('/:id/my-estimate/decision', asyncHandler(async (req, res) => {
+  router.patch('/:id/my-estimate/decision', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const userId = String(req.body?.userId || '');
@@ -185,7 +186,7 @@ export function createTasksRouter() {
     res.json(task);
   }));
 
-  router.patch('/:id/estimate/decision', asyncHandler(async (req, res) => {
+  router.patch('/:id/estimate/decision', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const task = await Task.findById(req.params.id);
@@ -208,7 +209,7 @@ export function createTasksRouter() {
   }));
 
   // Assignee who is behind proposes a new completion date: now + value/unit.
-  router.patch('/:id/extension', asyncHandler(async (req, res) => {
+  router.patch('/:id/extension', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     if (!canLogProgress(req.user, task)) return res.status(403).json({ error: 'forbidden' });
@@ -224,7 +225,7 @@ export function createTasksRouter() {
   }));
 
   // PM/owner accepts or rejects the proposed new completion date.
-  router.patch('/:id/extension/decision', asyncHandler(async (req, res) => {
+  router.patch('/:id/extension/decision', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'reject'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const task = await Task.findById(req.params.id);
@@ -246,7 +247,7 @@ export function createTasksRouter() {
     res.json(task);
   }));
 
-  router.patch('/:id', asyncHandler(async (req, res) => {
+  router.patch('/:id', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);
@@ -264,7 +265,7 @@ export function createTasksRouter() {
   }));
 
   // PM sets the full assignee team + shares directly (no offers).
-  router.patch('/:id/assignees', asyncHandler(async (req, res) => {
+  router.patch('/:id/assignees', requireFeature('my-tasks', { write: true }), asyncHandler(async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ error: 'not found' });
     const project = await Project.findById(task.project);

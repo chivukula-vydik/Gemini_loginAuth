@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { Task } from '../models/Task.js';
 import { EditRequest } from '../models/EditRequest.js';
@@ -97,7 +98,7 @@ export function createTimesheetRouter() {
     }));
   }));
 
-  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
+  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const doc = await Timesheet.findById(req.params.id);
@@ -231,7 +232,7 @@ export function createTimesheetRouter() {
     })));
   }));
 
-  router.post('/tasks', asyncHandler(async (req, res) => {
+  router.post('/tasks', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const { title, projectId } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: 'title required' });
     if (!projectId || !mongoose.isValidObjectId(projectId)) return res.status(400).json({ error: 'invalid projectId' });
@@ -383,7 +384,7 @@ export function createTimesheetRouter() {
     });
   }));
 
-  router.put('/:weekStart', asyncHandler(async (req, res) => {
+  router.put('/:weekStart', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     const userId = req.user.sub;
@@ -479,7 +480,7 @@ export function createTimesheetRouter() {
     res.json({ ok: true, updatedAt, overtime: createdOT.length > 0 ? createdOT : undefined });
   }));
 
-  router.post('/:weekStart/submit', asyncHandler(async (req, res) => {
+  router.post('/:weekStart/submit', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     if (weekStart > currentMonday()) return res.status(409).json({ error: 'cannot submit a future week' });
@@ -531,7 +532,7 @@ export function createTimesheetRouter() {
     res.json({ ok: true, status: newStatus, dayStatus: newDs });
   }));
 
-  router.post('/:weekStart/edit-requests', asyncHandler(async (req, res) => {
+  router.post('/:weekStart/edit-requests', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday (YYYY-MM-DD)' });
     // Requests are a previous-week concept only; the current/future week has no request process.
@@ -556,7 +557,7 @@ export function createTimesheetRouter() {
     res.status(201).json(reqDoc);
   }));
 
-  router.post('/:weekStart/attachments', upload.single('file'), asyncHandler(async (req, res) => {
+  router.post('/:weekStart/attachments', requireFeature('timesheet', { write: true }), upload.single('file'), asyncHandler(async (req, res) => {
     const { weekStart } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday' });
     if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
@@ -583,7 +584,7 @@ export function createTimesheetRouter() {
     res.status(201).json({ fileId: String(attachment.fileId), filename: attachment.filename, contentType: attachment.contentType, size: attachment.size, uploadedAt: attachment.uploadedAt });
   }));
 
-  router.delete('/:weekStart/attachments/:fileId', asyncHandler(async (req, res) => {
+  router.delete('/:weekStart/attachments/:fileId', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const { weekStart, fileId } = req.params;
     if (!isValidMonday(weekStart)) return res.status(400).json({ error: 'weekStart must be a Monday' });
     if (!mongoose.isValidObjectId(fileId)) return res.status(400).json({ error: 'invalid fileId' });

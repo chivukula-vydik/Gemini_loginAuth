@@ -1,7 +1,7 @@
 import { type ReactElement, useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
-import { useFeatures } from './featureContext';
+import { useFeatures, ReadonlyGuard } from './featureContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
 import { navSectionsForRoles, keyForPath, NavKey } from './pm/nav';
@@ -298,43 +298,43 @@ export function AppShell() {
       <main className="shell-content">
         <Routes>
           <Route path="/" element={<RoleHome />} />
-          <Route path="/users" element={<AdminUsers />} />
-          <Route path="/users/:id" element={<UserDetailPage />} />
-          <Route path="/skills" element={<AdminSkills />} />
-          <Route path="/departments" element={<AdminDepartments />} />
-          <Route path="/shifts" element={<AdminShifts />} />
-          <Route path="/company-fit" element={<CompanyFit />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/requests" element={<Requests />} />
-          <Route path="/my-tasks" element={<MyTasks />} />
-          <Route path="/my-skills" element={<MySkills />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/timesheet" element={<TimesheetPage />} />
-          <Route path="/attendance" element={<AttendancePage />} />
-          <Route path="/my-requests" element={<MyRequests />} />
-          <Route path="/utilization" element={<Utilization />} />
-          <Route path="/my-team" element={<MyTeam />} />
-          <Route path="/team-attendance" element={<TeamAttendanceDashboard />} />
-          <Route path="/organisation" element={<OrgModule />} />
-          <Route path="/onboarding" element={<OnboardingBoard />} />
-          <Route path="/onboarding/:id" element={<CaseDetail />} />
-          <Route path="/onboarding-tasks" element={<MyOnboardingTasks />} />
-          <Route path="/onboarding-templates" element={<TemplateBuilder />} />
+          <Route path="/users" element={<ReadonlyGuard featureKey="users"><AdminUsers /></ReadonlyGuard>} />
+          <Route path="/users/:id" element={<ReadonlyGuard featureKey="users"><UserDetailPage /></ReadonlyGuard>} />
+          <Route path="/skills" element={<ReadonlyGuard featureKey="skills"><AdminSkills /></ReadonlyGuard>} />
+          <Route path="/departments" element={<ReadonlyGuard featureKey="departments"><AdminDepartments /></ReadonlyGuard>} />
+          <Route path="/shifts" element={<ReadonlyGuard featureKey="shifts"><AdminShifts /></ReadonlyGuard>} />
+          <Route path="/company-fit" element={<ReadonlyGuard featureKey="company-fit"><CompanyFit /></ReadonlyGuard>} />
+          <Route path="/projects" element={<ReadonlyGuard featureKey="projects"><Projects /></ReadonlyGuard>} />
+          <Route path="/requests" element={<ReadonlyGuard featureKey="requests"><Requests /></ReadonlyGuard>} />
+          <Route path="/my-tasks" element={<ReadonlyGuard featureKey="my-tasks"><MyTasks /></ReadonlyGuard>} />
+          <Route path="/my-skills" element={<ReadonlyGuard featureKey="my-skills"><MySkills /></ReadonlyGuard>} />
+          <Route path="/marketplace" element={<ReadonlyGuard featureKey="marketplace"><Marketplace /></ReadonlyGuard>} />
+          <Route path="/timesheet" element={<ReadonlyGuard featureKey="timesheet"><TimesheetPage /></ReadonlyGuard>} />
+          <Route path="/attendance" element={<ReadonlyGuard featureKey="attendance"><AttendancePage /></ReadonlyGuard>} />
+          <Route path="/my-requests" element={<ReadonlyGuard featureKey="my-requests"><MyRequests /></ReadonlyGuard>} />
+          <Route path="/utilization" element={<ReadonlyGuard featureKey="utilization"><Utilization /></ReadonlyGuard>} />
+          <Route path="/my-team" element={<ReadonlyGuard featureKey="users"><MyTeam /></ReadonlyGuard>} />
+          <Route path="/team-attendance" element={<ReadonlyGuard featureKey="team-attendance"><TeamAttendanceDashboard /></ReadonlyGuard>} />
+          <Route path="/organisation" element={<ReadonlyGuard featureKey="organisation"><OrgModule /></ReadonlyGuard>} />
+          <Route path="/onboarding" element={<ReadonlyGuard featureKey="onboarding"><OnboardingBoard /></ReadonlyGuard>} />
+          <Route path="/onboarding/:id" element={<ReadonlyGuard featureKey="onboarding"><CaseDetail /></ReadonlyGuard>} />
+          <Route path="/onboarding-tasks" element={<ReadonlyGuard featureKey="onboarding-tasks"><MyOnboardingTasks /></ReadonlyGuard>} />
+          <Route path="/onboarding-templates" element={<ReadonlyGuard featureKey="onboarding-templates"><TemplateBuilder /></ReadonlyGuard>} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/payroll" element={<PayrollRunList />} />
-          <Route path="/payroll/run/:id" element={<PayrollRunDetail />} />
-          <Route path="/payroll/salary/:userId" element={<SalaryEditor />} />
-          <Route path="/my-payslips" element={<MyPayslips />} />
-          <Route path="/my-payslips/:year/:month" element={<MyPayslips />} />
-          <Route path="/declarations" element={<Declarations />} />
-          <Route path="/declarations/compare" element={<RegimeComparison />} />
-          <Route path="/declarations/review" element={<DeclarationReview />} />
-          <Route path="/my-loans" element={<MyLoans />} />
-          <Route path="/loan-management" element={<LoanManagement />} />
-          <Route path="/tax-summary" element={<TaxSummary />} />
-          <Route path="/reimbursements" element={<Reimbursements />} />
+          <Route path="/payroll" element={<ReadonlyGuard featureKey="payroll"><PayrollRunList /></ReadonlyGuard>} />
+          <Route path="/payroll/run/:id" element={<ReadonlyGuard featureKey="payroll"><PayrollRunDetail /></ReadonlyGuard>} />
+          <Route path="/payroll/salary/:userId" element={<ReadonlyGuard featureKey="payroll"><SalaryEditor /></ReadonlyGuard>} />
+          <Route path="/my-payslips" element={<ReadonlyGuard featureKey="my-payslips"><MyPayslips /></ReadonlyGuard>} />
+          <Route path="/my-payslips/:year/:month" element={<ReadonlyGuard featureKey="my-payslips"><MyPayslips /></ReadonlyGuard>} />
+          <Route path="/declarations" element={<ReadonlyGuard featureKey="declarations"><Declarations /></ReadonlyGuard>} />
+          <Route path="/declarations/compare" element={<ReadonlyGuard featureKey="declarations"><RegimeComparison /></ReadonlyGuard>} />
+          <Route path="/declarations/review" element={<ReadonlyGuard featureKey="declaration-review"><DeclarationReview /></ReadonlyGuard>} />
+          <Route path="/my-loans" element={<ReadonlyGuard featureKey="my-loans"><MyLoans /></ReadonlyGuard>} />
+          <Route path="/loan-management" element={<ReadonlyGuard featureKey="loan-management"><LoanManagement /></ReadonlyGuard>} />
+          <Route path="/tax-summary" element={<ReadonlyGuard featureKey="tax-summary"><TaxSummary /></ReadonlyGuard>} />
+          <Route path="/reimbursements" element={<ReadonlyGuard featureKey="reimbursements"><Reimbursements /></ReadonlyGuard>} />
           <Route path="/feature-management" element={<FeatureManagement />} />
-          <Route path="/approval-flows" element={<ApprovalFlowBuilder />} />
+          <Route path="/approval-flows" element={<ReadonlyGuard featureKey="approval-flows"><ApprovalFlowBuilder /></ReadonlyGuard>} />
           <Route path="/roster-import" element={<RosterImport />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { Leave, LEAVE_TYPES, HALF_DAY_OPTIONS, enumerateDays, workingDays, requestedDaysFor } from '../models/Leave.js';
 import { Attendance } from '../models/Attendance.js';
 import { getOrCreateBalance, remaining, QUOTA_LEAVE_TYPES } from '../models/LeaveBalance.js';
@@ -26,7 +27,7 @@ export function createLeaveRouter() {
   }));
 
   // POST /leave — employee submits a leave request
-  router.post('/', asyncHandler(async (req, res) => {
+  router.post('/', requireFeature('my-requests', { write: true }), asyncHandler(async (req, res) => {
     const { type, startDate, endDate, reason, halfDay } = req.body;
     if (!LEAVE_TYPES.includes(type)) return res.status(400).json({ error: 'invalid leave type' });
     if (!DATE_RE.test(startDate || '') || !DATE_RE.test(endDate || '')) {
@@ -90,7 +91,7 @@ export function createLeaveRouter() {
 
   // DELETE /leave/:id — cancel a pending request (just delete) or an approved
   // future leave (refund balance + clean up attendance records).
-  router.delete('/:id', asyncHandler(async (req, res) => {
+  router.delete('/:id', requireFeature('my-requests', { write: true }), asyncHandler(async (req, res) => {
     const doc = await Leave.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     if (String(doc.userId) !== req.user.sub) return res.status(403).json({ error: 'forbidden' });
@@ -147,7 +148,7 @@ export function createLeaveRouter() {
   }));
 
   // PATCH /leave/:id/decide — approves or rejects
-  router.patch('/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
+  router.patch('/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), requireFeature('requests', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });

@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { SalaryStructure } from '../models/SalaryStructure.js';
 import { User } from '../models/User.js';
 import { PayGrade } from '../models/PayGrade.js';
@@ -15,7 +16,7 @@ export function createSalaryRouter() {
     res.json(active);
   }));
 
-  router.post('/:userId', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/:userId', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { ctcAnnual, components, effectiveFrom } = req.body;
     if (!ctcAnnual || !components || !effectiveFrom) {
       return res.status(400).json({ error: 'ctcAnnual, components, and effectiveFrom required' });

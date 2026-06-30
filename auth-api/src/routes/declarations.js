@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { InvestmentDeclaration } from '../models/InvestmentDeclaration.js';
 import { SalaryStructure } from '../models/SalaryStructure.js';
 import { resolveMonthlyAmounts } from '../services/payrollEngine.js';
@@ -88,7 +89,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── Employee: save / update declaration ────────────────────────────────
-  router.post('/:fy', requireAuth, asyncHandler(async (req, res) => {
+  router.post('/:fy', requireAuth, requireFeature('declarations', { write: true }), asyncHandler(async (req, res) => {
     const { regime, items, hraDetail } = req.body;
     if (!regime) return res.status(400).json({ error: 'regime required' });
 
@@ -120,7 +121,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── Employee: upload proof for an item ─────────────────────────────────
-  router.post('/:fy/proof/:sectionIdx', requireAuth, upload.single('file'), asyncHandler(async (req, res) => {
+  router.post('/:fy/proof/:sectionIdx', requireAuth, requireFeature('declarations', { write: true }), upload.single('file'), asyncHandler(async (req, res) => {
     const dec = await InvestmentDeclaration.findOne({ user: req.user.sub, financialYear: req.params.fy });
     if (!dec) return res.status(404).json({ error: 'declaration not found' });
     if (dec.phase === 'closed') return res.status(400).json({ error: 'declaration is closed' });
@@ -161,7 +162,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── Employee: submit proofs (transition declaration → proof phase) ─────
-  router.post('/:fy/submit-proofs', requireAuth, asyncHandler(async (req, res) => {
+  router.post('/:fy/submit-proofs', requireAuth, requireFeature('declarations', { write: true }), asyncHandler(async (req, res) => {
     const dec = await InvestmentDeclaration.findOne({ user: req.user.sub, financialYear: req.params.fy });
     if (!dec) return res.status(404).json({ error: 'declaration not found' });
     if (dec.phase !== 'declaration') return res.status(400).json({ error: `cannot submit proofs in phase: ${dec.phase}` });
@@ -204,7 +205,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: verify or reject an item ──────────────────────────────
-  router.patch('/:fy/verify/:userId/:sectionIdx', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.patch('/:fy/verify/:userId/:sectionIdx', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const { action, proofAmount, rejectReason } = req.body;
     if (!['verify', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be verify or reject' });
 
@@ -227,7 +228,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: close declaration (lock + transition to closed) ────────
-  router.post('/:fy/close/:userId', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.post('/:fy/close/:userId', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const dec = await InvestmentDeclaration.findOne({ user: req.params.userId, financialYear: req.params.fy });
     if (!dec) return res.status(404).json({ error: 'declaration not found' });
 
@@ -238,7 +239,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: bulk close all declarations for FY ─────────────────────
-  router.post('/:fy/close-all', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.post('/:fy/close-all', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const result = await InvestmentDeclaration.updateMany(
       { financialYear: req.params.fy, phase: { $ne: 'closed' } },
       { $set: { phase: 'closed', lockedForTds: true } },

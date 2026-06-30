@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { LegalEntity } from '../models/LegalEntity.js';
 import { BusinessUnit } from '../models/BusinessUnit.js';
 import { Department } from '../models/Department.js';
@@ -102,7 +103,7 @@ export function createOrgRouter() {
   }));
 
   // ── Admin-only write endpoints ──
-  const adminOnly = [requireRole('admin')];
+  const adminOnly = [requireRole('admin'), requireFeature('organisation', { write: true })];
 
   // Legal Entities
   router.post('/legal-entities', ...adminOnly, asyncHandler(async (req, res) => {

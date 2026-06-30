@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { ApprovalFlow } from '../models/ApprovalFlow.js';
 import { ApprovalRequest } from '../models/ApprovalRequest.js';
 import { validateFlow, recordDecision } from '../services/approvalEngine.js';
@@ -23,7 +24,7 @@ export function createApprovalFlowsRouter() {
   }));
 
   // ── Admin: create flow ────────────────────────────────────────────────
-  router.post('/', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/', requireAuth, requireRole('admin'), requireFeature('approval-flows', { write: true }), asyncHandler(async (req, res) => {
     const errors = validateFlow(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
 
@@ -36,7 +37,7 @@ export function createApprovalFlowsRouter() {
   }));
 
   // ── Admin: update flow ────────────────────────────────────────────────
-  router.put('/:id', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.put('/:id', requireAuth, requireRole('admin'), requireFeature('approval-flows', { write: true }), asyncHandler(async (req, res) => {
     const errors = validateFlow(req.body);
     if (errors.length) return res.status(400).json({ error: errors.join('; ') });
 
@@ -50,7 +51,7 @@ export function createApprovalFlowsRouter() {
   }));
 
   // ── Admin: toggle active ──────────────────────────────────────────────
-  router.patch('/:id/toggle', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.patch('/:id/toggle', requireAuth, requireRole('admin'), requireFeature('approval-flows', { write: true }), asyncHandler(async (req, res) => {
     const flow = await ApprovalFlow.findById(req.params.id);
     if (!flow) return res.status(404).json({ error: 'not found' });
     flow.active = !flow.active;
@@ -61,7 +62,7 @@ export function createApprovalFlowsRouter() {
   }));
 
   // ── Admin: delete flow ────────────────────────────────────────────────
-  router.delete('/:id', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.delete('/:id', requireAuth, requireRole('admin'), requireFeature('approval-flows', { write: true }), asyncHandler(async (req, res) => {
     const pending = await ApprovalRequest.countDocuments({ flowId: req.params.id, status: 'pending' });
     if (pending > 0) return res.status(400).json({ error: `${pending} pending request(s) use this flow — cannot delete` });
     const flow = await ApprovalFlow.findByIdAndDelete(req.params.id);
@@ -70,7 +71,7 @@ export function createApprovalFlowsRouter() {
   }));
 
   // ── Admin: duplicate flow ─────────────────────────────────────────────
-  router.post('/:id/duplicate', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/:id/duplicate', requireAuth, requireRole('admin'), requireFeature('approval-flows', { write: true }), asyncHandler(async (req, res) => {
     const source = await ApprovalFlow.findById(req.params.id).lean();
     if (!source) return res.status(404).json({ error: 'not found' });
     delete source._id;

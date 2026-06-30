@@ -5,6 +5,7 @@ import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { Reimbursement } from '../models/Reimbursement.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
@@ -39,7 +40,7 @@ export function createReimbursementsRouter() {
   const router = express.Router();
 
   // ── Employee: submit claim ─────────────────────────────────────────────
-  router.post('/', requireAuth, asyncHandler(async (req, res) => {
+  router.post('/', requireAuth, requireFeature('reimbursements', { write: true }), asyncHandler(async (req, res) => {
     const { category, amount, claimDate, description, project } = req.body;
     if (!category || !amount || !claimDate) {
       return res.status(400).json({ error: 'category, amount, and claimDate required' });
@@ -142,7 +143,7 @@ export function createReimbursementsRouter() {
   }));
 
   // ── Approve ────────────────────────────────────────────────────────────
-  router.post('/:id/approve', requireAuth, asyncHandler(async (req, res) => {
+  router.post('/:id/approve', requireAuth, requireFeature('reimbursements', { write: true }), asyncHandler(async (req, res) => {
     const claim = await Reimbursement.findById(req.params.id);
     if (!claim) return res.status(404).json({ error: 'not found' });
     if (['approved', 'paid', 'rejected'].includes(claim.status)) {
@@ -170,7 +171,7 @@ export function createReimbursementsRouter() {
   }));
 
   // ── Reject ─────────────────────────────────────────────────────────────
-  router.post('/:id/reject', requireAuth, asyncHandler(async (req, res) => {
+  router.post('/:id/reject', requireAuth, requireFeature('reimbursements', { write: true }), asyncHandler(async (req, res) => {
     const claim = await Reimbursement.findById(req.params.id);
     if (!claim) return res.status(404).json({ error: 'not found' });
     if (['approved', 'paid', 'rejected'].includes(claim.status)) {
@@ -197,7 +198,7 @@ export function createReimbursementsRouter() {
   }));
 
   // ── File upload ────────────────────────────────────────────────────────
-  router.post('/:id/attachments', requireAuth, upload.single('file'), asyncHandler(async (req, res) => {
+  router.post('/:id/attachments', requireAuth, requireFeature('reimbursements', { write: true }), upload.single('file'), asyncHandler(async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'no file uploaded' });
     const claim = await Reimbursement.findById(req.params.id);
     if (!claim) return res.status(404).json({ error: 'not found' });
@@ -236,7 +237,7 @@ export function createReimbursementsRouter() {
   }));
 
   // ── Delete attachment ──────────────────────────────────────────────────
-  router.delete('/:id/attachments/:fileId', requireAuth, asyncHandler(async (req, res) => {
+  router.delete('/:id/attachments/:fileId', requireAuth, requireFeature('reimbursements', { write: true }), asyncHandler(async (req, res) => {
     const { id, fileId } = req.params;
     if (!mongoose.isValidObjectId(fileId)) return res.status(400).json({ error: 'invalid fileId' });
     const claim = await Reimbursement.findById(id);

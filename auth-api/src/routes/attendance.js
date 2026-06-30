@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import {
   Attendance, deriveStatus, calcMinutes, todayStr,
   SHIFT_START_HOUR, SHIFT_START_MINUTE,
@@ -100,7 +101,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // POST /attendance/checkin
-  router.post('/checkin', asyncHandler(async (req, res) => {
+  router.post('/checkin', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { punchType } = req.body;                         // "office" | "remote" | "wfh"
     if (!['office', 'remote', 'wfh'].includes(punchType)) {
       return res.status(400).json({ error: 'invalid punchType' });
@@ -156,7 +157,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // POST /attendance/checkout
-  router.post('/checkout', asyncHandler(async (req, res) => {
+  router.post('/checkout', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const date = todayStr();
     const doc = await Attendance.findOne({ userId: req.user.sub, date });
 
@@ -181,7 +182,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // POST /attendance/break/start
-  router.post('/break/start', asyncHandler(async (req, res) => {
+  router.post('/break/start', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const date = todayStr();
     const doc = await Attendance.findOne({ userId: req.user.sub, date });
 
@@ -197,7 +198,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // POST /attendance/break/end
-  router.post('/break/end', asyncHandler(async (req, res) => {
+  router.post('/break/end', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const date = todayStr();
     const doc = await Attendance.findOne({ userId: req.user.sub, date });
 
@@ -388,7 +389,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // POST /attendance/regularise — employee submits a correction request
-  router.post('/regularise', asyncHandler(async (req, res) => {
+  router.post('/regularise', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { date, reason, correctedCheckIn, correctedCheckOut } = req.body;
     if (!date || !reason) return res.status(400).json({ error: 'date and reason required' });
 
@@ -573,7 +574,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/regularise/:id/decide — reporting line approval
-  router.patch('/regularise/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), asyncHandler(async (req, res) => {
+  router.patch('/regularise/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -632,7 +633,7 @@ export function createAttendanceRouter(shiftConfig) {
   // ─── Overtime ───
 
   // POST /attendance/overtime — employee submits overtime request
-  router.post('/overtime', asyncHandler(async (req, res) => {
+  router.post('/overtime', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { date, startTime, endTime, reason, note } = req.body;
     if (!date || !startTime || !endTime) return res.status(400).json({ error: 'date, startTime and endTime required' });
 
@@ -674,7 +675,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/overtime/:id/decide — RM approves or rejects
-  router.patch('/overtime/:id/decide', requireRole('admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.patch('/overtime/:id/decide', requireRole('admin', 'reporting_manager'), requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;
     if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
 

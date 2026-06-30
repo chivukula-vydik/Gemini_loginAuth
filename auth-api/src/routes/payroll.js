@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { PayGrade } from '../models/PayGrade.js';
 import { PayGroup } from '../models/PayGroup.js';
 import { PayrollRun } from '../models/PayrollRun.js';
@@ -36,7 +37,7 @@ export function createPayrollRouter() {
     res.json(grades);
   }));
 
-  router.post('/grades', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/grades', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { code, label, minCtc, maxCtc, defaultComponents } = req.body;
     const grade = await PayGrade.create({ code, label, minCtc, maxCtc, defaultComponents: defaultComponents || [] });
     res.status(201).json(grade);
@@ -48,14 +49,14 @@ export function createPayrollRouter() {
     res.json(groups);
   }));
 
-  router.post('/groups', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/groups', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { name, entity, cycle, ptState, members } = req.body;
     const group = await PayGroup.create({ name, entity: entity || null, cycle, ptState, members: members || [] });
     res.status(201).json(group);
   }));
 
   // --- Runs ---
-  router.post('/runs', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.post('/runs', requireAuth, requireRole('admin', 'finance'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { month, year, payGroup, runType, scope, adhocMembers } = req.body;
     const run = await PayrollRun.create({
       period: { month, year },
@@ -83,7 +84,7 @@ export function createPayrollRouter() {
     res.json({ run, inputs, payslips });
   }));
 
-  router.post('/runs/:id/compute', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/runs/:id/compute', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const run = await PayrollRun.findById(req.params.id).populate('payGroup');
     if (!run) return res.status(404).json({ error: 'run not found' });
     if (run.status === 'LOCKED' || run.status === 'PAID') {
@@ -189,7 +190,7 @@ export function createPayrollRouter() {
     res.json(run);
   }));
 
-  router.post('/runs/:id/lock', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/runs/:id/lock', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const run = await PayrollRun.findById(req.params.id);
     if (!run) return res.status(404).json({ error: 'run not found' });
     if (run.status !== 'REVIEW') return res.status(400).json({ error: 'can only lock a REVIEW run' });
@@ -228,7 +229,7 @@ export function createPayrollRouter() {
     res.json(run);
   }));
 
-  router.post('/runs/:id/reopen', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/runs/:id/reopen', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const run = await PayrollRun.findById(req.params.id);
     if (!run) return res.status(404).json({ error: 'run not found' });
     if (run.status !== 'LOCKED') return res.status(400).json({ error: 'can only reopen a LOCKED run' });
@@ -241,7 +242,7 @@ export function createPayrollRouter() {
     res.json(run);
   }));
 
-  router.post('/runs/:id/disburse', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.post('/runs/:id/disburse', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const run = await PayrollRun.findById(req.params.id);
     if (!run) return res.status(404).json({ error: 'run not found' });
     if (run.status !== 'LOCKED') return res.status(400).json({ error: 'can only disburse a LOCKED run' });
@@ -308,7 +309,7 @@ export function createPayrollRouter() {
   }));
 
   // --- Arrears: compute diff-based arrears for salary revision ---
-  router.post('/arrears/compute', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.post('/arrears/compute', requireAuth, requireRole('admin', 'finance'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { userId, periods, newCtcAnnual, newComponents } = req.body;
     if (!userId || !periods?.length) return res.status(400).json({ error: 'userId and periods required' });
 
@@ -355,7 +356,7 @@ export function createPayrollRouter() {
   }));
 
   // --- Arrears: create arrear payroll run from computed arrears ---
-  router.post('/arrears/create-run', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.post('/arrears/create-run', requireAuth, requireRole('admin', 'finance'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { userId, payGroupId, arrears, month, year } = req.body;
     if (!userId || !payGroupId || !arrears?.length) return res.status(400).json({ error: 'userId, payGroupId, arrears required' });
 
