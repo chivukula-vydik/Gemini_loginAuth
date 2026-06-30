@@ -169,13 +169,13 @@ export function ApprovalFlowBuilder() {
           {/* Basic info */}
           <div style={{ display: 'grid', gap: 12, maxWidth: 500 }}>
             <label>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>Flow Name</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Flow Name</span>
               <input className="input" placeholder="e.g. High-value Reimbursement Approval" value={editing.name}
                 onChange={e => setEditing({ ...editing, name: e.target.value })} />
             </label>
             <div style={{ display: 'flex', gap: 12 }}>
               <label style={{ flex: 1 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Applies To</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Applies To</span>
                 <select className="input" value={editing.appliesTo.entityType}
                   onChange={e => {
                     setEditing({ ...editing, appliesTo: { entityType: e.target.value } });
@@ -184,22 +184,22 @@ export function ApprovalFlowBuilder() {
                 </select>
               </label>
               <label style={{ width: 100 }}>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>Priority</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Priority</span>
                 <input className="input" type="number" value={editing.priority}
                   onChange={e => setEditing({ ...editing, priority: Number(e.target.value) })} />
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lower = checked first</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Lower = checked first</span>
               </label>
             </div>
           </div>
 
           {/* Condition */}
-          <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 6, maxWidth: 500 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+          <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 6, maxWidth: 500, background: 'var(--surface)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text)' }}>
               When should this flow apply?
             </div>
             {editing.appliesTo.condition ? (
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13 }}>If</span>
+                <span style={{ fontSize: 13, color: 'var(--text)' }}>If</span>
                 {entityFields.length > 0 ? (
                   <select className="input" style={{ width: 140 }}
                     value={editing.appliesTo.condition.field}
@@ -224,7 +224,7 @@ export function ApprovalFlowBuilder() {
               </div>
             ) : (
               <div>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Always (no condition). </span>
+                <span style={{ fontSize: 13, color: 'var(--muted)' }}>Always (no condition). </span>
                 {entityFields.length > 0 && (
                   <button className="btn btn-auto" style={{ fontSize: 12, padding: '2px 8px' }}
                     onClick={() => setCondition({ field: entityFields[0].value, op: 'gt', value: '' })}>
@@ -242,8 +242,8 @@ export function ApprovalFlowBuilder() {
           </div>
 
           {/* Steps */}
-          <h3 style={{ marginTop: 24, marginBottom: 4 }}>Approval Steps</h3>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+          <h3 style={{ marginTop: 24, marginBottom: 4, color: 'var(--text)' }}>Approval Steps</h3>
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 12px' }}>
             Steps run in order. Each step must be approved before the next one starts.
           </p>
 
@@ -252,10 +252,10 @@ export function ApprovalFlowBuilder() {
             return (
               <div key={idx} style={{
                 border: '1px solid var(--border)', borderRadius: 6, padding: 12, marginBottom: 8,
-                background: 'var(--bg-offset, #fafafa)',
+                background: 'var(--surface)',
               }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-muted)', minWidth: 28 }}>{step.order}</span>
+                  <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--muted)', minWidth: 28 }}>{step.order}</span>
                   <input className="input" placeholder="Step name, e.g. Manager Review" value={step.name}
                     onChange={e => updateStep(idx, { name: e.target.value })} style={{ flex: 1 }} />
                   <div style={{ display: 'flex', gap: 2 }}>
@@ -264,20 +264,20 @@ export function ApprovalFlowBuilder() {
                     <button className="btn btn-auto" onClick={() => moveStep(idx, 1)}
                       disabled={idx === editing.steps.length - 1} title="Move down" style={{ padding: '4px 8px', fontSize: 14 }}>↓</button>
                     <button className="btn btn-auto" onClick={() => removeStep(idx)}
-                      disabled={editing.steps.length <= 1} title="Remove" style={{ padding: '4px 8px', fontSize: 14, color: 'var(--color-danger, red)' }}>×</button>
+                      disabled={editing.steps.length <= 1} title="Remove" style={{ padding: '4px 8px', fontSize: 14, color: 'var(--danger, #ef4444)' }}>×</button>
                   </div>
                 </div>
 
                 <div style={{ paddingLeft: 36 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 90 }}>Who approves:</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 90, color: 'var(--text)' }}>Who approves:</span>
                     <select className="input" value={step.approverType} style={{ width: 180 }}
                       onChange={e => updateStep(idx, { approverType: e.target.value, approvers: [] })}>
                       {APPROVER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                     {step.approverType === 'role' && (
                       <>
-                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>needs</span>
+                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>needs</span>
                         <select className="input" value={step.rule} style={{ width: 100 }}
                           onChange={e => updateStep(idx, { rule: e.target.value })}>
                           <option value="any">Any one</option>
@@ -288,14 +288,15 @@ export function ApprovalFlowBuilder() {
                   </div>
 
                   {typeInfo && (
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>{typeInfo.desc}</p>
+                    <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px' }}>{typeInfo.desc}</p>
                   )}
 
                   {step.approverType === 'role' && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                       {ROLES.map(r => (
-                        <label key={r} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                        <label key={r} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--text)' }}>
                           <input type="checkbox" checked={step.approvers.includes(r)}
+                            style={{ accentColor: 'var(--primary)' }}
                             onChange={e => {
                               const approvers = e.target.checked
                                 ? [...step.approvers, r]
@@ -354,7 +355,7 @@ export function ApprovalFlowBuilder() {
               <tr key={f._id} style={{ opacity: f.active ? 1 : 0.5 }}>
                 <td className="ts-task">{f.name}</td>
                 <td style={{ textTransform: 'capitalize' }}>{f.appliesTo.entityType}</td>
-                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                <td style={{ fontSize: 12, color: 'var(--muted)' }}>
                   {f.appliesTo.condition
                     ? `${f.appliesTo.condition.field} ${f.appliesTo.condition.op} ${f.appliesTo.condition.value}`
                     : 'Always'}
