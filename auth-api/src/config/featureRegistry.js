@@ -1,0 +1,33 @@
+// ponytail: code-defined manifest — admins toggle entries, never invent features
+export const FEATURE_REGISTRY = {
+  users:              { key: 'users',              label: 'Users',                defaultEnabled: true,  defaultRoles: ['admin', 'hr', 'director', 'vp'],                           system: false },
+  skills:             { key: 'skills',             label: 'Skills',               defaultEnabled: true,  defaultRoles: ['admin'],                                                    system: false },
+  departments:        { key: 'departments',        label: 'Departments',          defaultEnabled: true,  defaultRoles: ['admin'],                                                    system: false },
+  shifts:             { key: 'shifts',             label: 'Shifts',               defaultEnabled: true,  defaultRoles: ['admin'],                                                    system: false },
+  'company-fit':      { key: 'company-fit',        label: 'Company Fit',          defaultEnabled: true,  defaultRoles: ['admin'],                                                    system: false },
+  projects:           { key: 'projects',           label: 'Projects',             defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'finance', 'director', 'vp'],                  system: false },
+  'my-tasks':         { key: 'my-tasks',           label: 'My Tasks',             defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'team_lead', 'director', 'vp'], system: false },
+  timesheet:          { key: 'timesheet',          label: 'Timesheet',            defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  attendance:         { key: 'attendance',         label: 'Attendance',           defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  requests:           { key: 'requests',           label: 'Requests',             defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'reporting_manager', 'team_lead', 'hr', 'director', 'vp'], system: false },
+  'team-attendance':  { key: 'team-attendance',    label: 'Team Attendance',      defaultEnabled: true,  defaultRoles: ['reporting_manager', 'team_lead', 'hr', 'director', 'vp'],    system: false },
+  'my-requests':      { key: 'my-requests',        label: 'My Requests',          defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  reimbursements:     { key: 'reimbursements',     label: 'Reimbursements',       defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  utilization:        { key: 'utilization',        label: 'Utilization',          defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'finance', 'director', 'vp'],                  system: false },
+  payroll:            { key: 'payroll',             label: 'Payroll',              defaultEnabled: true,  defaultRoles: ['admin', 'finance'],                                         system: false },
+  'my-payslips':      { key: 'my-payslips',        label: 'My Payslips',          defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  declarations:       { key: 'declarations',       label: 'Declarations',         defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  'tax-summary':      { key: 'tax-summary',        label: 'Tax Summary',          defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  'declaration-review': { key: 'declaration-review', label: 'Declaration Review', defaultEnabled: true,  defaultRoles: ['admin', 'finance'],                                         system: false },
+  'my-loans':         { key: 'my-loans',           label: 'My Loans',             defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  'loan-management':  { key: 'loan-management',    label: 'Loan Management',      defaultEnabled: true,  defaultRoles: ['admin', 'finance'],                                         system: false },
+  onboarding:         { key: 'onboarding',         label: 'Onboarding',           defaultEnabled: true,  defaultRoles: ['admin', 'hr'],                                              system: false },
+  'onboarding-templates': { key: 'onboarding-templates', label: 'Onboarding Templates', defaultEnabled: true, defaultRoles: ['admin', 'hr'],                                        system: false },
+  'onboarding-tasks': { key: 'onboarding-tasks',   label: 'My Onboarding',        defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  organisation:       { key: 'organisation',       label: 'Organisation',         defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: true },
+  'my-skills':        { key: 'my-skills',          label: 'My Skills',            defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  marketplace:        { key: 'marketplace',        label: 'Marketplace',          defaultEnabled: true,  defaultRoles: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], system: false },
+  'approval-flows':   { key: 'approval-flows',    label: 'Approval Flows',       defaultEnabled: true,  defaultRoles: ['admin'],                                                    system: false },
+};
+
+export const FEATURE_KEYS = Object.keys(FEATURE_REGISTRY);

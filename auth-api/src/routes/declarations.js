@@ -25,11 +25,15 @@ const SECTION_LIMITS = {
   '80TTA':     10000,
   '80DDB':     100000,
   '80U':       125000,
+  '80EEB':     150000,
   'NPS_EMPLOYER': 750000,
 };
 
-function validateItems(items) {
+const OLD_REGIME_ONLY_SECTIONS = ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA', '80DDB', '80U', '80EEB'];
+
+function validateItems(items, regime) {
   const errors = [];
+  const loanSections = ['24B', '80E', '80EEB'];
   for (const item of items) {
     const limit = SECTION_LIMITS[item.section];
     if (limit === undefined) {
@@ -38,6 +42,9 @@ function validateItems(items) {
       errors.push(`${item.section}: amount cannot be negative`);
     } else if (limit !== Infinity && item.declaredAmount > limit) {
       errors.push(`${item.section}: exceeds limit of ₹${limit.toLocaleString('en-IN')}`);
+    }
+    if (regime === 'new' && loanSections.includes(item.section)) {
+      errors.push(`${item.section}: loan interest deductions are not available under the New Tax Regime`);
     }
   }
   return errors;
@@ -90,7 +97,7 @@ export function createDeclarationsRouter() {
     if (existing?.phase === 'closed') return res.status(400).json({ error: 'declaration is closed for this FY' });
 
     if (items) {
-      const errors = validateItems(items);
+      const errors = validateItems(items, regime);
       if (errors.length) return res.status(400).json({ error: errors.join('; ') });
     }
 
@@ -118,9 +125,18 @@ export function createDeclarationsRouter() {
     if (!dec) return res.status(404).json({ error: 'declaration not found' });
     if (dec.phase === 'closed') return res.status(400).json({ error: 'declaration is closed' });
 
+    if (dec.regime === 'new' && ['24B', '80E', '80EEB'].includes(dec.items[Number(req.params.sectionIdx)]?.section)) {
+      return res.status(400).json({ error: 'loan deduction proofs cannot be uploaded under New Tax Regime' });
+    }
+
     const idx = Number(req.params.sectionIdx);
     if (!dec.items[idx]) return res.status(400).json({ error: 'invalid item index' });
     if (!req.file) return res.status(400).json({ error: 'file required' });
+
+    const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!ALLOWED_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({ error: 'only PDF or image files accepted — upload official certificates, not raw bank statements' });
+    }
 
     const bucket = getProofBucket();
     const stream = bucket.openUploadStream(req.file.originalname, {
@@ -153,6 +169,25 @@ export function createDeclarationsRouter() {
     dec.phase = 'proof';
     await dec.save();
     res.json(dec);
+  }));
+
+  // ── Download proof — employee (own) + admin/finance/hr only ────────────
+  router.get('/:fy/proof/:fileId', requireAuth, asyncHandler(async (req, res) => {
+    const fileId = new mongoose.Types.ObjectId(req.params.fileId);
+    const bucket = getProofBucket();
+    const files = await bucket.find({ _id: fileId }).toArray();
+    if (!files.length) return res.status(404).json({ error: 'file not found' });
+
+    const meta = files[0].metadata || {};
+    const isOwner = meta.user === req.user.sub;
+    const isPrivileged = ['admin', 'finance', 'hr'].some(r => (req.user.roles || []).includes(r));
+    if (!isOwner && !isPrivileged) {
+      return res.status(403).json({ error: 'access denied — only the employee or HR/payroll admins may view proof documents' });
+    }
+
+    res.set('Content-Type', files[0].contentType || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${files[0].filename}"`);
+    bucket.openDownloadStream(fileId).pipe(res);
   }));
 
   // ── Section limits reference ───────────────────────────────────────────

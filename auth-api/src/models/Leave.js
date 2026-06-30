@@ -20,6 +20,7 @@ const leaveSchema = new mongoose.Schema({
   decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   decidedAt: { type: Date, default: null },
   assignedApprover: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  approvalRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ApprovalRequest', default: null },
 });
 
 leaveSchema.index({ userId: 1, startDate: 1 });

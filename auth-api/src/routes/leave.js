@@ -9,6 +9,7 @@ import { User } from '../models/User.js';
 import { sendLeaveDecision, sendLeaveRequest } from '../services/mailer.js';
 import { Notification } from '../models/Notification.js';
 import { isRmGateActive } from '../middleware/requireScope.js';
+import { selectFlow, createApprovalRequest, recordDecision } from '../services/approvalEngine.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -60,6 +61,18 @@ export function createLeaveRouter() {
       reason: String(reason || ''),
       assignedApprover,
     });
+
+    // Create approval request via engine
+    const flow = await selectFlow('leave', { type, requestedDays, startDate, endDate });
+    if (flow) {
+      try {
+        const ar = await createApprovalRequest(flow._id, 'leave', doc._id, req.user.sub, { type, requestedDays });
+        doc.approvalRequestId = ar._id;
+        await doc.save();
+      } catch (e) {
+        console.error('[approval-engine] leave flow error:', e.message);
+      }
+    }
 
     if (assignedApprover) {
       const manager = await User.findById(assignedApprover).select('email');
@@ -145,18 +158,32 @@ export function createLeaveRouter() {
     if (doc.status !== 'pending') return res.status(409).json({ error: 'already decided' });
 
     const roles = req.user.roles || [req.user.role];
-    if ((roles.includes('reporting_manager') || roles.includes('team_lead')) && String(doc.assignedApprover) !== req.user.sub) {
-      return res.status(404).json({ error: 'not found' });
-    }
-    if (roles.includes('hr') && !roles.includes('admin')) {
-      const requesterUser = await User.findById(doc.userId).select('reportingManagerId');
-      const gateActive = await isRmGateActive(requesterUser?.reportingManagerId);
-      if (!gateActive) {
-        return res.status(403).json({ error: 'RM is active — HR approval not available' });
+
+    // If engine-managed, delegate state transition
+    if (doc.approvalRequestId) {
+      const engineDecision = decision === 'approved' ? 'approve' : 'reject';
+      const comment = decision === 'rejected' ? (req.body.reason || '') : '';
+      try {
+        const ar = await recordDecision(doc.approvalRequestId, req.user.sub, engineDecision, comment);
+        doc.status = ar.status === 'approved' ? 'approved' : ar.status === 'rejected' ? 'rejected' : 'pending';
+      } catch (e) {
+        return res.status(403).json({ error: e.message });
       }
+    } else {
+      // Legacy path for pre-engine leaves
+      if ((roles.includes('reporting_manager') || roles.includes('team_lead')) && String(doc.assignedApprover) !== req.user.sub) {
+        return res.status(404).json({ error: 'not found' });
+      }
+      if (roles.includes('hr') && !roles.includes('admin')) {
+        const requesterUser = await User.findById(doc.userId).select('reportingManagerId');
+        const gateActive = await isRmGateActive(requesterUser?.reportingManagerId);
+        if (!gateActive) {
+          return res.status(403).json({ error: 'RM is active — HR approval not available' });
+        }
+      }
+      doc.status = decision;
     }
 
-    doc.status = decision;
     doc.decidedBy = req.user.sub;
     doc.decidedAt = new Date();
     await doc.save();

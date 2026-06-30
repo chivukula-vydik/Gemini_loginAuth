@@ -7,7 +7,10 @@ const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', c
 
 interface EMI { period: { month: number; year: number }; amount: number; status: string }
 interface UserRef { _id: string; displayName: string; email: string }
-interface Loan { _id: string; user: UserRef; label: string; principal: number; emiAmount: number; tenureMonths: number; schedule: EMI[]; status: string; createdAt: string }
+interface Loan { _id: string; user: UserRef; label: string; loanType: string; principal: number; emiAmount: number; tenureMonths: number; schedule: EMI[]; status: string; createdAt: string }
+
+const TYPE_LABELS: Record<string, string> = { home_loan: 'Home Loan', education_loan: 'Education Loan', ev_loan: 'EV Loan', salary_advance: 'Salary Advance', other: 'Other' };
+const TAX_DEDUCTIBLE = ['home_loan', 'education_loan', 'ev_loan'];
 
 export function LoanManagement() {
   const navigate = useNavigate();
@@ -73,7 +76,11 @@ export function LoanManagement() {
             <div className="lm-card-header" onClick={() => setExpanded(isExpanded ? null : loan._id)}>
               <div>
                 <div className="lm-card-name">{loan.user.displayName}</div>
-                <div className="lm-card-sub">{loan.label || 'Loan'} · {fmt(loan.principal)} · {loan.tenureMonths}mo</div>
+                <div className="lm-card-sub">
+                  {loan.label || 'Loan'} · {TYPE_LABELS[loan.loanType] || loan.loanType}
+                  {TAX_DEDUCTIBLE.includes(loan.loanType) && <span className="lm-tax-badge">Tax Deductible</span>}
+                  {' · '}{fmt(loan.principal)} · {loan.tenureMonths}mo
+                </div>
               </div>
               <div className="lm-card-right">
                 <span className={`lm-status lm-status-${loan.status}`}>{loan.status}</span>

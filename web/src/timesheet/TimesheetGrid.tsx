@@ -10,6 +10,7 @@ import { popoverPosition, type Placement } from '../pm/popoverPosition';
 import { attendanceIcon, attendanceIconColorClass, attendanceTooltip } from './attendanceRow';
 import type { AttendanceCell } from './attendanceRow';
 import { TaskSearch } from './TaskSearch';
+import { formatSize } from '../format';
 
 const ADD_MENU_WIDTH = 300;
 const ADD_MENU_HEIGHT = 340;
@@ -39,12 +40,6 @@ type Props = {
   attachments?: Attachment[];
   onAttachmentsChange?: (attachments: Attachment[]) => void;
 };
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function TimesheetGrid({
   weekStart, tasks, readOnly = false, todayDay, grants, pendingKeys, attendance = {}, dayStatus,

@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import type { TaskDetail } from './pmApi';
 import { personName } from './personName.ts';
 
@@ -55,12 +54,4 @@ function triggerDownload(blob: Blob, fileName: string) {
 export function downloadCSV(rows: ExportRow[], fileName = 'tasks.csv') {
   const csv = toCSV(rows);
   triggerDownload(new Blob([csv], { type: 'text/csv;charset=utf-8;' }), fileName);
-}
-
-export function downloadXLSX(rows: ExportRow[], fileName = 'tasks.xlsx') {
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
-  const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  triggerDownload(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName);
 }

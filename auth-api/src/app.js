@@ -36,6 +36,10 @@ import { createDeclarationsRouter } from './routes/declarations.js';
 import { createFeedRouter } from './routes/feed.js';
 import { createInboxRouter } from './routes/inbox.js';
 import { createNotificationsRouter } from './routes/notifications.js';
+import { createFeaturesRouter } from './routes/features.js';
+import { createApprovalFlowsRouter } from './routes/approvalFlows.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import { requireFeature } from './middleware/requireFeature.js';
 
 export function createApp(config) {
   const app = express();
@@ -97,37 +101,42 @@ export function createApp(config) {
   const authRouter = createAuthRouter(config.enabled);
   mountProviders(authRouter, config.enabled, {});
   app.use('/auth', authLimiter, authRouter);
-  app.use('/timesheets', createTimesheetRouter());
+  // ponytail: feature-gated routes get requireAuth + requireFeature at mount level
+  const fg = (key) => [requireAuth, requireFeature(key)];
+
+  app.use('/timesheets', ...fg('timesheet'), createTimesheetRouter());
   app.use('/admin', createAdminRouter());
-  app.use('/skills', createSkillsRouter());
+  app.use('/skills', ...fg('skills'), createSkillsRouter());
   app.use('/me', createProfileRouter());
-  app.use('/projects', createProjectsRouter());
-  app.use('/tasks', createTasksRouter());
-  app.use('/users', createUsersRouter());
+  app.use('/projects', ...fg('projects'), createProjectsRouter());
+  app.use('/tasks', ...fg('my-tasks'), createTasksRouter());
+  app.use('/users', ...fg('users'), createUsersRouter());
   app.use('/edit-requests', createEditRequestsRouter());
-  app.use('/marketplace', createMarketplaceRouter());
+  app.use('/marketplace', ...fg('marketplace'), createMarketplaceRouter());
   app.use('/claim-requests', createClaimRequestsRouter());
   app.use('/assignment-offers', createAssignmentOffersRouter());
-  app.use('/attendance', createAttendanceRouter(shiftConfig));
-  app.use('/leave', createLeaveRouter());
+  app.use('/attendance', ...fg('attendance'), createAttendanceRouter(shiftConfig));
+  app.use('/leave', ...fg('attendance'), createLeaveRouter());
   app.use('/holidays', createHolidaysRouter());
   app.use('/reports', createReportsRouter());
   app.use('/dashboard', createDashboardRouter());
   app.use('/manager', createManagerRouter());
   app.use('/org', createOrgRouter());
-  app.use('/my-requests', createMyRequestsRouter());
+  app.use('/my-requests', ...fg('my-requests'), createMyRequestsRouter());
   app.use('/onboarding/portal', createOnboardingPortalRouter());
-  app.use('/onboarding', createOnboardingRouter());
+  app.use('/onboarding', ...fg('onboarding'), createOnboardingRouter());
   app.use('/people', createPeopleRouter());
-  app.use('/payroll', createPayrollRouter());
-  app.use('/salary', createSalaryRouter());
-  app.use('/payslips', createPayslipsRouter());
-  app.use('/reimbursements', createReimbursementsRouter());
-  app.use('/loans', createLoansRouter());
-  app.use('/declarations', createDeclarationsRouter());
+  app.use('/payroll', ...fg('payroll'), createPayrollRouter());
+  app.use('/salary', ...fg('payroll'), createSalaryRouter());
+  app.use('/payslips', ...fg('my-payslips'), createPayslipsRouter());
+  app.use('/reimbursements', ...fg('reimbursements'), createReimbursementsRouter());
+  app.use('/loans', ...fg('my-loans'), createLoansRouter());
+  app.use('/declarations', ...fg('declarations'), createDeclarationsRouter());
   app.use('/feed', createFeedRouter());
   app.use('/inbox', createInboxRouter());
   app.use('/notifications', createNotificationsRouter());
+  app.use('/features', createFeaturesRouter());
+  app.use('/approval-flows', ...fg('approval-flows'), createApprovalFlowsRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

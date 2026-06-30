@@ -1,22 +1,25 @@
-/* web/src/payroll/Reimbursements.css */
-.rb-page { padding: 28px 32px; max-width: 800px; }
-.rb-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 20px; }
+.rb-page { padding: 28px 32px; max-width: 860px; }
+.rb-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+
+/* Tabs */
+.rb-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+.rb-tab { padding: 10px 24px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; cursor: pointer; transition: all 0.15s; }
+.rb-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.rb-tab:hover:not(.active) { color: var(--text); }
+
+.rb-queue-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+.rb-queue-tab { padding: 7px 16px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.rb-queue-tab.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+
+/* Submit form */
 .rb-submit-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 28px; box-shadow: var(--shadow); margin-bottom: 20px; }
+.rb-card-section-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px; }
 .rb-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .rb-form-group { display: flex; flex-direction: column; gap: 5px; }
 .rb-form-label { font-size: 12px; font-weight: 600; color: var(--muted); }
-.rb-list { display: flex; flex-direction: column; gap: 8px; }
-.rb-item { display: flex; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px; box-shadow: var(--shadow); }
-.rb-item-info { display: flex; flex-direction: column; gap: 2px; }
-.rb-item-cat { font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize; }
-.rb-item-desc { font-size: 12px; color: var(--muted); }
-.rb-item-amount { font-size: 15px; font-weight: 700; color: var(--text); }
-.rb-item-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; }
-.rb-item-status.submitted { background: rgba(234,179,8,0.12); color: #b45309; }
-.rb-item-status.approved { background: rgba(59,130,246,0.12); color: #1d4ed8; }
-.rb-item-status.rejected { background: rgba(239,68,68,0.12); color: #dc2626; }
-.rb-item-status.paid { background: rgba(34,197,94,0.12); color: #15803d; }
 .rb-form-actions { display: flex; align-items: center; gap: 12px; }
+.rb-flow-hint { margin-top: 10px; font-size: 12px; color: var(--muted); font-style: italic; }
+.rb-pending-files { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .rb-attach-btn {
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -24,11 +27,54 @@
   transition: border-color 0.12s, color 0.12s;
 }
 .rb-attach-btn:hover { border-color: var(--accent); color: var(--accent); }
-.rb-pending-files { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.rb-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }
-.rb-claim-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-.rb-claim-card .rb-item { border: none; box-shadow: none; background: none; border-radius: 0; }
-.rb-attachments { padding: 0 20px 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Expandable card */
+.rb-list { display: flex; flex-direction: column; gap: 8px; }
+.rb-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; transition: border-color 0.15s; }
+.rb-card-open { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+
+.rb-card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; cursor: pointer; transition: background 0.1s; gap: 12px; }
+.rb-card-header:hover { background: var(--surface); }
+
+.rb-card-left { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.rb-card-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.rb-card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rb-card-cat { font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize; }
+.rb-card-project { font-size: 11px; padding: 1px 8px; background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); border-radius: 10px; font-weight: 600; }
+.rb-card-date { font-size: 12px; color: var(--muted); }
+.rb-card-desc { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
+
+.rb-card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.rb-card-amount { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.rb-chevron { font-size: 12px; color: var(--muted); }
+
+/* Status pills */
+.rb-item-status { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+.rb-item-status.submitted { background: rgba(234,179,8,0.12); color: #b45309; }
+.rb-item-status.rm_approved { background: rgba(59,130,246,0.12); color: #1d4ed8; }
+.rb-item-status.pm_approved { background: rgba(139,92,246,0.12); color: #7c3aed; }
+.rb-item-status.approved { background: rgba(34,197,94,0.12); color: #15803d; }
+.rb-item-status.rejected { background: rgba(239,68,68,0.12); color: #dc2626; }
+.rb-item-status.paid { background: rgba(34,197,94,0.12); color: #15803d; }
+
+/* Expanded body */
+.rb-card-body { padding: 0 20px 16px; border-top: 1px solid var(--border); }
+
+.rb-trail-section { margin-top: 14px; }
+.rb-trail-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.rb-trail-steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.rb-trail-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+.rb-trail-role { font-weight: 700; }
+.rb-trail-reason { font-weight: 400; color: var(--muted); }
+.rb-trail-approved { background: rgba(34,197,94,0.12); color: #15803d; }
+.rb-trail-rejected { background: rgba(239,68,68,0.12); color: #dc2626; }
+
+.rb-reject-reason { margin-top: 8px; font-size: 12px; color: #dc2626; padding: 6px 10px; background: rgba(239,68,68,0.06); border-radius: 6px; }
+
+/* Detail attachments */
+.rb-detail-attachments { margin-top: 14px; }
+.rb-no-att { font-size: 12px; color: var(--muted); }
+.rb-att-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .rb-att { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; }
 .rb-att-name { color: var(--accent); text-decoration: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rb-att-name:hover { text-decoration: underline; }
@@ -38,3 +84,14 @@
 .rb-att-add { background: none; border: 1px dashed var(--border); border-radius: 6px; padding: 4px 12px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .rb-att-add:hover { border-color: var(--accent); color: var(--accent); }
 .rb-att-add:disabled { opacity: 0.5; cursor: default; }
+
+/* Approval action buttons */
+.rb-approval-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.rb-btn-approve { padding: 8px 20px; font-size: 13px; font-weight: 600; color: #fff; background: #22c55e; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; }
+.rb-btn-approve:hover:not(:disabled) { opacity: 0.85; }
+.rb-btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
+.rb-btn-reject { padding: 8px 20px; font-size: 13px; font-weight: 600; color: #fff; background: #ef4444; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; }
+.rb-btn-reject:hover:not(:disabled) { opacity: 0.85; }
+.rb-btn-reject:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.rb-empty { text-align: center; color: var(--faint); padding: 40px; font-size: 13px; }

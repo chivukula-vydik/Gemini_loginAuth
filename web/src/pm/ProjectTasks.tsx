@@ -12,7 +12,7 @@ import { TaskToolbar } from './TaskToolbar';
 import { BulkBar } from './BulkBar';
 import { Pagination } from './Pagination';
 import { filterTasks, paginate } from './taskFilter';
-import { downloadCSV, downloadXLSX, toExportRows } from './taskExport';
+import { downloadCSV, toExportRows } from './taskExport';
 import { PM_FLAGS } from './featureFlags';
 
 const PAGE_SIZE = 10;
@@ -161,7 +161,6 @@ export function ProjectTasks(props: Props) {
             if (window.confirm(`Delete ${selectedIds.size} selected task(s)?`)) runBulk('delete');
           }}
           onExportCSV={() => downloadCSV(toExportRows(selectedTasks), 'project-tasks.csv')}
-          onExportXLSX={() => downloadXLSX(toExportRows(selectedTasks), 'project-tasks.xlsx')}
         />
       )}
 

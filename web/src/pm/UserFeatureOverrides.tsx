@@ -1,0 +1,85 @@
+import { useEffect, useState } from 'react';
+import { authed } from '../fetchHelper';
+
+type OverrideState = {
+  overrides: Record<string, 'on' | 'off'>;
+  resolved: Record<string, boolean>;
+};
+
+export function UserFeatureOverrides({ userId }: { userId: string }) {
+  const [state, setState] = useState<OverrideState | null>(null);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState('');
+
+  function reload() {
+    authed(`/features/user-override/${userId}`).then(setState).catch(e => setError(e.message));
+  }
+  useEffect(() => { reload(); }, [userId]);
+
+  async function setOverride(featureKey: string, value: 'on' | 'off' | null) {
+    setSaving(featureKey);
+    try {
+      await authed(`/features/user-override/${userId}`, 'PATCH', { featureKey, value });
+      reload();
+    } catch (e) { setError((e as Error).message); }
+    finally { setSaving(''); }
+  }
+
+  if (!state) return null;
+
+  const keys = Object.keys(state.resolved).sort();
+  const hasOverrides = Object.keys(state.overrides).length > 0;
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <h3 style={{ marginBottom: 8 }}>Feature Overrides</h3>
+      {error && <p className="ts-error">{error}</p>}
+      {!hasOverrides && <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 8 }}>No overrides — all features follow role defaults.</p>}
+      <table className="ts-table" style={{ fontSize: 13 }}>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th style={{ textAlign: 'center' }}>Status</th>
+            <th style={{ textAlign: 'center' }}>Source</th>
+            <th style={{ textAlign: 'center' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {keys.map(key => {
+            const override = state.overrides[key];
+            const resolved = state.resolved[key];
+            const source = override ? `Override: ${override}` : `Inherited (${resolved ? 'on' : 'off'})`;
+            return (
+              <tr key={key}>
+                <td>{key}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <span style={{ color: resolved ? 'var(--color-success, green)' : 'var(--color-danger, red)' }}>
+                    {resolved ? '● On' : '○ Off'}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'center', fontStyle: override ? 'normal' : 'italic', fontWeight: override ? 600 : 400 }}>
+                  {source}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {override ? (
+                    <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px' }}
+                      disabled={saving === key} onClick={() => setOverride(key, null)}>
+                      Reset to role
+                    </button>
+                  ) : (
+                    <>
+                      <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px', marginRight: 4 }}
+                        disabled={saving === key} onClick={() => setOverride(key, resolved ? 'off' : 'on')}>
+                        {resolved ? 'Revoke' : 'Grant'}
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

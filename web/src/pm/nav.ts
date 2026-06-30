@@ -1,9 +1,9 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
-export type NavKey = 'home' | 'users' | 'skills' | 'departments' | 'shifts' | 'company-fit' | 'projects' | 'requests' | 'marketplace' | 'my-tasks' | 'my-skills' | 'timesheet' | 'attendance' | 'my-requests' | 'utilization' | 'my-team' | 'team-attendance' | 'organisation' | 'profile' | 'payroll' | 'my-payslips' | 'reimbursements' | 'declarations' | 'tax-summary' | 'reimbursement-approvals' | 'declaration-review' | 'my-loans' | 'loan-management' | 'onboarding' | 'onboarding-tasks' | 'onboarding-templates';
+
+const ALL_NAV_KEYS = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'] as const;
+export type NavKey = (typeof ALL_NAV_KEYS)[number];
 export type NavItem = { key: NavKey; label: string; path: string };
 export type NavSection = { title: string; items: NavItem[] };
-
-const ALL_NAV_KEYS: NavKey[] = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'reimbursement-approvals', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'];
 
 const CUSTOM_PATHS: Partial<Record<NavKey, string>> = {
   'declaration-review': '/declarations/review',
@@ -33,7 +33,7 @@ function sectionsForRole(role: Role): NavSection[] {
       people.push(I('users', 'Users'));
     }
     if (role === 'admin') {
-      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'));
+      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'), I('feature-management', 'Features'), I('approval-flows', 'Approvals'));
     }
     people.push(I('organisation', 'Organisation'));
     sections.push({ title: 'People', items: people });
@@ -45,9 +45,7 @@ function sectionsForRole(role: Role): NavSection[] {
     work.push(I('timesheet', 'Timesheet'));
     work.push(I('utilization', 'Utilization'));
     sections.push({ title: 'Work', items: work });
-  } else if (['reporting_manager', 'team_lead'].includes(role)) {
-    sections.push({ title: 'Work', items: [I('my-tasks', 'My Tasks'), I('timesheet', 'Timesheet')] });
-  } else if (role === 'employee') {
+  } else if (['reporting_manager', 'team_lead', 'employee'].includes(role)) {
     sections.push({ title: 'Work', items: [I('my-tasks', 'My Tasks'), I('timesheet', 'Timesheet')] });
   } else {
     sections.push({ title: 'Work', items: [I('timesheet', 'Timesheet')] });

@@ -9,12 +9,13 @@ const ProofSchema = new mongoose.Schema({
 }, { _id: false });
 
 const DeclarationItemSchema = new mongoose.Schema({
-  section:        { type: String, required: true },
-  declaredAmount: { type: Number, required: true },
-  proofAmount:    { type: Number, default: null },
-  proofs:         [ProofSchema],
-  verifyStatus:   { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
-  rejectReason:   { type: String, default: '' },
+  section:            { type: String, required: true },
+  declaredAmount:     { type: Number, required: true },
+  proofAmount:        { type: Number, default: null },
+  ownershipPercent:   { type: Number, default: 100, min: 1, max: 100 },
+  proofs:             [ProofSchema],
+  verifyStatus:       { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+  rejectReason:       { type: String, default: '' },
 }, { _id: false });
 
 const HraDetailSchema = new mongoose.Schema({

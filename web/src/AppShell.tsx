@@ -1,6 +1,7 @@
 import { type ReactElement, useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './authContext';
+import { useFeatures } from './featureContext';
 import { TimesheetPage } from './timesheet/TimesheetPage';
 import { AttendancePage } from './attendance/AttendancePage';
 import { navSectionsForRoles, keyForPath, NavKey } from './pm/nav';
@@ -31,7 +32,9 @@ import {
   getNotifications, getNotificationsUnreadCount, markNotificationRead, markAllNotificationsRead,
   InboxItem, NotificationItem,
 } from './dashboard/inboxApi';
-import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, ReimbursementApprovals, RegimeComparison, DeclarationReview, MyLoans, LoanManagement } from './payroll/index';
+import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, RegimeComparison, DeclarationReview, MyLoans, LoanManagement } from './payroll/index';
+import { FeatureManagement } from './pm/FeatureManagement';
+import { ApprovalFlowBuilder } from './pm/ApprovalFlowBuilder';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -40,6 +43,8 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   departments: <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11" />,
   shifts: <path d="M12 2v10l4.5 2.6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />,
   'company-fit': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3M9 11l3 3L22 4" />,
+  'feature-management': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
+  'approval-flows': <path d="M9 11l3 3L22 4M4 12l3 3 3-3M4 5h16M4 19h16" />,
   projects: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
   requests: <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" />,
   marketplace: <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />,
@@ -61,7 +66,6 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   reimbursements: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
   declarations: <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M9 14l2 2 4-4" />,
   'tax-summary': <path d="M4 7h16M4 11h16M4 15h10M4 19h6" />,
-  'reimbursement-approvals': <path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
   'declaration-review': <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M12 12l2 2 4-4" />,
   'my-loans': <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
   'loan-management': <path d="M2 17h2.4L6 13l4 8 4-12 2 4h6" />,
@@ -78,7 +82,14 @@ function NavIcon({ name }: { name: NavKey }) {
 
 export function AppShell() {
   const { user, signOut } = useAuth();
-  const sections = navSectionsForRoles(user?.roles ?? ['employee']);
+  const { features } = useFeatures();
+  const allSections = navSectionsForRoles(user?.roles ?? ['employee']);
+  // ponytail: filter nav by resolved features — home/profile always visible
+  const ALWAYS_VISIBLE = new Set(['home', 'profile']);
+  const sections = allSections.map(sec => ({
+    ...sec,
+    items: sec.items.filter(it => ALWAYS_VISIBLE.has(it.key) || features[it.key] !== false),
+  })).filter(sec => sec.items.length > 0);
   const navigate = useNavigate();
   const location = useLocation();
   const active = keyForPath(location.pathname);
@@ -320,7 +331,8 @@ export function AppShell() {
           <Route path="/loan-management" element={<LoanManagement />} />
           <Route path="/tax-summary" element={<TaxSummary />} />
           <Route path="/reimbursements" element={<Reimbursements />} />
-          <Route path="/reimbursement-approvals" element={<ReimbursementApprovals />} />
+          <Route path="/feature-management" element={<FeatureManagement />} />
+          <Route path="/approval-flows" element={<ApprovalFlowBuilder />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

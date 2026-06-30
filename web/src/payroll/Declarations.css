@@ -1,6 +1,7 @@
 /* web/src/payroll/Declarations.css */
 .dec-page { padding: 28px 32px; max-width: 760px; }
 .dec-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.dec-disclaimer { padding: 10px 16px; margin-bottom: 16px; border-radius: 8px; font-size: 12px; line-height: 1.5; background: color-mix(in srgb, #3b82f6 8%, transparent); color: color-mix(in srgb, #3b82f6 80%, var(--text)); border-left: 3px solid #3b82f6; }
 
 .dec-phase-bar { padding: 8px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
 .dec-phase-declaration { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
@@ -22,6 +23,7 @@
 /* Item cards */
 .dec-item-card { padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--surface); }
 .dec-item-card.dec-item-rejected { border-color: #fca5a5; background: color-mix(in srgb, #ef4444 5%, var(--surface)); }
+.dec-item-card.dec-item-blocked { border-color: #fbbf24; background: color-mix(in srgb, #f59e0b 6%, var(--surface)); opacity: 0.75; }
 .dec-item-row { display: flex; gap: 10px; align-items: center; }
 .dec-select { flex: 1.5; padding: 8px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--text); }
 .dec-select:disabled { opacity: 0.6; }
@@ -46,6 +48,15 @@
 .dec-upload-btn:hover { background: var(--primary); color: var(--on-primary); }
 .dec-proof-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .dec-proof-file { font-size: 11px; padding: 3px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
+
+.dec-optional { font-size: 11px; font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: 0; }
+
+.dec-coborrower { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.dec-coborrower-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.dec-coborrower-input { width: 60px !important; text-align: center; }
+.dec-coborrower-note { font-size: 11px; color: #b45309; }
+
+.dec-proof-hint { font-size: 11px; color: var(--muted); margin-top: 4px; font-style: italic; }
 
 .dec-add { display: inline-flex; align-items: center; gap: 4px; padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); border: none; border-radius: 6px; cursor: pointer; margin-top: 4px; }
 

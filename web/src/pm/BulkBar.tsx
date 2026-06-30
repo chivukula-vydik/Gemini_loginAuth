@@ -10,7 +10,6 @@ type Props = {
   onReassign: (assigneeId: string) => void;
   onDelete: () => void;
   onExportCSV: () => void;
-  onExportXLSX: () => void;
 };
 
 export function BulkBar(props: Props) {
@@ -37,7 +36,6 @@ export function BulkBar(props: Props) {
       <button className="btn btn-ghost" onClick={() => assignee && props.onReassign(assignee)} disabled={!assignee}>Reassign</button>
       <button className="btn btn-ghost" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={props.onDelete}>Delete</button>
       <button className="btn btn-ghost" onClick={props.onExportCSV}>Export CSV</button>
-      <button className="btn btn-ghost" onClick={props.onExportXLSX}>Export Excel</button>
     </div>
   );
 }

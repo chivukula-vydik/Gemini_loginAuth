@@ -15,6 +15,7 @@ import {
   IconArrowLeft,
 } from '@tabler/icons-react';
 import { authed } from '../fetchHelper';
+import { UserFeatureOverrides } from './UserFeatureOverrides';
 import './UserDetailPage.css';
 
 type PopRef = { _id: string; name: string } | null;
@@ -118,7 +119,7 @@ interface UserDetail {
   timesheets: TimesheetRecord[];
 }
 
-type Tab = 'overview' | 'attendance' | 'leave' | 'tasks' | 'timesheets';
+type Tab = 'overview' | 'attendance' | 'leave' | 'tasks' | 'timesheets' | 'features';
 
 function fmtDate(d: string | null): string {
   if (!d) return '—';
@@ -312,6 +313,7 @@ export function UserDetailPage() {
     { key: 'leave', label: `Leave (${data.leaves.length})` },
     { key: 'tasks', label: `Tasks (${data.tasks.length})` },
     { key: 'timesheets', label: `Timesheets (${data.timesheets.length})` },
+    { key: 'features', label: 'Features' },
   ];
 
   return (
@@ -558,6 +560,14 @@ export function UserDetailPage() {
           {data.timesheets.map((ts) => (
             <TimesheetCard key={ts._id} ts={ts} />
           ))}
+        </div>
+      )}
+
+      {tab === 'features' && id && (
+        <div className="ud-content">
+          <div className="ud-card">
+            <UserFeatureOverrides userId={id} />
+          </div>
         </div>
       )}
     </div>

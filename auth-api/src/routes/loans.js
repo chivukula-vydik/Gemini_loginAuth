@@ -2,16 +2,19 @@ import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { Loan } from '../models/Loan.js';
+import { Loan, LOAN_TYPES } from '../models/Loan.js';
 
 export function createLoansRouter() {
   const router = express.Router();
 
   // --- Admin/Finance: create loan ---
   router.post('/', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
-    const { user, principal, emiAmount, tenureMonths, startMonth, startYear, label } = req.body;
+    const { user, principal, emiAmount, tenureMonths, startMonth, startYear, label, loanType } = req.body;
     if (!user || !principal || !emiAmount || !tenureMonths || !startMonth || !startYear) {
       return res.status(400).json({ error: 'user, principal, emiAmount, tenureMonths, startMonth, startYear required' });
+    }
+    if (loanType && !LOAN_TYPES.includes(loanType)) {
+      return res.status(400).json({ error: `loanType must be one of: ${LOAN_TYPES.join(', ')}` });
     }
     const schedule = [];
     let m = startMonth, y = startYear;
@@ -20,7 +23,7 @@ export function createLoansRouter() {
       m++;
       if (m > 12) { m = 1; y++; }
     }
-    const loan = await Loan.create({ user, principal, emiAmount, tenureMonths, schedule, label: label || '' });
+    const loan = await Loan.create({ user, principal, emiAmount, tenureMonths, schedule, label: label || '', loanType: loanType || 'other' });
     res.status(201).json(loan);
   }));
 

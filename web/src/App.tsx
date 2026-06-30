@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './authContext';
+import { FeatureProvider } from './featureContext';
 import { AuthLayout } from './AuthLayout';
 import { AppShell } from './AppShell';
 import { LoginWidget } from './LoginWidget';
@@ -10,7 +11,7 @@ import { CandidatePortal } from './onboarding/CandidatePortal';
 function Gate() {
   const { user, loading } = useAuth();
   if (loading) return <AuthLayout><p className="center-loading">Loading…</p></AuthLayout>;
-  if (user) return <AppShell />;
+  if (user) return <FeatureProvider><AppShell /></FeatureProvider>;
   return <AuthLayout><LoginWidget /></AuthLayout>;
 }
 

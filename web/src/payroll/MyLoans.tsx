@@ -5,7 +5,10 @@ import './MyLoans.css';
 const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 
 interface EMI { period: { month: number; year: number }; amount: number; status: string }
-interface Loan { _id: string; label: string; principal: number; emiAmount: number; tenureMonths: number; schedule: EMI[]; status: string; createdAt: string }
+interface Loan { _id: string; label: string; loanType: string; principal: number; emiAmount: number; tenureMonths: number; schedule: EMI[]; status: string; createdAt: string }
+
+const TYPE_LABELS: Record<string, string> = { home_loan: 'Home Loan', education_loan: 'Education Loan', ev_loan: 'EV Loan', salary_advance: 'Salary Advance', other: 'Other' };
+const TAX_DEDUCTIBLE = ['home_loan', 'education_loan', 'ev_loan'];
 
 export function MyLoans() {
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -30,7 +33,13 @@ export function MyLoans() {
         return (
           <div key={loan._id} className="ml-card">
             <div className="ml-card-header">
-              <div className="ml-card-name">{loan.label || 'Loan'}</div>
+              <div>
+                <div className="ml-card-name">{loan.label || 'Loan'}</div>
+                <div className="ml-card-type">
+                  {TYPE_LABELS[loan.loanType] || loan.loanType}
+                  {TAX_DEDUCTIBLE.includes(loan.loanType) && <span className="ml-tax-badge">Tax Deductible</span>}
+                </div>
+              </div>
               <span className={`ml-status ml-status-${loan.status}`}>{loan.status}</span>
             </div>
             <div className="ml-stats">

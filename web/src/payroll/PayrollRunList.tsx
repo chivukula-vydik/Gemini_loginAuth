@@ -6,6 +6,7 @@ import {
   IconChevronRight, IconRocket,
 } from '@tabler/icons-react';
 import { authed } from '../fetchHelper';
+import { formatINR } from '../format';
 import './PayrollRunList.css';
 
 interface PayrollRun {
@@ -25,9 +26,7 @@ interface PayGroup {
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
-}
+const formatCurrency = formatINR;
 
 function statusLabel(s: string) {
   return s.charAt(0) + s.slice(1).toLowerCase();

@@ -66,6 +66,7 @@ const userSchema = new mongoose.Schema({
   bankName: { type: String, default: '' },
   bankAccount: { type: String, default: '' },
   ifsc: { type: String, default: '' },
+  featureOverrides: { type: Map, of: { type: String, enum: ['on', 'off'] }, default: {} },
   payGrade:  { type: mongoose.Schema.Types.ObjectId, ref: 'PayGrade', default: null },
   payGroup:  { type: mongoose.Schema.Types.ObjectId, ref: 'PayGroup', default: null },
   createdAt: { type: Date, default: Date.now },

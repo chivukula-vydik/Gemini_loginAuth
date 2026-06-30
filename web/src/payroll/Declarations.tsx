@@ -4,7 +4,7 @@ import { authed, authedRaw } from '../fetchHelper';
 import './Declarations.css';
 
 interface Proof { fileId: string; filename: string; contentType: string; size: number }
-interface Item { section: string; declaredAmount: number; proofAmount: number | null; proofs: Proof[]; verifyStatus: string; rejectReason: string }
+interface Item { section: string; declaredAmount: number; proofAmount: number | null; ownershipPercent: number; proofs: Proof[]; verifyStatus: string; rejectReason: string }
 interface HraDetail { monthlyRent: number; isMetro: boolean; landlordPan: string }
 interface Declaration {
   _id: string;
@@ -18,19 +18,22 @@ interface Declaration {
 
 type Limits = Record<string, number>;
 
-const SECTIONS = ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA', '80DDB', '80U'];
+const ALL_SECTIONS = ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA', '80DDB', '80U', '80EEB'];
 const SECTION_LABELS: Record<string, string> = {
-  '80C': '80C — PPF, ELSS, LIC, etc.',
+  '80C': '80C — PPF, ELSS, LIC, home loan principal, etc.',
   '80D': '80D — Medical insurance',
-  '80E': '80E — Education loan interest',
+  '80E': '80E — Education loan interest (no limit)',
   '80G': '80G — Donations',
   'HRA': 'HRA — House Rent Allowance',
-  '24B': '24B — Home loan interest',
+  '24B': '24B — Home loan interest (up to ₹2L)',
   '80CCD(1B)': '80CCD(1B) — NPS (additional)',
   '80TTA': '80TTA — Savings interest',
   '80DDB': '80DDB — Medical treatment',
   '80U': '80U — Disability',
+  '80EEB': '80EEB — EV loan interest (up to ₹1.5L)',
 };
+const LOAN_SECTIONS = ['24B', '80E', '80EEB'];
+const NEW_REGIME_BLOCKED = new Set(LOAN_SECTIONS);
 
 const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 
@@ -83,7 +86,7 @@ export function Declarations() {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
   }
   function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
-  function addItem() { setItems(prev => [...prev, { section: '80C', declaredAmount: 0, proofAmount: null, proofs: [], verifyStatus: 'pending', rejectReason: '' }]); }
+  function addItem() { setItems(prev => [...prev, { section: '80C', declaredAmount: 0, proofAmount: null, ownershipPercent: 100, proofs: [], verifyStatus: 'pending', rejectReason: '' }]); }
 
   async function save() {
     setSaving(true);
@@ -137,12 +140,20 @@ export function Declarations() {
   const isReadOnly = locked || phase === 'closed';
   const hasHra = regime === 'old' && items.some(it => it.section === 'HRA');
   const totalDeclared = items.reduce((s, it) => s + (it.declaredAmount || 0), 0);
+  const availableSections = regime === 'new' ? ALL_SECTIONS.filter(s => !NEW_REGIME_BLOCKED.has(s)) : ALL_SECTIONS;
 
   return (
     <div className="dec-page">
       <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={onFileSelect} accept=".pdf,.jpg,.jpeg,.png" />
 
       <h1 className="dec-title">Investment Declaration — {fy}</h1>
+
+      <div className="dec-disclaimer">
+        This data is collected solely for the purpose of computing your annual TDS and tax exemptions under the Income Tax Act. It will not be shared with third parties or used for employment evaluation. Only authorised Payroll/HR personnel can access uploaded documents.
+        <br /><br />
+        <strong>Eligible loan certificates:</strong> Home Loan (§24B interest / §80C principal), Education Loan (§80E), and EV Loan (§80EEB) only. Personal loans, car loans, and consumer EMIs do not qualify for tax deductions and must not be uploaded.
+      </div>
+
       {phase !== 'declaration' && (
         <div className={`dec-phase-bar dec-phase-${phase}`}>
           Phase: <strong>{phase}</strong>{locked ? ' (locked for TDS)' : ''}
@@ -157,21 +168,25 @@ export function Declarations() {
           <button className={`dec-regime-btn ${regime === 'old' ? 'active' : ''}`} disabled={isReadOnly} onClick={() => setRegime('old')}>Old Regime</button>
         </div>
         <button className="dec-compare-btn" onClick={() => navigate('/declarations/compare')}>Compare & Choose Regime →</button>
-        {regime === 'new' && <div className="dec-info">Under new regime, most deductions don't apply. Your declarations are recorded but won't reduce TDS.</div>}
+        {regime === 'new' && <div className="dec-info">Under the New Tax Regime, most deductions don't apply. Loan interest deductions (Home Loan §24B, Education Loan §80E, EV Loan §80EEB) are disabled. Switch to Old Regime to claim these.</div>}
       </div>
 
       {/* Declarations */}
       <div className="dec-card">
-        <div className="dec-section-label">Declarations</div>
-        {items.length === 0 && <div className="dec-empty">No declarations yet. Add one below.</div>}
+        <div className="dec-section-label">Declarations <span className="dec-optional">(optional)</span></div>
+        {items.length === 0 && <div className="dec-empty">No declarations yet. Adding declarations is voluntary — only add if you want to claim deductions under the Old Tax Regime.</div>}
         {items.map((item, i) => {
           const limit = limits[item.section];
           const overLimit = limit && limit !== Infinity && item.declaredAmount > limit;
           return (
-            <div key={i} className={`dec-item-card ${item.verifyStatus === 'rejected' ? 'dec-item-rejected' : ''}`}>
+            <div key={i} className={`dec-item-card ${item.verifyStatus === 'rejected' ? 'dec-item-rejected' : ''} ${regime === 'new' && NEW_REGIME_BLOCKED.has(item.section) ? 'dec-item-blocked' : ''}`}>
+              {regime === 'new' && NEW_REGIME_BLOCKED.has(item.section) && (
+                <div className="dec-warn">This loan section is not deductible under the New Tax Regime. Remove it or switch to Old Regime.</div>
+              )}
               <div className="dec-item-row">
                 <select className="dec-select" value={item.section} disabled={isReadOnly} onChange={e => updateItem(i, 'section', e.target.value)}>
-                  {SECTIONS.map(s => <option key={s} value={s}>{SECTION_LABELS[s] || s}</option>)}
+                  {availableSections.map(s => <option key={s} value={s}>{SECTION_LABELS[s] || s}</option>)}
+                  {!availableSections.includes(item.section) && <option value={item.section}>{SECTION_LABELS[item.section] || item.section} (blocked)</option>}
                 </select>
                 <div className="dec-amount-wrap">
                   <input className={`dec-input ${overLimit ? 'dec-input-err' : ''}`} type="number" value={item.declaredAmount} disabled={isReadOnly}
@@ -183,6 +198,22 @@ export function Declarations() {
               {overLimit && <div className="dec-warn">Exceeds section limit of {fmt(limit!)}</div>}
               {item.rejectReason && <div className="dec-warn">Rejected: {item.rejectReason}</div>}
 
+              {/* Co-borrower share for home loan sections */}
+              {['24B', '80C'].includes(item.section) && (
+                <div className="dec-coborrower">
+                  <label className="dec-coborrower-label">
+                    Your ownership share
+                    <input className="dec-input dec-coborrower-input" type="number" min={1} max={100}
+                      value={item.ownershipPercent ?? 100} disabled={isReadOnly}
+                      onChange={e => updateItem(i, 'ownershipPercent', Math.min(100, Math.max(1, Number(e.target.value))))} />
+                    <span>%</span>
+                  </label>
+                  {(item.ownershipPercent ?? 100) < 100 && (
+                    <span className="dec-coborrower-note">Co-borrower detected — only your {item.ownershipPercent}% share will be considered</span>
+                  )}
+                </div>
+              )}
+
               {/* Proof section */}
               <div className="dec-proof-row">
                 <StatusBadge status={item.verifyStatus} />
@@ -192,10 +223,13 @@ export function Declarations() {
                 {item.proofAmount !== null && item.verifyStatus === 'verified' && (
                   <span className="dec-proof-amt">Verified: {fmt(item.proofAmount)}</span>
                 )}
-                {!isReadOnly && (
+                {!isReadOnly && !(regime === 'new' && NEW_REGIME_BLOCKED.has(item.section)) && (
                   <button className="dec-upload-btn" onClick={() => triggerUpload(i)}>Upload proof</button>
                 )}
               </div>
+              {!isReadOnly && LOAN_SECTIONS.includes(item.section) && (
+                <div className="dec-proof-hint">Upload official Provisional Interest Certificate from your bank/NBFC — raw bank statements will be rejected.</div>
+              )}
               {item.proofs.length > 0 && (
                 <div className="dec-proof-list">
                   {item.proofs.map((p, pi) => (

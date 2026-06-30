@@ -43,7 +43,12 @@ export async function authed(path: string, method = 'GET', body?: unknown) {
     () => doFetch(path, method, body),
     async (r) => {
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error((data && data.error) || `request failed (${r.status})`);
+      if (!r.ok) {
+        if (r.status === 403 && data?.error === 'feature_disabled') {
+          window.dispatchEvent(new CustomEvent('feature-disabled'));
+        }
+        throw new Error((data && data.error) || `request failed (${r.status})`);
+      }
       return data;
     },
   );

@@ -15,7 +15,8 @@
 .lm-card-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; cursor: pointer; transition: background 0.1s; }
 .lm-card-header:hover { background: var(--surface); }
 .lm-card-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.lm-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.lm-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.lm-tax-badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; background: color-mix(in srgb, #22c55e 12%, transparent); color: #15803d; }
 .lm-card-right { display: flex; align-items: center; gap: 10px; }
 .lm-card-remaining { font-size: 13px; font-weight: 600; color: var(--text); }
 .lm-chevron { font-size: 12px; color: var(--muted); }
