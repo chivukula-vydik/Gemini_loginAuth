@@ -1,16 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, setUserDepartment, setUserShift, listDepartments, listShifts, getUserLeaveBalance, updateUserLeaveBalance, UserRow, Department, ShiftDef, LeaveBalanceRecord } from './pmApi';
+import { listUsers, setUserRoles, setUserActive, deleteUser, setReportingManager, setUserDepartment, setUserShift, listDepartments, listShifts, getUserLeaveBalance, updateUserLeaveBalance, listRoles, UserRow, Department, ShiftDef, LeaveBalanceRecord, RoleDef } from './pmApi';
 import { useAuth } from '../authContext';
 import { personName, initials } from './personName';
-import type { Role } from './nav';
-
-const ROLES: Role[] = ['admin', 'vp', 'director', 'pm', 'hr', 'finance', 'reporting_manager', 'team_lead', 'employee'];
-const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Admin', vp: 'VP', director: 'Director', pm: 'PM',
-  hr: 'HR', finance: 'Finance', reporting_manager: 'Reporting Manager',
-  team_lead: 'Team Lead', employee: 'Employee',
-};
 
 type SelectOption = { value: string; label: string };
 
@@ -61,7 +53,7 @@ function SearchSelect({ value, options, placeholder, onChange }: {
   );
 }
 
-function RoleMultiSelect({ selected, onChange }: { selected: Role[]; onChange: (roles: Role[]) => void }) {
+function RoleMultiSelect({ selected, onChange, roleDefs }: { selected: string[]; onChange: (roles: string[]) => void; roleDefs: RoleDef[] }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -74,11 +66,12 @@ function RoleMultiSelect({ selected, onChange }: { selected: Role[]; onChange: (
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const filtered = ROLES.filter((r) =>
-    ROLE_LABELS[r].toLowerCase().includes(search.toLowerCase()),
+  const roleLabel = (name: string) => roleDefs.find(r => r.name === name)?.label || name.replace(/_/g, ' ');
+  const filtered = roleDefs.map(r => r.name).filter((r) =>
+    roleLabel(r).toLowerCase().includes(search.toLowerCase()),
   );
 
-  function toggle(role: Role) {
+  function toggle(role: string) {
     const has = selected.includes(role);
     const next = has ? selected.filter((r) => r !== role) : [...selected, role];
     if (next.length === 0) return;
@@ -91,7 +84,7 @@ function RoleMultiSelect({ selected, onChange }: { selected: Role[]; onChange: (
         {selected.length === 0
           ? <span className="ss-placeholder">Select roles…</span>
           : <span className="role-ms-tags">{selected.map((r) => (
-              <span key={r} className="role-ms-tag">{ROLE_LABELS[r]}<span className="role-ms-tag-x" onClick={(e) => { e.stopPropagation(); toggle(r); }}>×</span></span>
+              <span key={r} className="role-ms-tag">{roleLabel(r)}<span className="role-ms-tag-x" onClick={(e) => { e.stopPropagation(); toggle(r); }}>×</span></span>
             ))}</span>
         }
         <span className="ss-arrow">▾</span>
@@ -104,7 +97,7 @@ function RoleMultiSelect({ selected, onChange }: { selected: Role[]; onChange: (
             {filtered.map((r) => (
               <label key={r} className="ss-option ss-option-check">
                 <input type="checkbox" checked={selected.includes(r)} onChange={() => toggle(r)} />
-                <span>{ROLE_LABELS[r]}</span>
+                <span>{roleLabel(r)}</span>
               </label>
             ))}
           </div>
@@ -120,6 +113,7 @@ export function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [shifts, setShifts] = useState<ShiftDef[]>([]);
+  const [roleDefs, setRoleDefs] = useState<RoleDef[]>([]);
   const [error, setError] = useState('');
   const [leaveEditId, setLeaveEditId] = useState<string | null>(null);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalanceRecord | null>(null);
@@ -130,9 +124,10 @@ export function AdminUsers() {
     listUsers().then(setUsers).catch((e) => setError(e.message));
     listDepartments().then(setDepartments).catch(() => {});
     listShifts().then(setShifts).catch(() => {});
+    listRoles().then(setRoleDefs).catch(() => {});
   }, []);
 
-  async function toggleRole(id: string, next: Role[]) {
+  async function toggleRole(id: string, next: string[]) {
     setError('');
     if (next.length === 0) return;
     try {
@@ -309,6 +304,7 @@ export function AdminUsers() {
                     <RoleMultiSelect
                       selected={u.roles}
                       onChange={(next) => toggleRole(u._id, next)}
+                      roleDefs={roleDefs}
                     />
                   </td>
                   <td className="col-left">

@@ -15,8 +15,7 @@ import { Shift } from '../models/Shift.js';
 import { LeaveBalance, QUOTA_LEAVE_TYPES, getOrCreateBalance } from '../models/LeaveBalance.js';
 import { Attendance } from '../models/Attendance.js';
 import { Leave } from '../models/Leave.js';
-
-const ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
+import { Role } from '../models/Role.js';
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -83,7 +82,8 @@ export function createAdminRouter() {
   router.patch('/users/:id/roles', asyncHandler(async (req, res) => {
     const { roles } = req.body || {};
     if (!Array.isArray(roles) || roles.length === 0) return res.status(400).json({ error: 'roles must be a non-empty array' });
-    if (roles.some((r) => !ROLES.includes(r))) return res.status(400).json({ error: 'invalid role in array' });
+    const validRoles = await Role.find({ active: true }).distinct('name');
+    if (roles.some((r) => !validRoles.includes(r))) return res.status(400).json({ error: 'invalid role in array' });
     const unique = [...new Set(roles)];
     const user = await User.findByIdAndUpdate(req.params.id, { roles: unique, $unset: { role: 1 } }, { new: true })
       .select('email displayName roles active');
@@ -285,6 +285,41 @@ export function createAdminRouter() {
       .select('email displayName roles active departmentId shiftId');
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
+  }));
+
+  // --- Roles ---
+  router.get('/roles', asyncHandler(async (_req, res) => {
+    const roles = await Role.find({ active: true }).sort('name');
+    res.json(roles);
+  }));
+
+  router.post('/roles', asyncHandler(async (req, res) => {
+    const name = String(req.body?.name || '').trim().toLowerCase().replace(/\s+/g, '_');
+    const label = String(req.body?.label || req.body?.name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const exists = await Role.findOne({ name });
+    if (exists) return res.status(409).json({ error: 'role already exists' });
+    const role = await Role.create({ name, label });
+    res.status(201).json(role);
+  }));
+
+  router.patch('/roles/:id', asyncHandler(async (req, res) => {
+    const role = await Role.findById(req.params.id);
+    if (!role) return res.status(404).json({ error: 'not found' });
+    const update = {};
+    if (typeof req.body?.label === 'string') update.label = req.body.label.trim();
+    if (typeof req.body?.active === 'boolean') update.active = req.body.active;
+    const updated = await Role.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json(updated);
+  }));
+
+  router.delete('/roles/:id', asyncHandler(async (req, res) => {
+    const role = await Role.findById(req.params.id);
+    if (!role) return res.status(404).json({ error: 'not found' });
+    const count = await User.countDocuments({ roles: role.name });
+    if (count > 0) return res.status(409).json({ error: `${count} user(s) still have this role` });
+    await Role.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
   }));
 
   return router;

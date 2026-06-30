@@ -30,6 +30,26 @@ test('validateFlow accepts manager step with empty approvers', () => {
   assert.equal(errors.length, 0);
 });
 
+test('validateFlow accepts project_manager step with empty approvers', () => {
+  const errors = validateFlow({
+    name: 'X',
+    appliesTo: { entityType: 'reimbursement' },
+    steps: [{ order: 1, name: 'PM Review', approverType: 'project_manager', approvers: [], rule: 'any' }],
+  });
+  assert.equal(errors.length, 0);
+});
+
+for (const type of ['team_lead', 'hr', 'director', 'vp']) {
+  test(`validateFlow accepts ${type} step with empty approvers`, () => {
+    const errors = validateFlow({
+      name: 'X',
+      appliesTo: { entityType: 'reimbursement' },
+      steps: [{ order: 1, name: `${type} Review`, approverType: type, approvers: [], rule: 'any' }],
+    });
+    assert.equal(errors.length, 0);
+  });
+}
+
 test('validateFlow rejects missing entityType', () => {
   const errors = validateFlow({
     name: 'X',

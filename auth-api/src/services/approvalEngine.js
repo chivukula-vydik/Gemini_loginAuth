@@ -1,6 +1,7 @@
 import { ApprovalFlow } from '../models/ApprovalFlow.js';
 import { ApprovalRequest } from '../models/ApprovalRequest.js';
 import { User } from '../models/User.js';
+import mongoose from 'mongoose';
 
 /** Evaluate a simple condition against an entity */
 function evalCondition(condition, entity) {
@@ -31,7 +32,7 @@ export async function selectFlow(entityType, entity) {
 }
 
 /** Resolve concrete approver userIds for a step, filtering out requester (self-approval). */
-async function resolveStep(step, requesterId) {
+async function resolveStep(step, requesterId, entity) {
   let userIds = [];
 
   if (step.approverType === 'user') {
@@ -47,6 +48,20 @@ async function resolveStep(step, requesterId) {
     if (requester?.reportingManagerId) {
       userIds = [requester.reportingManagerId.toString()];
     }
+  } else if (step.approverType === 'project_manager') {
+    const projectId = entity?.project || entity?.projectId;
+    if (projectId) {
+      const Project = mongoose.model('Project');
+      const proj = await Project.findById(projectId).select('ownerPm').lean();
+      if (proj?.ownerPm) userIds = [proj.ownerPm.toString()];
+    }
+  } else if (['team_lead', 'hr', 'director', 'vp'].includes(step.approverType)) {
+    // ponytail: all four resolve the same — users with that role in requester's department
+    const requester = await User.findById(requesterId).select('departmentId').lean();
+    const query = { roles: step.approverType, active: true };
+    if (requester?.departmentId) query.departmentId = requester.departmentId;
+    const users = await User.find(query).select('_id').lean();
+    userIds = users.map(u => u._id.toString());
   }
 
   // filter out self-approval
@@ -68,7 +83,7 @@ export async function createApprovalRequest(flowId, entityType, entityId, reques
       approverType: step.approverType,
       rule: step.rule,
     });
-    const approvers = await resolveStep(step, requestedBy);
+    const approvers = await resolveStep(step, requestedBy, entity);
     if (approvers.length === 0) {
       throw new Error(`step "${step.name}" resolves to zero approvers`);
     }
@@ -157,7 +172,8 @@ export function validateFlow(flow) {
   if (flow.steps) {
     for (const step of flow.steps) {
       if (!step.name?.trim()) errors.push(`step ${step.order}: name is required`);
-      if (step.approverType !== 'manager' && (!step.approvers?.length)) {
+      const autoResolved = ['manager', 'project_manager', 'team_lead', 'hr', 'director', 'vp'];
+      if (!autoResolved.includes(step.approverType) && (!step.approvers?.length)) {
         errors.push(`step "${step.name || step.order}": at least one approver is required`);
       }
     }

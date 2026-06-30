@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, default: '' },
   passwordHash: { type: String, default: null },
   providers: { type: [linkSchema], default: [] },
-  roles: { type: [String], enum: ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'], default: ['employee'] },
+  roles: { type: [String], default: ['employee'] },
   active: { type: Boolean, default: true },
   skills: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }], default: [] },
   reestimations: { type: [reestimationSchema], default: [] },

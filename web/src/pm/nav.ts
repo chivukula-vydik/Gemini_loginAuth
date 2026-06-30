@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
+export type Role = string;
 
 const ALL_NAV_KEYS = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'roster-import', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'] as const;
 export type NavKey = (typeof ALL_NAV_KEYS)[number];

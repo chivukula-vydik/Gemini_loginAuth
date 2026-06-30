@@ -2,10 +2,38 @@ import { useEffect, useState } from 'react';
 import { authed } from '../fetchHelper';
 
 const ENTITY_TYPES = ['reimbursement', 'leave', 'payrollRun'] as const;
-const APPROVER_TYPES = ['user', 'role', 'manager'] as const;
+const APPROVER_TYPES = [
+  { value: 'manager', label: 'Reporting Manager', desc: 'Requester\'s direct manager' },
+  { value: 'project_manager', label: 'Project Manager', desc: 'PM of the linked project' },
+  { value: 'team_lead', label: 'Team Lead', desc: 'Team lead in requester\'s department' },
+  { value: 'hr', label: 'HR', desc: 'HR in requester\'s department' },
+  { value: 'director', label: 'Director', desc: 'Director in requester\'s department' },
+  { value: 'vp', label: 'VP', desc: 'VP in requester\'s department' },
+  { value: 'role', label: 'Anyone with Role', desc: 'Pick which roles can approve' },
+  { value: 'user', label: 'Specific Users', desc: 'Enter user IDs' },
+] as const;
 const RULES = ['any', 'all'] as const;
 const ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
-const CONDITION_OPS = ['gt', 'gte', 'lt', 'lte', 'eq'] as const;
+
+// Known condition fields per entity type for friendly dropdowns
+const CONDITION_FIELDS: Record<string, { value: string; label: string; type: 'number' | 'string' }[]> = {
+  reimbursement: [
+    { value: 'amount', label: 'Amount', type: 'number' },
+    { value: 'category', label: 'Category', type: 'string' },
+  ],
+  leave: [
+    { value: 'requestedDays', label: 'Days Requested', type: 'number' },
+    { value: 'type', label: 'Leave Type', type: 'string' },
+  ],
+  payrollRun: [],
+};
+const CONDITION_OPS = [
+  { value: 'gt', label: '>' },
+  { value: 'gte', label: '>=' },
+  { value: 'lt', label: '<' },
+  { value: 'lte', label: '<=' },
+  { value: 'eq', label: '=' },
+];
 
 type Step = { order: number; name: string; approverType: string; approvers: string[]; rule: string };
 type Condition = { field: string; op: string; value: string | number } | null;
@@ -87,7 +115,6 @@ export function ApprovalFlowBuilder() {
     } catch (e) { setError((e as Error).message); }
   }
 
-  // Step helpers
   function updateStep(idx: number, patch: Partial<Step>) {
     if (!editing) return;
     const steps = [...editing.steps];
@@ -117,11 +144,12 @@ export function ApprovalFlowBuilder() {
     setEditing({ ...editing, steps: reordered });
   }
 
-  // Condition helpers
   function setCondition(c: Condition) {
     if (!editing) return;
     setEditing({ ...editing, appliesTo: { ...editing.appliesTo, condition: c } });
   }
+
+  const entityFields = editing ? (CONDITION_FIELDS[editing.appliesTo.entityType] || []) : [];
 
   if (editing) {
     return (
@@ -138,108 +166,158 @@ export function ApprovalFlowBuilder() {
         {error && <p className="ts-error">{error}</p>}
 
         <div className="ts-card" style={{ padding: 16 }}>
-          <div style={{ display: 'grid', gap: 12, maxWidth: 600 }}>
+          {/* Basic info */}
+          <div style={{ display: 'grid', gap: 12, maxWidth: 500 }}>
             <label>
-              Name
-              <input className="input" value={editing.name}
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Flow Name</span>
+              <input className="input" placeholder="e.g. High-value Reimbursement Approval" value={editing.name}
                 onChange={e => setEditing({ ...editing, name: e.target.value })} />
             </label>
-            <label>
-              Entity Type
-              <select className="input" value={editing.appliesTo.entityType}
-                onChange={e => setEditing({ ...editing, appliesTo: { ...editing.appliesTo, entityType: e.target.value } })}>
-                {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </label>
-            <label>
-              Priority (lower = higher priority)
-              <input className="input" type="number" value={editing.priority}
-                onChange={e => setEditing({ ...editing, priority: Number(e.target.value) })} />
-            </label>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <label style={{ flex: 1 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Applies To</span>
+                <select className="input" value={editing.appliesTo.entityType}
+                  onChange={e => {
+                    setEditing({ ...editing, appliesTo: { entityType: e.target.value } });
+                  }}>
+                  {ENTITY_TYPES.map(t => <option key={t} value={t}>{t === 'payrollRun' ? 'Payroll Run' : t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                </select>
+              </label>
+              <label style={{ width: 100 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Priority</span>
+                <input className="input" type="number" value={editing.priority}
+                  onChange={e => setEditing({ ...editing, priority: Number(e.target.value) })} />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Lower = checked first</span>
+              </label>
+            </div>
+          </div>
 
-            {/* Condition */}
-            <fieldset style={{ border: '1px solid var(--border)', padding: 12, borderRadius: 6 }}>
-              <legend>Condition (optional)</legend>
-              {editing.appliesTo.condition ? (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input className="input" placeholder="field" style={{ width: 120 }}
+          {/* Condition */}
+          <div style={{ marginTop: 16, padding: 12, border: '1px solid var(--border)', borderRadius: 6, maxWidth: 500 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              When should this flow apply?
+            </div>
+            {editing.appliesTo.condition ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13 }}>If</span>
+                {entityFields.length > 0 ? (
+                  <select className="input" style={{ width: 140 }}
+                    value={editing.appliesTo.condition.field}
+                    onChange={e => setCondition({ ...editing.appliesTo.condition!, field: e.target.value })}>
+                    <option value="">Select field...</option>
+                    {entityFields.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  </select>
+                ) : (
+                  <input className="input" placeholder="field name" style={{ width: 120 }}
                     value={editing.appliesTo.condition.field}
                     onChange={e => setCondition({ ...editing.appliesTo.condition!, field: e.target.value })} />
-                  <select className="input" style={{ width: 80 }}
-                    value={editing.appliesTo.condition.op}
-                    onChange={e => setCondition({ ...editing.appliesTo.condition!, op: e.target.value })}>
-                    {CONDITION_OPS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <input className="input" placeholder="value" style={{ width: 120 }}
-                    value={editing.appliesTo.condition.value}
-                    onChange={e => setCondition({ ...editing.appliesTo.condition!, value: e.target.value })} />
-                  <button className="btn btn-auto" onClick={() => setCondition(null)}>Remove</button>
-                </div>
-              ) : (
-                <button className="btn btn-auto" onClick={() => setCondition({ field: '', op: 'gt', value: '' })}>
-                  Add condition
-                </button>
-              )}
-            </fieldset>
+                )}
+                <select className="input" style={{ width: 60 }}
+                  value={editing.appliesTo.condition.op}
+                  onChange={e => setCondition({ ...editing.appliesTo.condition!, op: e.target.value })}>
+                  {CONDITION_OPS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <input className="input" placeholder="value" style={{ width: 100 }}
+                  value={editing.appliesTo.condition.value}
+                  onChange={e => setCondition({ ...editing.appliesTo.condition!, value: e.target.value })} />
+                <button className="btn btn-auto" style={{ fontSize: 12, padding: '2px 8px' }} onClick={() => setCondition(null)}>Remove</button>
+              </div>
+            ) : (
+              <div>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Always (no condition). </span>
+                {entityFields.length > 0 && (
+                  <button className="btn btn-auto" style={{ fontSize: 12, padding: '2px 8px' }}
+                    onClick={() => setCondition({ field: entityFields[0].value, op: 'gt', value: '' })}>
+                    Add condition
+                  </button>
+                )}
+                {entityFields.length === 0 && (
+                  <button className="btn btn-auto" style={{ fontSize: 12, padding: '2px 8px' }}
+                    onClick={() => setCondition({ field: '', op: 'gt', value: '' })}>
+                    Add condition
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Steps */}
-          <h3 style={{ marginTop: 20, marginBottom: 8 }}>Steps</h3>
-          {editing.steps.map((step, idx) => (
-            <div key={idx} style={{
-              border: '1px solid var(--border)', borderRadius: 6, padding: 12, marginBottom: 8,
-              display: 'grid', gap: 8, gridTemplateColumns: '1fr',
-            }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, minWidth: 30 }}>#{step.order}</span>
-                <input className="input" placeholder="Step name" value={step.name}
-                  onChange={e => updateStep(idx, { name: e.target.value })} style={{ flex: 1 }} />
-                <select className="input" value={step.approverType} style={{ width: 110 }}
-                  onChange={e => updateStep(idx, { approverType: e.target.value, approvers: [] })}>
-                  {APPROVER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select className="input" value={step.rule} style={{ width: 80 }}
-                  onChange={e => updateStep(idx, { rule: e.target.value })}>
-                  {RULES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-                <button className="btn btn-auto" onClick={() => moveStep(idx, -1)} disabled={idx === 0}
-                  title="Move up" style={{ padding: '2px 6px' }}>↑</button>
-                <button className="btn btn-auto" onClick={() => moveStep(idx, 1)}
-                  disabled={idx === editing.steps.length - 1} title="Move down" style={{ padding: '2px 6px' }}>↓</button>
-                <button className="btn btn-auto" onClick={() => removeStep(idx)}
-                  disabled={editing.steps.length <= 1} title="Remove step" style={{ padding: '2px 6px', color: 'var(--color-danger, red)' }}>×</button>
+          <h3 style={{ marginTop: 24, marginBottom: 4 }}>Approval Steps</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+            Steps run in order. Each step must be approved before the next one starts.
+          </p>
+
+          {editing.steps.map((step, idx) => {
+            const typeInfo = APPROVER_TYPES.find(t => t.value === step.approverType);
+            return (
+              <div key={idx} style={{
+                border: '1px solid var(--border)', borderRadius: 6, padding: 12, marginBottom: 8,
+                background: 'var(--bg-offset, #fafafa)',
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-muted)', minWidth: 28 }}>{step.order}</span>
+                  <input className="input" placeholder="Step name, e.g. Manager Review" value={step.name}
+                    onChange={e => updateStep(idx, { name: e.target.value })} style={{ flex: 1 }} />
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button className="btn btn-auto" onClick={() => moveStep(idx, -1)} disabled={idx === 0}
+                      title="Move up" style={{ padding: '4px 8px', fontSize: 14 }}>↑</button>
+                    <button className="btn btn-auto" onClick={() => moveStep(idx, 1)}
+                      disabled={idx === editing.steps.length - 1} title="Move down" style={{ padding: '4px 8px', fontSize: 14 }}>↓</button>
+                    <button className="btn btn-auto" onClick={() => removeStep(idx)}
+                      disabled={editing.steps.length <= 1} title="Remove" style={{ padding: '4px 8px', fontSize: 14, color: 'var(--color-danger, red)' }}>×</button>
+                  </div>
+                </div>
+
+                <div style={{ paddingLeft: 36 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 90 }}>Who approves:</span>
+                    <select className="input" value={step.approverType} style={{ width: 180 }}
+                      onChange={e => updateStep(idx, { approverType: e.target.value, approvers: [] })}>
+                      {APPROVER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                    {step.approverType === 'role' && (
+                      <>
+                        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>needs</span>
+                        <select className="input" value={step.rule} style={{ width: 100 }}
+                          onChange={e => updateStep(idx, { rule: e.target.value })}>
+                          <option value="any">Any one</option>
+                          <option value="all">All of them</option>
+                        </select>
+                      </>
+                    )}
+                  </div>
+
+                  {typeInfo && (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>{typeInfo.desc}</p>
+                  )}
+
+                  {step.approverType === 'role' && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {ROLES.map(r => (
+                        <label key={r} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={step.approvers.includes(r)}
+                            onChange={e => {
+                              const approvers = e.target.checked
+                                ? [...step.approvers, r]
+                                : step.approvers.filter(a => a !== r);
+                              updateStep(idx, { approvers });
+                            }} />
+                          {r.replace('_', ' ')}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {step.approverType === 'user' && (
+                    <input className="input" placeholder="Comma-separated user IDs"
+                      value={step.approvers.join(', ')}
+                      onChange={e => updateStep(idx, { approvers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+                  )}
+                </div>
               </div>
-              {step.approverType === 'role' && (
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingLeft: 38 }}>
-                  {ROLES.map(r => (
-                    <label key={r} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <input type="checkbox" checked={step.approvers.includes(r)}
-                        onChange={e => {
-                          const approvers = e.target.checked
-                            ? [...step.approvers, r]
-                            : step.approvers.filter(a => a !== r);
-                          updateStep(idx, { approvers });
-                        }} />
-                      {r.replace('_', ' ')}
-                    </label>
-                  ))}
-                </div>
-              )}
-              {step.approverType === 'user' && (
-                <div style={{ paddingLeft: 38 }}>
-                  <input className="input" placeholder="Comma-separated user IDs"
-                    value={step.approvers.join(', ')}
-                    onChange={e => updateStep(idx, { approvers: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
-                </div>
-              )}
-              {step.approverType === 'manager' && (
-                <p style={{ paddingLeft: 38, fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-                  Resolved to requester's reporting manager at request time.
-                </p>
-              )}
-            </div>
-          ))}
-          <button className="btn btn-auto" onClick={addStep}>+ Add Step</button>
+            );
+          })}
+          <button className="btn btn-auto" onClick={addStep} style={{ marginTop: 4 }}>+ Add Step</button>
         </div>
       </div>
     );
@@ -250,7 +328,7 @@ export function ApprovalFlowBuilder() {
       <header className="ts-header">
         <div>
           <h1 className="ts-h1">Approval Flows</h1>
-          <p className="ts-sub">{flows.length} flow{flows.length === 1 ? '' : 's'}</p>
+          <p className="ts-sub">{flows.length} flow{flows.length === 1 ? '' : 's'} — define who approves what, in what order</p>
         </div>
         <button className="btn btn-auto btn-primary" onClick={startNew}>New Flow</button>
       </header>
@@ -262,7 +340,8 @@ export function ApprovalFlowBuilder() {
           <thead>
             <tr>
               <th className="ts-task">Name</th>
-              <th>Entity</th>
+              <th>Type</th>
+              <th>Condition</th>
               <th>Steps</th>
               <th style={{ textAlign: 'center' }}>Priority</th>
               <th style={{ textAlign: 'center' }}>Status</th>
@@ -270,12 +349,23 @@ export function ApprovalFlowBuilder() {
             </tr>
           </thead>
           <tbody>
-            {flows.length === 0 && <tr><td colSpan={6} className="ts-empty">No flows yet.</td></tr>}
+            {flows.length === 0 && <tr><td colSpan={7} className="ts-empty">No flows yet.</td></tr>}
             {flows.map(f => (
               <tr key={f._id} style={{ opacity: f.active ? 1 : 0.5 }}>
                 <td className="ts-task">{f.name}</td>
-                <td>{f.appliesTo.entityType}</td>
-                <td>{f.steps.length} step{f.steps.length === 1 ? '' : 's'}</td>
+                <td style={{ textTransform: 'capitalize' }}>{f.appliesTo.entityType}</td>
+                <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {f.appliesTo.condition
+                    ? `${f.appliesTo.condition.field} ${f.appliesTo.condition.op} ${f.appliesTo.condition.value}`
+                    : 'Always'}
+                </td>
+                <td>
+                  {f.steps.map((s, i) => (
+                    <span key={i} style={{ fontSize: 12 }}>
+                      {i > 0 && ' → '}{s.name || `Step ${s.order}`}
+                    </span>
+                  ))}
+                </td>
                 <td style={{ textAlign: 'center' }}>{f.priority}</td>
                 <td style={{ textAlign: 'center' }}>
                   <span className={`status-badge ${f.active ? 'status-done' : 'status-archived'}`}>

@@ -2,8 +2,13 @@ import { randomUUID } from 'crypto';
 import * as XLSX from 'xlsx';
 import { User } from '../models/User.js';
 import { LegalEntity } from '../models/LegalEntity.js';
+import { Role } from '../models/Role.js';
 
-const VALID_ROLES = ['admin', 'pm', 'employee', 'reporting_manager', 'hr', 'finance', 'team_lead', 'director', 'vp'];
+let _validRoles = null;
+async function getValidRoles() {
+  if (!_validRoles) _validRoles = await Role.find({ active: true }).distinct('name');
+  return _validRoles;
+}
 
 const TEMPLATE_COLUMNS = [
   'email', 'displayName', 'employeeCode', 'role', 'phone',
@@ -116,7 +121,7 @@ function applyMapping(row, mapping) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PAN_RE = /^[A-Z]{5}\d{4}[A-Z]$/;
 
-function validateRow(mapped, rowNum) {
+function validateRow(mapped, rowNum, validRoles) {
   const errors = [];
   const warnings = [];
 
@@ -126,8 +131,8 @@ function validateRow(mapped, rowNum) {
   if (!mapped.displayname) {
     errors.push(`row ${rowNum}: displayName is required`);
   }
-  if (mapped.role && !VALID_ROLES.includes(mapped.role.toLowerCase())) {
-    errors.push(`row ${rowNum}: unknown role "${mapped.role}" — valid: ${VALID_ROLES.join(', ')}`);
+  if (mapped.role && !validRoles.includes(mapped.role.toLowerCase())) {
+    errors.push(`row ${rowNum}: unknown role "${mapped.role}" — valid: ${validRoles.join(', ')}`);
   }
   if (mapped.manageremail && !EMAIL_RE.test(mapped.manageremail)) {
     warnings.push(`row ${rowNum}: invalid manager email "${mapped.manageremail}"`);
@@ -143,7 +148,8 @@ function validateRow(mapped, rowNum) {
 }
 
 // ── Dry-run (validate all, no writes) ───────────────────────────────────
-export function dryRun(data, mapping) {
+export async function dryRun(data, mapping) {
+  const validRoles = await getValidRoles();
   const allErrors = [];
   const allWarnings = [];
   const emails = new Set();
@@ -151,7 +157,7 @@ export function dryRun(data, mapping) {
 
   for (let i = 0; i < data.length; i++) {
     const mapped = applyMapping(data[i], mapping);
-    const { errors, warnings } = validateRow(mapped, i + 2); // +2 for header row + 1-indexed
+    const { errors, warnings } = validateRow(mapped, i + 2, validRoles);
     allErrors.push(...errors);
     allWarnings.push(...warnings);
 
@@ -205,6 +211,7 @@ export function dryRun(data, mapping) {
 
 // ── Commit (two-pass) ───────────────────────────────────────────────────
 export async function commitImport(data, mapping) {
+  const validRoles = await getValidRoles();
   const batchId = randomUUID();
   const results = [];
   const emailToId = {};
@@ -224,7 +231,7 @@ export async function commitImport(data, mapping) {
   // Pass 1: create/update users (no manager link)
   for (let i = 0; i < data.length; i++) {
     const mapped = applyMapping(data[i], mapping);
-    const { errors } = validateRow(mapped, i + 2);
+    const { errors } = validateRow(mapped, i + 2, validRoles);
     if (errors.length > 0) {
       results.push({ row: i + 2, email: mapped.email, status: 'error', errors });
       continue;

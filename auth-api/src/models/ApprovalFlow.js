@@ -9,7 +9,7 @@ const conditionSchema = new mongoose.Schema({
 const approvalStepSchema = new mongoose.Schema({
   order: { type: Number, required: true },
   name: { type: String, required: true },
-  approverType: { type: String, enum: ['user', 'role', 'manager'], required: true },
+  approverType: { type: String, enum: ['user', 'role', 'manager', 'project_manager', 'team_lead', 'hr', 'director', 'vp'], required: true },
   approvers: { type: [String], default: [] },
   rule: { type: String, enum: ['all', 'any'], default: 'any' },
 }, { _id: false });

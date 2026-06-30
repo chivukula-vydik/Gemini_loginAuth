@@ -97,6 +97,12 @@ export const createShift = (body: Partial<ShiftDef>) => authed('/admin/shifts', 
 export const updateShift = (id: string, patch: Partial<ShiftDef>) => authed(`/admin/shifts/${id}`, 'PATCH', patch) as Promise<ShiftDef>;
 export const deleteShift = (id: string) => authed(`/admin/shifts/${id}`, 'DELETE');
 
+export type RoleDef = { _id: string; name: string; label: string; builtIn: boolean; active: boolean };
+export const listRoles = () => authed('/admin/roles') as Promise<RoleDef[]>;
+export const createRole = (name: string, label?: string) => authed('/admin/roles', 'POST', { name, label }) as Promise<RoleDef>;
+export const updateRole = (id: string, patch: Partial<RoleDef>) => authed(`/admin/roles/${id}`, 'PATCH', patch) as Promise<RoleDef>;
+export const deleteRole = (id: string) => authed(`/admin/roles/${id}`, 'DELETE');
+
 export type LeaveBalanceCounter = { total: number; used: number };
 export type LeaveBalanceRecord = { _id: string; userId: string; year: number; casual: LeaveBalanceCounter; sick: LeaveBalanceCounter; earned: LeaveBalanceCounter };
 

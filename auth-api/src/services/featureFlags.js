@@ -27,21 +27,14 @@ export async function ensureFlags() {
 
 /** Seed missing flags from registry on startup. Existing flags are untouched. */
 export async function seedFlags() {
-  const existing = await FeatureFlag.find().lean();
-  const byKey = new Set(existing.map(f => f.featureKey));
-  const toInsert = [];
   for (const key of FEATURE_KEYS) {
-    if (!byKey.has(key)) {
-      const def = FEATURE_REGISTRY[key];
-      toInsert.push({
-        featureKey: key,
-        enabled: def.defaultEnabled,
-        roleGrants: def.defaultRoles,
-        readonlyRoles: def.defaultReadonlyRoles || [],
-      });
-    }
+    const def = FEATURE_REGISTRY[key];
+    await FeatureFlag.updateOne(
+      { featureKey: key },
+      { $setOnInsert: { enabled: def.defaultEnabled, roleGrants: def.defaultRoles, readonlyRoles: def.defaultReadonlyRoles || [] } },
+      { upsert: true },
+    );
   }
-  if (toInsert.length) await FeatureFlag.insertMany(toInsert);
   return loadFlags();
 }
 

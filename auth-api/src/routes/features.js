@@ -39,8 +39,8 @@ export function createFeaturesRouter() {
 
     const flag = await FeatureFlag.findOneAndUpdate(
       { featureKey: key },
-      { enabled: req.body.enabled, updatedBy: req.user.sub, updatedAt: new Date() },
-      { new: true },
+      { $set: { enabled: req.body.enabled, updatedBy: req.user.sub, updatedAt: new Date() } },
+      { new: true, upsert: true },
     );
     await loadFlags();
     res.json(flag);
@@ -52,14 +52,14 @@ export function createFeaturesRouter() {
     if (!reg) return res.status(404).json({ error: 'unknown feature' });
     if (reg.system) return res.status(400).json({ error: 'system feature cannot be modified' });
 
-    const update = { updatedBy: req.user.sub, updatedAt: new Date() };
-    if (req.body.roleGrants !== undefined) update.roleGrants = req.body.roleGrants;
-    if (req.body.readonlyRoles !== undefined) update.readonlyRoles = req.body.readonlyRoles;
+    const setFields = { updatedBy: req.user.sub, updatedAt: new Date() };
+    if (req.body.roleGrants !== undefined) setFields.roleGrants = req.body.roleGrants;
+    if (req.body.readonlyRoles !== undefined) setFields.readonlyRoles = req.body.readonlyRoles;
 
     const flag = await FeatureFlag.findOneAndUpdate(
       { featureKey: key },
-      update,
-      { new: true },
+      { $set: setFields },
+      { new: true, upsert: true },
     );
     await loadFlags();
     res.json(flag);
