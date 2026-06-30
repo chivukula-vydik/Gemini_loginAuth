@@ -37,6 +37,7 @@ export async function seedFlags() {
         featureKey: key,
         enabled: def.defaultEnabled,
         roleGrants: def.defaultRoles,
+        readonlyRoles: def.defaultReadonlyRoles || [],
       });
     }
   }
@@ -44,32 +45,34 @@ export async function seedFlags() {
   return loadFlags();
 }
 
-/**
- * Single source of truth for feature access.
- * Used by both backend middleware and serialized to frontend.
- */
+// ponytail: returns 'full' | 'readonly' | false — single resolver for both middleware and frontend
 export function resolveFeature(featureKey, user, flags) {
   const reg = FEATURE_REGISTRY[featureKey];
   if (!reg) return false;
 
-  // super-admin bypasses all layers
   const adminEmail = String(process.env.ADMIN_EMAIL || '').toLowerCase().trim();
   const isSuperAdmin = adminEmail && String(user.email || '').toLowerCase().trim() === adminEmail;
-  if (isSuperAdmin) return true;
+  if (isSuperAdmin) return 'full';
 
   const flag = flags[featureKey];
   if (!flag?.enabled) return false;
 
-  // user override beats role
   const override = user.featureOverrides?.[featureKey];
-  if (override) return override === 'on';
+  if (override) {
+    if (override === 'full' || override === 'on') return 'full';
+    if (override === 'readonly') return 'readonly';
+    return false;
+  }
 
-  // fall back to role grant
   const userRoles = user.roles || [];
-  return userRoles.some(r => (flag.roleGrants || []).includes(r));
+  const hasFull = userRoles.some(r => (flag.roleGrants || []).includes(r));
+  if (hasFull) return 'full';
+  const hasReadonly = userRoles.some(r => (flag.readonlyRoles || []).includes(r));
+  if (hasReadonly) return 'readonly';
+  return false;
 }
 
-/** Resolve all features for a user — returns { [key]: boolean } */
+/** Resolve all features for a user — returns { [key]: 'full' | 'readonly' | false } */
 export function resolveAllFeatures(user, flags) {
   const result = {};
   for (const key of FEATURE_KEYS) {

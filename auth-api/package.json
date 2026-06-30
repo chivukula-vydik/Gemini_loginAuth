@@ -24,7 +24,8 @@
     "nodemailer": "^6.9.13",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "passport-local": "^1.0.0"
+    "passport-local": "^1.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.2.0",

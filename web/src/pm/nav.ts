@@ -1,6 +1,6 @@
 export type Role = 'admin' | 'pm' | 'employee' | 'reporting_manager' | 'hr' | 'finance' | 'team_lead' | 'director' | 'vp';
 
-const ALL_NAV_KEYS = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'] as const;
+const ALL_NAV_KEYS = ['home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'roster-import', 'projects', 'requests', 'marketplace', 'my-tasks', 'my-skills', 'timesheet', 'attendance', 'my-requests', 'utilization', 'my-team', 'team-attendance', 'organisation', 'profile', 'payroll', 'my-payslips', 'reimbursements', 'declarations', 'tax-summary', 'declaration-review', 'my-loans', 'loan-management', 'onboarding', 'onboarding-tasks', 'onboarding-templates'] as const;
 export type NavKey = (typeof ALL_NAV_KEYS)[number];
 export type NavItem = { key: NavKey; label: string; path: string };
 export type NavSection = { title: string; items: NavItem[] };
@@ -33,7 +33,7 @@ function sectionsForRole(role: Role): NavSection[] {
       people.push(I('users', 'Users'));
     }
     if (role === 'admin') {
-      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'), I('feature-management', 'Features'), I('approval-flows', 'Approvals'));
+      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'), I('feature-management', 'Features'), I('approval-flows', 'Approvals'), I('roster-import', 'Import'));
     }
     people.push(I('organisation', 'Organisation'));
     sections.push({ title: 'People', items: people });

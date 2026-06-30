@@ -4,7 +4,7 @@ import { navForRoles } from './nav.ts';
 
 test('admin nav', () => {
   assert.deepEqual(navForRoles(['admin']).map((n) => n.key), [
-    'home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'organisation',
+    'home', 'users', 'skills', 'departments', 'shifts', 'company-fit', 'feature-management', 'approval-flows', 'roster-import', 'organisation',
     'projects', 'my-tasks', 'timesheet', 'utilization',
     'attendance', 'requests', 'my-requests', 'reimbursements',
     'payroll', 'my-payslips', 'declarations', 'tax-summary', 'declaration-review', 'my-loans', 'loan-management',

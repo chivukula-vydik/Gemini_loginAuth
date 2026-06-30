@@ -10,30 +10,27 @@ import { loadFlags, resolveAllFeatures, ensureFlags } from '../services/featureF
 export function createFeaturesRouter() {
   const router = express.Router();
 
-  // Public: resolved features for current user (used by frontend nav)
   router.get('/my-features', requireAuth, asyncHandler(async (req, res) => {
     const flags = await ensureFlags();
     const user = await User.findById(req.user.sub).select('email roles featureOverrides').lean();
     if (!user) return res.status(404).json({ error: 'not found' });
-    // convert Mongoose Map to plain object
     if (user.featureOverrides instanceof Map) {
       user.featureOverrides = Object.fromEntries(user.featureOverrides);
     }
     res.json(resolveAllFeatures(user, flags));
   }));
 
-  // Admin: get registry + all flags (for the matrix UI)
   router.get('/', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const flags = await ensureFlags();
     const registry = FEATURE_KEYS.map(key => ({
       ...FEATURE_REGISTRY[key],
       enabled: flags[key]?.enabled ?? FEATURE_REGISTRY[key].defaultEnabled,
       roleGrants: flags[key]?.roleGrants ?? FEATURE_REGISTRY[key].defaultRoles,
+      readonlyRoles: flags[key]?.readonlyRoles ?? [],
     }));
     res.json(registry);
   }));
 
-  // Admin: toggle global flag
   router.patch('/:key/toggle', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const { key } = req.params;
     const reg = FEATURE_REGISTRY[key];
@@ -49,31 +46,33 @@ export function createFeaturesRouter() {
     res.json(flag);
   }));
 
-  // Admin: update role grants for a feature
   router.patch('/:key/roles', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const { key } = req.params;
     const reg = FEATURE_REGISTRY[key];
     if (!reg) return res.status(404).json({ error: 'unknown feature' });
     if (reg.system) return res.status(400).json({ error: 'system feature cannot be modified' });
 
+    const update = { updatedBy: req.user.sub, updatedAt: new Date() };
+    if (req.body.roleGrants !== undefined) update.roleGrants = req.body.roleGrants;
+    if (req.body.readonlyRoles !== undefined) update.readonlyRoles = req.body.readonlyRoles;
+
     const flag = await FeatureFlag.findOneAndUpdate(
       { featureKey: key },
-      { roleGrants: req.body.roleGrants, updatedBy: req.user.sub, updatedAt: new Date() },
+      update,
       { new: true },
     );
     await loadFlags();
     res.json(flag);
   }));
 
-  // Admin: set user override
   router.patch('/user-override/:userId', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const { userId } = req.params;
-    const { featureKey, value } = req.body; // value: 'on' | 'off' | null (null = clear)
+    const { featureKey, value } = req.body; // value: 'full' | 'readonly' | 'off' | null (null = clear)
     if (!FEATURE_REGISTRY[featureKey]) return res.status(404).json({ error: 'unknown feature' });
 
     const update = value
       ? { [`featureOverrides.${featureKey}`]: value }
-      : { [`featureOverrides.${featureKey}`]: 1 }; // for $unset
+      : { [`featureOverrides.${featureKey}`]: 1 };
 
     const op = value
       ? { $set: update }
@@ -83,7 +82,6 @@ export function createFeaturesRouter() {
     res.json({ ok: true });
   }));
 
-  // Admin: get user's overrides + resolved state
   router.get('/user-override/:userId', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.userId).select('email roles featureOverrides').lean();
     if (!user) return res.status(404).json({ error: 'not found' });

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { authed } from '../fetchHelper';
+import type { FeatureAccess } from '../featureContext';
 
 type OverrideState = {
-  overrides: Record<string, 'on' | 'off'>;
-  resolved: Record<string, boolean>;
+  overrides: Record<string, string>;
+  resolved: Record<string, FeatureAccess>;
 };
 
 export function UserFeatureOverrides({ userId }: { userId: string }) {
@@ -16,7 +17,7 @@ export function UserFeatureOverrides({ userId }: { userId: string }) {
   }
   useEffect(() => { reload(); }, [userId]);
 
-  async function setOverride(featureKey: string, value: 'on' | 'off' | null) {
+  async function setOverride(featureKey: string, value: 'full' | 'readonly' | 'off' | null) {
     setSaving(featureKey);
     try {
       await authed(`/features/user-override/${userId}`, 'PATCH', { featureKey, value });
@@ -29,6 +30,12 @@ export function UserFeatureOverrides({ userId }: { userId: string }) {
 
   const keys = Object.keys(state.resolved).sort();
   const hasOverrides = Object.keys(state.overrides).length > 0;
+
+  function resolvedLabel(v: FeatureAccess): { text: string; color: string } {
+    if (v === 'full') return { text: '● Full', color: 'var(--color-success, green)' };
+    if (v === 'readonly') return { text: '◐ Read-only', color: 'orange' };
+    return { text: '○ Off', color: 'var(--color-danger, red)' };
+  }
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -48,14 +55,13 @@ export function UserFeatureOverrides({ userId }: { userId: string }) {
           {keys.map(key => {
             const override = state.overrides[key];
             const resolved = state.resolved[key];
-            const source = override ? `Override: ${override}` : `Inherited (${resolved ? 'on' : 'off'})`;
+            const { text, color } = resolvedLabel(resolved);
+            const source = override ? `Override: ${override}` : `Inherited`;
             return (
               <tr key={key}>
                 <td>{key}</td>
                 <td style={{ textAlign: 'center' }}>
-                  <span style={{ color: resolved ? 'var(--color-success, green)' : 'var(--color-danger, red)' }}>
-                    {resolved ? '● On' : '○ Off'}
-                  </span>
+                  <span style={{ color }}>{text}</span>
                 </td>
                 <td style={{ textAlign: 'center', fontStyle: override ? 'normal' : 'italic', fontWeight: override ? 600 : 400 }}>
                   {source}
@@ -67,12 +73,26 @@ export function UserFeatureOverrides({ userId }: { userId: string }) {
                       Reset to role
                     </button>
                   ) : (
-                    <>
-                      <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px', marginRight: 4 }}
-                        disabled={saving === key} onClick={() => setOverride(key, resolved ? 'off' : 'on')}>
-                        {resolved ? 'Revoke' : 'Grant'}
-                      </button>
-                    </>
+                    <span style={{ display: 'inline-flex', gap: 4 }}>
+                      {resolved !== 'full' && (
+                        <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px' }}
+                          disabled={saving === key} onClick={() => setOverride(key, 'full')}>
+                          Grant Full
+                        </button>
+                      )}
+                      {resolved !== 'readonly' && (
+                        <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px' }}
+                          disabled={saving === key} onClick={() => setOverride(key, 'readonly')}>
+                          Set Read-only
+                        </button>
+                      )}
+                      {resolved && (
+                        <button className="btn btn-auto" style={{ fontSize: 11, padding: '2px 8px' }}
+                          disabled={saving === key} onClick={() => setOverride(key, 'off')}>
+                          Revoke
+                        </button>
+                      )}
+                    </span>
                   )}
                 </td>
               </tr>

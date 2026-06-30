@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { authed } from './fetchHelper';
 
-type FeatureFlags = Record<string, boolean>;
+export type FeatureAccess = 'full' | 'readonly' | false;
+type FeatureFlags = Record<string, FeatureAccess>;
 type FeatureState = { features: FeatureFlags; loading: boolean; reload: () => Promise<void> };
 
 const Ctx = createContext<FeatureState>({ features: {}, loading: true, reload: async () => {} });

@@ -35,6 +35,7 @@ import {
 import { PayrollRunList, PayrollRunDetail, SalaryEditor, MyPayslips, Declarations, TaxSummary, Reimbursements, RegimeComparison, DeclarationReview, MyLoans, LoanManagement } from './payroll/index';
 import { FeatureManagement } from './pm/FeatureManagement';
 import { ApprovalFlowBuilder } from './pm/ApprovalFlowBuilder';
+import { RosterImport } from './pm/RosterImport';
 
 const NAV_ICONS: Record<NavKey, ReactElement> = {
   home: <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />,
@@ -45,6 +46,7 @@ const NAV_ICONS: Record<NavKey, ReactElement> = {
   'company-fit': <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3M9 11l3 3L22 4" />,
   'feature-management': <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
   'approval-flows': <path d="M9 11l3 3L22 4M4 12l3 3 3-3M4 5h16M4 19h16" />,
+  'roster-import': <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
   projects: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
   requests: <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" />,
   marketplace: <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />,
@@ -333,6 +335,7 @@ export function AppShell() {
           <Route path="/reimbursements" element={<Reimbursements />} />
           <Route path="/feature-management" element={<FeatureManagement />} />
           <Route path="/approval-flows" element={<ApprovalFlowBuilder />} />
+          <Route path="/roster-import" element={<RosterImport />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

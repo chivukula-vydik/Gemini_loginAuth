@@ -38,6 +38,7 @@ import { createInboxRouter } from './routes/inbox.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createFeaturesRouter } from './routes/features.js';
 import { createApprovalFlowsRouter } from './routes/approvalFlows.js';
+import { createImportRouter } from './routes/import.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { requireFeature } from './middleware/requireFeature.js';
 
@@ -137,6 +138,7 @@ export function createApp(config) {
   app.use('/notifications', createNotificationsRouter());
   app.use('/features', createFeaturesRouter());
   app.use('/approval-flows', ...fg('approval-flows'), createApprovalFlowsRouter());
+  app.use('/import', createImportRouter());
 
   app.use((err, req, res, next) => {
     console.error('[auth-api] request error', err);

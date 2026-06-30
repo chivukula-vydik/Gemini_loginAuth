@@ -8,6 +8,7 @@ type FeatureEntry = {
   label: string;
   enabled: boolean;
   roleGrants: string[];
+  readonlyRoles: string[];
   system: boolean;
 };
 
@@ -30,15 +31,32 @@ export function FeatureManagement() {
     finally { setSaving(''); }
   }
 
-  async function toggleRole(key: string, role: string, currentGrants: string[]) {
-    const has = currentGrants.includes(role);
-    const roleGrants = has ? currentGrants.filter(r => r !== role) : [...currentGrants, role];
+  async function toggleRole(key: string, role: string, currentGrants: string[], currentReadonly: string[]) {
+    const hasFull = currentGrants.includes(role);
+    const hasRO = currentReadonly.includes(role);
+    // cycle: off → full → readonly → off
+    let roleGrants = currentGrants;
+    let readonlyRoles = currentReadonly;
+    if (!hasFull && !hasRO) {
+      roleGrants = [...currentGrants, role];
+    } else if (hasFull) {
+      roleGrants = currentGrants.filter(r => r !== role);
+      readonlyRoles = [...currentReadonly, role];
+    } else {
+      readonlyRoles = currentReadonly.filter(r => r !== role);
+    }
     setSaving(`${key}-${role}`);
     try {
-      await authed(`/features/${key}/roles`, 'PATCH', { roleGrants });
+      await authed(`/features/${key}/roles`, 'PATCH', { roleGrants, readonlyRoles });
       reload();
     } catch (e) { setError((e as Error).message); }
     finally { setSaving(''); }
+  }
+
+  function accessLabel(f: FeatureEntry, role: string): { text: string; color: string } {
+    if (f.roleGrants.includes(role)) return { text: 'Full', color: 'var(--color-success, green)' };
+    if (f.readonlyRoles.includes(role)) return { text: 'RO', color: 'orange' };
+    return { text: '—', color: 'var(--text-muted, #999)' };
   }
 
   return (
@@ -46,7 +64,7 @@ export function FeatureManagement() {
       <header className="ts-header">
         <div>
           <h1 className="ts-h1">Feature Management</h1>
-          <p className="ts-sub">Control which features are visible to each role</p>
+          <p className="ts-sub">Control which features are visible to each role. Click a cell to cycle: Full → Read-only → Off</p>
         </div>
       </header>
 
@@ -84,18 +102,20 @@ export function FeatureManagement() {
                   )}
                 </td>
                 {ALL_ROLES.map(role => {
-                  const granted = f.roleGrants.includes(role);
+                  const { text, color } = accessLabel(f, role);
                   return (
                     <td key={role} style={{ textAlign: 'center' }}>
                       {f.system ? (
-                        granted ? <span style={{ color: 'var(--color-success, green)' }}>●</span> : '—'
+                        f.roleGrants.includes(role) ? <span style={{ color: 'var(--color-success, green)' }}>●</span> : '—'
                       ) : (
-                        <input
-                          type="checkbox"
-                          checked={granted}
+                        <button
+                          className="btn btn-auto"
+                          style={{ minWidth: 40, padding: '2px 6px', fontSize: 11, color, fontWeight: 600 }}
                           disabled={!f.enabled || saving === `${f.key}-${role}`}
-                          onChange={() => toggleRole(f.key, role, f.roleGrants)}
-                        />
+                          onClick={() => toggleRole(f.key, role, f.roleGrants, f.readonlyRoles)}
+                        >
+                          {text}
+                        </button>
                       )}
                     </td>
                   );
