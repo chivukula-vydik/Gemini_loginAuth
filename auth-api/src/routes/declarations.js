@@ -1,7 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
-import { Readable } from 'stream';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -9,12 +8,9 @@ import { requireFeature } from '../middleware/requireFeature.js';
 import { InvestmentDeclaration } from '../models/InvestmentDeclaration.js';
 import { SalaryStructure } from '../models/SalaryStructure.js';
 import { resolveMonthlyAmounts } from '../services/payrollEngine.js';
+import { encryptAndSave, decryptAndRead, deleteFile } from '../services/fileVault.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-
-function getProofBucket() {
-  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'declarationProofs' });
-}
 
 const SECTION_LIMITS = {
   '80C':       150000,
@@ -139,19 +135,11 @@ export function createDeclarationsRouter() {
       return res.status(400).json({ error: 'only PDF or image files accepted — upload official certificates, not raw bank statements' });
     }
 
-    const bucket = getProofBucket();
-    const stream = bucket.openUploadStream(req.file.originalname, {
-      contentType: req.file.mimetype,
-      metadata: { user: req.user.sub, fy: req.params.fy, section: dec.items[idx].section },
-    });
-    const readable = new Readable();
-    readable.push(req.file.buffer);
-    readable.push(null);
-    readable.pipe(stream);
-    await new Promise((resolve, reject) => { stream.on('finish', resolve); stream.on('error', reject); });
+    const subDir = `declarations/${req.params.fy}`;
+    const fileId = encryptAndSave(req.file.buffer, subDir);
 
     dec.items[idx].proofs.push({
-      fileId: stream.id,
+      fileId,
       filename: req.file.originalname,
       contentType: req.file.mimetype,
       size: req.file.size,
@@ -174,21 +162,29 @@ export function createDeclarationsRouter() {
 
   // ── Download proof — employee (own) + admin/finance/hr only ────────────
   router.get('/:fy/proof/:fileId', requireAuth, requireFeature('declarations'), asyncHandler(async (req, res) => {
-    const fileId = new mongoose.Types.ObjectId(req.params.fileId);
-    const bucket = getProofBucket();
-    const files = await bucket.find({ _id: fileId }).toArray();
-    if (!files.length) return res.status(404).json({ error: 'file not found' });
+    const dec = await InvestmentDeclaration.findOne({ financialYear: req.params.fy, 'items.proofs.fileId': req.params.fileId });
+    if (!dec) return res.status(404).json({ error: 'file not found' });
 
-    const meta = files[0].metadata || {};
-    const isOwner = meta.user === req.user.sub;
+    const isOwner = String(dec.user) === req.user.sub;
     const isPrivileged = ['admin', 'finance', 'hr'].some(r => (req.user.roles || []).includes(r));
     if (!isOwner && !isPrivileged) {
       return res.status(403).json({ error: 'access denied — only the employee or HR/payroll admins may view proof documents' });
     }
 
-    res.set('Content-Type', files[0].contentType || 'application/octet-stream');
-    res.set('Content-Disposition', `inline; filename="${files[0].filename}"`);
-    bucket.openDownloadStream(fileId).pipe(res);
+    let proof;
+    for (const item of dec.items) {
+      proof = item.proofs.find(p => p.fileId === req.params.fileId);
+      if (proof) break;
+    }
+    if (!proof) return res.status(404).json({ error: 'file not found' });
+
+    const subDir = `declarations/${req.params.fy}`;
+    const buffer = decryptAndRead(req.params.fileId, subDir);
+    if (!buffer) return res.status(404).json({ error: 'file not found on disk' });
+
+    res.set('Content-Type', proof.contentType || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${proof.filename}"`);
+    res.send(buffer);
   }));
 
   // ── Section limits reference ───────────────────────────────────────────
