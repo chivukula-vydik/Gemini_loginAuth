@@ -2,44 +2,22 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { User } from '../models/User.js';
 import { Task } from '../models/Task.js';
 import { summarize } from '../services/reestimations.js';
 import { directionCounts, completionStats, onTimeStats } from '../services/reputation.js';
 
-export function createUsersRouter() {
+export function createCompanyFitRouter() {
   const router = express.Router();
 
-  router.get('/', requireAuth, asyncHandler(async (req, res) => {
-    const isPm = (req.user.roles || [req.user.role]).some((r) => ['pm', 'admin'].includes(r));
-    const fields = req.query.fields;
-    let select = 'displayName email role';
-    if (isPm || (fields && typeof fields === 'string' && fields.includes('reportingManagerId'))) {
-      select = 'displayName email role roles reportingManagerId departmentId';
-    }
-    const users = await User.find({ active: { $ne: false } }).select(select).sort('displayName');
-    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
-  }));
-
-  // RM's assigned employees. Registered before '/:id' routes to avoid
-  // 'my-team' being parsed as an id.
-  router.get('/my-team', requireAuth, requireRole('reporting_manager'), asyncHandler(async (req, res) => {
-    const team = await User.find({ reportingManagerId: req.user.sub, active: true })
-      .select('displayName email role reportingManagerId')
-      .sort('displayName');
-    res.json(team);
-  }));
-
-  // Aggregate: how many people have ever asked for a re-estimation. PM/admin only.
-  // Declared before '/:id/...' so 'reestimations' is never read as an id.
-  router.get('/reestimations/summary', requireAuth, requireRole('pm', 'admin'), asyncHandler(async (req, res) => {
+  router.get('/reestimations/summary', asyncHandler(async (req, res) => {
     const requesters = await User.countDocuments({ reestimationCount: { $gt: 0 } });
     res.json({ requesters });
   }));
 
-  // Per-person reputation (company fit). Admin only.
-  router.get('/reputation', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.get('/reputation', asyncHandler(async (req, res) => {
     const users = await User.find({ active: { $ne: false } })
       .select('displayName email role roles reestimations').sort('displayName');
     const tasks = await Task.find({}).select('status dueDate completedAt assignees');
@@ -66,6 +44,34 @@ export function createUsersRouter() {
     });
     res.json({ people });
   }));
+
+  return router;
+}
+
+export function createUsersRouter() {
+  const router = express.Router();
+
+  router.get('/', requireAuth, asyncHandler(async (req, res) => {
+    const isPm = (req.user.roles || [req.user.role]).some((r) => ['pm', 'admin'].includes(r));
+    const fields = req.query.fields;
+    let select = 'displayName email role';
+    if (isPm || (fields && typeof fields === 'string' && fields.includes('reportingManagerId'))) {
+      select = 'displayName email role roles reportingManagerId departmentId';
+    }
+    const users = await User.find({ active: { $ne: false } }).select(select).sort('displayName');
+    res.json(users.map((u) => ({ ...u.toObject(), roles: u.roles?.length ? u.roles : [u.role || 'employee'] })));
+  }));
+
+  // RM's assigned employees. Registered before '/:id' routes to avoid
+  // 'my-team' being parsed as an id.
+  router.get('/my-team', requireAuth, requireRole('reporting_manager'), asyncHandler(async (req, res) => {
+    const team = await User.find({ reportingManagerId: req.user.sub, active: true })
+      .select('displayName email role reportingManagerId')
+      .sort('displayName');
+    res.json(team);
+  }));
+
+  // reputation + reestimations/summary moved to createCompanyFitRouter (gated by company-fit, not users)
 
   // A user's re-estimation history. A person sees their own; PM/admin see anyone's.
   router.get('/:id/reestimations', requireAuth, asyncHandler(async (req, res) => {

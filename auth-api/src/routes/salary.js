@@ -10,13 +10,13 @@ import { PayGrade } from '../models/PayGrade.js';
 export function createSalaryRouter() {
   const router = express.Router();
 
-  router.get('/:userId', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.get('/:userId', requireAuth, requireFeature('payroll'), asyncHandler(async (req, res) => {
     const active = await SalaryStructure.findOne({ user: req.params.userId, effectiveTo: null }).sort('-effectiveFrom');
     if (!active) return res.json(null);
     res.json(active);
   }));
 
-  router.post('/:userId', requireAuth, requireRole('admin'), requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:userId', requireAuth, requireFeature('payroll', { write: true }), asyncHandler(async (req, res) => {
     const { ctcAnnual, components, effectiveFrom } = req.body;
     if (!ctcAnnual || !components || !effectiveFrom) {
       return res.status(400).json({ error: 'ctcAnnual, components, and effectiveFrom required' });
@@ -37,7 +37,7 @@ export function createSalaryRouter() {
     res.status(201).json(structure);
   }));
 
-  router.get('/:userId/template', requireAuth, requireRole('admin'), asyncHandler(async (req, res) => {
+  router.get('/:userId/template', requireAuth, requireFeature('payroll'), asyncHandler(async (req, res) => {
     const user = await User.findById(req.params.userId).select('payGrade');
     if (!user?.payGrade) return res.json({ components: [] });
     const grade = await PayGrade.findById(user.payGrade);

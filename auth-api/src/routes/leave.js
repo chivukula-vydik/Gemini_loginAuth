@@ -134,7 +134,7 @@ export function createLeaveRouter() {
   }));
 
   // GET /leave/pending — approval review queue
-  router.get('/pending', requireRole('admin', 'reporting_manager', 'team_lead', 'hr', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/pending', requireFeature('requests'), asyncHandler(async (req, res) => {
     let filter = { status: 'pending' };
     const roles = req.user.roles || [req.user.role || 'employee'];
     if (roles.includes('reporting_manager') || roles.includes('team_lead')) {
@@ -148,7 +148,7 @@ export function createLeaveRouter() {
   }));
 
   // PATCH /leave/:id/decide — approves or rejects
-  router.patch('/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), requireFeature('requests', { write: true }), asyncHandler(async (req, res) => {
+  router.patch('/:id/decide', requireFeature('requests', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });

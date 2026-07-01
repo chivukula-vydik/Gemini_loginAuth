@@ -675,9 +675,18 @@ async function main() {
           { upTo: 250000, rate: 0 },
           { upTo: 500000, rate: 5 },
           { upTo: 1000000, rate: 20 },
-          { upTo: 999999999, rate: 30 },
+          { upTo: null, rate: 30 },
         ],
         standardDeduction: 50000,
+        rebate: { maxIncome: 500000, maxRebate: 12500 },
+        surcharge: [
+          { threshold: 5000000, rate: 10 },
+          { threshold: 10000000, rate: 15 },
+          { threshold: 20000000, rate: 25 },
+          { threshold: 50000000, rate: 37 },
+        ],
+        cessRate: 0.04,
+        allowedDeductions: ['80C', '80D', '80E', '80G', 'HRA', '24B', '80CCD(1B)', '80TTA', '80DDB', '80U', '80EEB', 'NPS_EMPLOYER'],
       },
       new: {
         slabs: [
@@ -687,9 +696,17 @@ async function main() {
           { upTo: 1600000, rate: 15 },
           { upTo: 2000000, rate: 20 },
           { upTo: 2400000, rate: 25 },
-          { upTo: 999999999, rate: 30 },
+          { upTo: null, rate: 30 },
         ],
         standardDeduction: 75000,
+        rebate: { maxIncome: 1200000, maxRebate: 60000 },
+        surcharge: [
+          { threshold: 5000000, rate: 10 },
+          { threshold: 10000000, rate: 15 },
+          { threshold: 20000000, rate: 25 },
+        ],
+        cessRate: 0.04,
+        allowedDeductions: ['NPS_EMPLOYER'],
       },
     },
   });

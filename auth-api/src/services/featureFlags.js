@@ -44,14 +44,17 @@ export function resolveFeature(featureKey, user, flags) {
   if (!reg) return false;
 
   const flag = flags[featureKey];
-  if (!flag?.enabled) return false;
 
+  // ponytail: per-user overrides trump the global toggle — an admin who grants
+  // access to a specific employee expects it to work even if the feature is off globally
   const override = user.featureOverrides?.[featureKey];
   if (override) {
     if (override === 'full' || override === 'on') return 'full';
     if (override === 'readonly') return 'readonly';
     return false;
   }
+
+  if (!flag?.enabled) return false;
 
   const userRoles = user.roles || [];
   const hasFull = userRoles.some(r => (flag.roleGrants || []).includes(r));

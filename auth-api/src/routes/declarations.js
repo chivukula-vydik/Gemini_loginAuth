@@ -69,7 +69,7 @@ export function createDeclarationsRouter() {
   const router = express.Router();
 
   // ── Employee: get own declaration ─────────────────────────────────────
-  router.get('/:fy/me', requireAuth, asyncHandler(async (req, res) => {
+  router.get('/:fy/me', requireAuth, requireFeature('declarations'), asyncHandler(async (req, res) => {
     const dec = await InvestmentDeclaration.findOne({ user: req.user.sub, financialYear: req.params.fy });
     if (!dec) return res.json(null);
 
@@ -173,7 +173,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── Download proof — employee (own) + admin/finance/hr only ────────────
-  router.get('/:fy/proof/:fileId', requireAuth, asyncHandler(async (req, res) => {
+  router.get('/:fy/proof/:fileId', requireAuth, requireFeature('declarations'), asyncHandler(async (req, res) => {
     const fileId = new mongoose.Types.ObjectId(req.params.fileId);
     const bucket = getProofBucket();
     const files = await bucket.find({ _id: fileId }).toArray();
@@ -192,12 +192,12 @@ export function createDeclarationsRouter() {
   }));
 
   // ── Section limits reference ───────────────────────────────────────────
-  router.get('/limits', requireAuth, (req, res) => {
+  router.get('/limits', requireAuth, requireFeature('declarations'), (req, res) => {
     res.json(SECTION_LIMITS);
   });
 
   // ── HR/Finance: list all declarations for a FY ─────────────────────────
-  router.get('/:fy/all', requireAuth, requireRole('admin', 'finance', 'hr'), asyncHandler(async (req, res) => {
+  router.get('/:fy/all', requireAuth, requireFeature('declaration-review'), asyncHandler(async (req, res) => {
     const decs = await InvestmentDeclaration.find({ financialYear: req.params.fy })
       .populate('user', 'firstName lastName email')
       .sort('-updatedAt');
@@ -205,7 +205,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: verify or reject an item ──────────────────────────────
-  router.patch('/:fy/verify/:userId/:sectionIdx', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
+  router.patch('/:fy/verify/:userId/:sectionIdx', requireAuth, requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const { action, proofAmount, rejectReason } = req.body;
     if (!['verify', 'reject'].includes(action)) return res.status(400).json({ error: 'action must be verify or reject' });
 
@@ -228,7 +228,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: close declaration (lock + transition to closed) ────────
-  router.post('/:fy/close/:userId', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:fy/close/:userId', requireAuth, requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const dec = await InvestmentDeclaration.findOne({ user: req.params.userId, financialYear: req.params.fy });
     if (!dec) return res.status(404).json({ error: 'declaration not found' });
 
@@ -239,7 +239,7 @@ export function createDeclarationsRouter() {
   }));
 
   // ── HR/Finance: bulk close all declarations for FY ─────────────────────
-  router.post('/:fy/close-all', requireAuth, requireRole('admin', 'finance'), requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:fy/close-all', requireAuth, requireFeature('declaration-review', { write: true }), asyncHandler(async (req, res) => {
     const result = await InvestmentDeclaration.updateMany(
       { financialYear: req.params.fy, phase: { $ne: 'closed' } },
       { $set: { phase: 'closed', lockedForTds: true } },

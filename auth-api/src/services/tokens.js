@@ -13,18 +13,18 @@ export function signAccessToken(user) {
   return jwt.sign(
     { sub: String(user._id), email: user.email, name: user.displayName, roles: user.roles?.length ? user.roles : [user.role || 'employee'] },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: ACCESS_TTL }
+    { algorithm: 'HS256', expiresIn: ACCESS_TTL }
   );
 }
 
 export function verifyAccessToken(token) {
-  return jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+  return jwt.verify(token, process.env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
 }
 
 export async function issueRefreshToken(user) {
   const jti = crypto.randomUUID();
   const token = jwt.sign({ sub: String(user._id), jti }, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: REFRESH_TTL,
+    algorithm: 'HS256', expiresIn: REFRESH_TTL,
   });
   const decoded = jwt.decode(token);
   await RefreshToken.create({
@@ -37,7 +37,7 @@ export async function issueRefreshToken(user) {
 
 export async function findValidRefreshToken(token) {
   try {
-    jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    jwt.verify(token, process.env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] });
   } catch {
     return null;
   }

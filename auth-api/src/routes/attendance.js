@@ -75,13 +75,13 @@ export function createAttendanceRouter(shiftConfig) {
   router.use(requireAuth);
 
   // GET /attendance/config — shift timings, sourced from auth.config.json
-  router.get('/config', asyncHandler(async (req, res) => {
+  router.get('/config', requireFeature('attendance'), asyncHandler(async (req, res) => {
     res.json(shift);
   }));
 
   // GET /attendance/state — activation boundary + whether any clock-in exists.
   // Drives the first-run/empty experience on the frontend.
-  router.get('/state', asyncHandler(async (req, res) => {
+  router.get('/state', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.sub).select('attendanceActivatedDate');
     const hasClockIn = await Attendance.exists({ userId: req.user.sub, checkIn: { $ne: null } });
     res.json({
@@ -91,7 +91,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/today — current day's doc for the logged-in user
-  router.get('/today', asyncHandler(async (req, res) => {
+  router.get('/today', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const date = todayStr();
     const doc = await Attendance.findOne({ userId: req.user.sub, date });
     if (!doc) {
@@ -214,7 +214,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/month?year=2026&month=6
-  router.get('/month', asyncHandler(async (req, res) => {
+  router.get('/month', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'year and month required' });
 
@@ -230,7 +230,7 @@ export function createAttendanceRouter(shiftConfig) {
   // GET /attendance/range?start=2026-06-22&end=2026-06-26 — arbitrary date
   // span, e.g. a Mon-Fri timesheet week (which can cross a month boundary,
   // unlike /month).
-  router.get('/range', asyncHandler(async (req, res) => {
+  router.get('/range', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const { start, end } = req.query;
     if (!start || !end) return res.status(400).json({ error: 'start and end required' });
 
@@ -266,7 +266,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/stats?year=2026&month=6
-  router.get('/stats', asyncHandler(async (req, res) => {
+  router.get('/stats', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'year and month required' });
 
@@ -318,7 +318,7 @@ export function createAttendanceRouter(shiftConfig) {
   // GET /attendance/team?year=2026&month=6 — per-member summary for a PM's
   // direct reports (project members across projects they own) or, for an
   // admin, every user.
-  router.get('/team', requireRole('admin', 'pm', 'reporting_manager', 'hr', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/team', requireFeature('team-attendance'), asyncHandler(async (req, res) => {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'year and month required' });
 
@@ -418,7 +418,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/team/today — live daily stats for the manager's team
-  router.get('/team/today', requireRole('admin', 'pm', 'reporting_manager', 'hr', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/team/today', requireFeature('team-attendance'), asyncHandler(async (req, res) => {
     const today = todayStr();
     const roles = req.user.roles || [req.user.role || 'employee'];
     let memberIds;
@@ -474,7 +474,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/team/calendar?year=2026&month=6 — per-day-per-member attendance
-  router.get('/team/calendar', requireRole('admin', 'pm', 'reporting_manager', 'hr', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/team/calendar', requireFeature('team-attendance'), asyncHandler(async (req, res) => {
     const { year, month } = req.query;
     if (!year || !month) return res.status(400).json({ error: 'year and month required' });
 
@@ -559,7 +559,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/regularise/pending — reporting line approval
-  router.get('/regularise/pending', requireRole('admin', 'reporting_manager', 'team_lead'), asyncHandler(async (req, res) => {
+  router.get('/regularise/pending', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const filter = { 'regularise.status': 'pending' };
     const roles = req.user.roles || [req.user.role];
     if (roles.includes('reporting_manager') || roles.includes('team_lead')) {
@@ -574,7 +574,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/regularise/:id/decide — reporting line approval
-  router.patch('/regularise/:id/decide', requireRole('admin', 'reporting_manager', 'team_lead', 'hr'), requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
+  router.patch('/regularise/:id/decide', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;   // "approved" | "rejected"
     if (!['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'invalid decision' });
@@ -655,13 +655,13 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // GET /attendance/overtime/mine — employee's own overtime requests
-  router.get('/overtime/mine', asyncHandler(async (req, res) => {
+  router.get('/overtime/mine', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const docs = await Overtime.find({ userId: req.user.sub }).sort({ requestedAt: -1 });
     res.json(docs);
   }));
 
   // GET /attendance/overtime/pending — RM sees pending overtime from direct reports
-  router.get('/overtime/pending', requireRole('admin', 'reporting_manager'), asyncHandler(async (req, res) => {
+  router.get('/overtime/pending', requireFeature('attendance'), asyncHandler(async (req, res) => {
     const roles = req.user.roles || [req.user.role || 'employee'];
     let filter = { status: 'pending' };
     if (roles.includes('reporting_manager') && !roles.includes('admin')) {
@@ -675,7 +675,7 @@ export function createAttendanceRouter(shiftConfig) {
   }));
 
   // PATCH /attendance/overtime/:id/decide — RM approves or rejects
-  router.patch('/overtime/:id/decide', requireRole('admin', 'reporting_manager'), requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
+  router.patch('/overtime/:id/decide', requireFeature('attendance', { write: true }), asyncHandler(async (req, res) => {
     const { decision } = req.body;
     if (!['approved', 'rejected'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
 

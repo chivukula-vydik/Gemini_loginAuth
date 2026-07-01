@@ -47,7 +47,7 @@ export function createTimesheetRouter() {
   router.use(requireAuth);
 
   // Review queue — scoped by role
-  router.get('/review', requireRole('pm', 'admin', 'reporting_manager', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/review', requireFeature('timesheet'), asyncHandler(async (req, res) => {
     const status = req.query.status || 'submitted';
     const filter = { status };
     const roles = req.user.roles || [req.user.role];
@@ -98,7 +98,7 @@ export function createTimesheetRouter() {
     }));
   }));
 
-  router.patch('/review/:id', requireRole('pm', 'admin', 'reporting_manager', 'team_lead'), requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
+  router.patch('/review/:id', requireFeature('timesheet', { write: true }), asyncHandler(async (req, res) => {
     const decision = req.body?.decision;
     if (!['approve', 'return'].includes(decision)) return res.status(400).json({ error: 'invalid decision' });
     const doc = await Timesheet.findById(req.params.id);
@@ -160,7 +160,7 @@ export function createTimesheetRouter() {
     res.json({ ok: true, status: update.status, dayStatus: newDs });
   }));
 
-  router.get('/review/:id/detail', requireRole('pm', 'admin', 'reporting_manager', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/review/:id/detail', requireFeature('timesheet'), asyncHandler(async (req, res) => {
     const doc = await Timesheet.findById(req.params.id).populate('userId', 'displayName email');
     if (!doc) return res.status(404).json({ error: 'not found' });
 
@@ -195,7 +195,7 @@ export function createTimesheetRouter() {
     });
   }));
 
-  router.get('/review/:id/notes', requireRole('pm', 'admin', 'reporting_manager', 'team_lead', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/review/:id/notes', requireFeature('timesheet'), asyncHandler(async (req, res) => {
     const doc = await Timesheet.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: 'not found' });
     const rows = [];

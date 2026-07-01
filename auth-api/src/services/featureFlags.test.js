@@ -30,8 +30,12 @@ test('user override off revokes against role', () => {
   assert.equal(resolveFeature('timesheet', { email: 'a@b.com', roles: ['employee'], featureOverrides: { timesheet: 'off' } }, flags), false);
 });
 
-test('global kill-switch beats user override', () => {
-  assert.equal(resolveFeature('payroll', { email: 'a@b.com', roles: ['admin'], featureOverrides: { payroll: 'full' } }, flags), false);
+test('user override beats global kill-switch', () => {
+  assert.equal(resolveFeature('payroll', { email: 'a@b.com', roles: ['admin'], featureOverrides: { payroll: 'full' } }, flags), 'full');
+});
+
+test('global kill-switch still blocks users without override', () => {
+  assert.equal(resolveFeature('payroll', { email: 'a@b.com', roles: ['admin'] }, flags), false);
 });
 
 test('admin role respects role grants — no super-admin bypass', () => {

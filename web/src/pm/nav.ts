@@ -22,96 +22,69 @@ export function keyForPath(pathname: string): NavKey {
 
 const I = (key: NavKey, label: string): NavItem => ({ key, label, path: pathForKey(key) });
 
-function sectionsForRole(role: Role): NavSection[] {
+// ponytail: nav includes ALL items regardless of role — the feature flag
+// filter in AppShell handles visibility so overrides aren't hidden
+function allSections(role: Role): NavSection[] {
   const sections: NavSection[] = [];
 
   sections.push({ title: '', items: [I('home', 'Home')] });
 
   {
-    const people: NavItem[] = [];
-    if (['admin', 'hr', 'director', 'vp'].includes(role)) {
-      people.push(I('users', 'Users'));
-    }
+    const people: NavItem[] = [
+      I('users', 'Users'),
+      I('skills', 'Skills'),
+      I('departments', 'Departments'),
+      I('shifts', 'Shifts'),
+      I('company-fit', 'Company Fit'),
+      I('organisation', 'Organisation'),
+    ];
     if (role === 'admin') {
-      people.push(I('skills', 'Skills'), I('departments', 'Departments'), I('shifts', 'Shifts'), I('company-fit', 'Company Fit'), I('feature-management', 'Features'), I('approval-flows', 'Approvals'), I('roster-import', 'Import'));
+      people.push(I('feature-management', 'Features'), I('approval-flows', 'Approvals'), I('roster-import', 'Import'));
+    } else {
+      people.push(I('approval-flows', 'Approvals'));
     }
-    people.push(I('organisation', 'Organisation'));
     sections.push({ title: 'People', items: people });
   }
 
-  if (['admin', 'pm', 'finance', 'director', 'vp'].includes(role)) {
-    const work: NavItem[] = [I('projects', 'Projects')];
-    if (role !== 'finance') work.push(I('my-tasks', 'My Tasks'));
-    work.push(I('timesheet', 'Timesheet'));
-    work.push(I('utilization', 'Utilization'));
-    sections.push({ title: 'Work', items: work });
-  } else if (['reporting_manager', 'team_lead', 'employee'].includes(role)) {
-    sections.push({ title: 'Work', items: [I('my-tasks', 'My Tasks'), I('timesheet', 'Timesheet')] });
-  } else {
-    sections.push({ title: 'Work', items: [I('timesheet', 'Timesheet')] });
-  }
+  sections.push({ title: 'Work', items: [
+    I('projects', 'Projects'),
+    I('my-tasks', 'My Tasks'),
+    I('timesheet', 'Timesheet'),
+    I('utilization', 'Utilization'),
+  ] });
 
-  const attLeave: NavItem[] = [I('attendance', 'Attendance')];
-  if (['admin', 'pm', 'reporting_manager', 'team_lead', 'hr', 'director', 'vp'].includes(role)) {
-    attLeave.push(I('requests', 'Requests'));
-  }
-  if (['reporting_manager', 'team_lead', 'hr', 'director', 'vp'].includes(role)) {
-    attLeave.push(I('team-attendance', 'Team Attendance'));
-  }
-  attLeave.push(I('my-requests', 'My Requests'));
-  attLeave.push(I('reimbursements', 'Reimbursements'));
-  sections.push({ title: 'Attendance & Leave', items: attLeave });
+  sections.push({ title: 'Attendance & Leave', items: [
+    I('attendance', 'Attendance'),
+    I('requests', 'Requests'),
+    I('team-attendance', 'Team Attendance'),
+    I('my-requests', 'My Requests'),
+    I('reimbursements', 'Reimbursements'),
+  ] });
 
-  if (['admin', 'finance'].includes(role)) {
-    sections.push({ title: 'Payroll', items: [I('payroll', 'Payroll'), I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('declaration-review', 'Declaration Review'), I('my-loans', 'My Loans'), I('loan-management', 'Loan Management')] });
-  } else {
-    sections.push({ title: 'Payroll', items: [I('my-payslips', 'My Payslips'), I('declarations', 'Declarations'), I('tax-summary', 'Tax Summary'), I('my-loans', 'My Loans')] });
-  }
+  sections.push({ title: 'Payroll', items: [
+    I('payroll', 'Payroll'),
+    I('my-payslips', 'My Payslips'),
+    I('declarations', 'Declarations'),
+    I('tax-summary', 'Tax Summary'),
+    I('declaration-review', 'Declaration Review'),
+    I('my-loans', 'My Loans'),
+    I('loan-management', 'Loan Management'),
+  ] });
 
-  {
-    const onb: NavItem[] = [];
-    if (['admin', 'hr'].includes(role)) {
-      onb.push(I('onboarding', 'Onboarding'), I('onboarding-templates', 'Onboarding Templates'));
-    }
-    onb.push(I('onboarding-tasks', 'My Onboarding'));
-    sections.push({ title: 'Onboarding', items: onb });
-  }
+  sections.push({ title: 'Onboarding', items: [
+    I('onboarding', 'Onboarding'),
+    I('onboarding-templates', 'Onboarding Templates'),
+    I('onboarding-tasks', 'My Onboarding'),
+  ] });
 
-  const growth: NavItem[] = [I('my-skills', 'My Skills'), I('marketplace', 'Marketplace')];
-  sections.push({ title: 'Growth', items: growth });
+  sections.push({ title: 'Growth', items: [I('my-skills', 'My Skills'), I('marketplace', 'Marketplace')] });
 
   return sections;
 }
 
 export function navSectionsForRoles(roles: Role[]): NavSection[] {
-  const seen = new Set<NavKey>();
-  const result: NavSection[] = [];
-  const priority: Role[] = ['admin', 'vp', 'director', 'pm', 'hr', 'finance', 'reporting_manager', 'team_lead', 'employee'];
-  const ordered = priority.filter((r) => roles.includes(r));
-  if (ordered.length === 0) ordered.push('employee');
-
-  const sectionMap = new Map<string, NavSection>();
-
-  for (const role of ordered) {
-    for (const section of sectionsForRole(role)) {
-      const key = section.title || '__home__';
-      if (!sectionMap.has(key)) {
-        sectionMap.set(key, { title: section.title, items: [] });
-      }
-      const merged = sectionMap.get(key)!;
-      for (const item of section.items) {
-        if (!seen.has(item.key)) {
-          seen.add(item.key);
-          merged.items.push(item);
-        }
-      }
-    }
-  }
-
-  for (const sec of sectionMap.values()) {
-    if (sec.items.length > 0) result.push(sec);
-  }
-  return result;
+  const primary = roles[0] || 'employee';
+  return allSections(primary);
 }
 
 export function navForRoles(roles: Role[]): NavItem[] {

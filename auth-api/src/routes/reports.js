@@ -1,6 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
-import { requireRole } from '../middleware/requireRole.js';
+import { requireFeature } from '../middleware/requireFeature.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { Timesheet } from '../models/Timesheet.js';
 import { User } from '../models/User.js';
@@ -11,7 +11,7 @@ export function createReportsRouter() {
   const router = express.Router();
   router.use(requireAuth);
 
-  router.get('/utilization', requireRole('pm', 'admin', 'finance', 'director', 'vp'), asyncHandler(async (req, res) => {
+  router.get('/utilization', requireFeature('utilization'), asyncHandler(async (req, res) => {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate required' });
 

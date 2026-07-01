@@ -1,15 +1,27 @@
 import express from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
-import { requireRole } from '../middleware/requireRole.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireFeature } from '../middleware/requireFeature.js';
 import { Loan, LOAN_TYPES } from '../models/Loan.js';
 
-export function createLoansRouter() {
+// ponytail: split into two routers — my-loans (employee) vs loan-management (admin/finance)
+// so mount-level fg() doesn't block overrides for the other feature
+
+export function createMyLoansRouter() {
   const router = express.Router();
 
-  // --- Admin/Finance: create loan ---
-  router.post('/', requireAuth, requireRole('admin', 'finance'), requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
+  router.get('/me', requireAuth, asyncHandler(async (req, res) => {
+    const loans = await Loan.find({ user: req.user.sub }).sort('-createdAt');
+    res.json(loans);
+  }));
+
+  return router;
+}
+
+export function createLoanManagementRouter() {
+  const router = express.Router();
+
+  router.post('/', requireAuth, requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
     const { user, principal, emiAmount, tenureMonths, startMonth, startYear, label, loanType } = req.body;
     if (!user || !principal || !emiAmount || !tenureMonths || !startMonth || !startYear) {
       return res.status(400).json({ error: 'user, principal, emiAmount, tenureMonths, startMonth, startYear required' });
@@ -28,28 +40,19 @@ export function createLoansRouter() {
     res.status(201).json(loan);
   }));
 
-  // --- Admin/Finance: list loans for a user ---
-  router.get('/user/:userId', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.get('/user/:userId', requireAuth, asyncHandler(async (req, res) => {
     const loans = await Loan.find({ user: req.params.userId }).sort('-createdAt');
     res.json(loans);
   }));
 
-  // --- Admin/Finance: list all active loans ---
-  router.get('/all', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.get('/all', requireAuth, asyncHandler(async (req, res) => {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
     const loans = await Loan.find(filter).populate('user', 'displayName email').sort('-createdAt');
     res.json(loans);
   }));
 
-  // --- Employee: my loans ---
-  router.get('/me', requireAuth, asyncHandler(async (req, res) => {
-    const loans = await Loan.find({ user: req.user.sub }).sort('-createdAt');
-    res.json(loans);
-  }));
-
-  // --- Admin/Finance: pause loan ---
-  router.post('/:id/pause', requireAuth, requireRole('admin', 'finance'), requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:id/pause', requireAuth, requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
     const loan = await Loan.findById(req.params.id);
     if (!loan) return res.status(404).json({ error: 'loan not found' });
     if (loan.status !== 'active') return res.status(400).json({ error: 'can only pause active loans' });
@@ -58,8 +61,7 @@ export function createLoansRouter() {
     res.json(loan);
   }));
 
-  // --- Admin/Finance: resume loan ---
-  router.post('/:id/resume', requireAuth, requireRole('admin', 'finance'), requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:id/resume', requireAuth, requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
     const loan = await Loan.findById(req.params.id);
     if (!loan) return res.status(404).json({ error: 'loan not found' });
     if (loan.status !== 'paused') return res.status(400).json({ error: 'can only resume paused loans' });
@@ -68,8 +70,7 @@ export function createLoansRouter() {
     res.json(loan);
   }));
 
-  // --- Admin/Finance: prepay (partial or full) ---
-  router.post('/:id/prepay', requireAuth, requireRole('admin', 'finance'), requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:id/prepay', requireAuth, requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
     const { amount } = req.body;
     if (!amount || amount <= 0) return res.status(400).json({ error: 'positive amount required' });
 
@@ -97,8 +98,7 @@ export function createLoansRouter() {
     res.json(loan);
   }));
 
-  // --- Admin/Finance: manually close loan ---
-  router.post('/:id/close', requireAuth, requireRole('admin', 'finance'), requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
+  router.post('/:id/close', requireAuth, requireFeature('loan-management', { write: true }), asyncHandler(async (req, res) => {
     const loan = await Loan.findById(req.params.id);
     if (!loan) return res.status(404).json({ error: 'loan not found' });
     loan.status = 'closed';
@@ -109,8 +109,7 @@ export function createLoansRouter() {
     res.json(loan);
   }));
 
-  // Backward-compat: old route pattern
-  router.get('/:userId', requireAuth, requireRole('admin', 'finance'), asyncHandler(async (req, res) => {
+  router.get('/:userId', requireAuth, asyncHandler(async (req, res) => {
     const loans = await Loan.find({ user: req.params.userId }).sort('-createdAt');
     res.json(loans);
   }));

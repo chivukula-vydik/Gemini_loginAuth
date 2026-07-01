@@ -103,7 +103,7 @@ export function createOrgRouter() {
   }));
 
   // ── Admin-only write endpoints ──
-  const adminOnly = [requireRole('admin'), requireFeature('organisation', { write: true })];
+  const adminOnly = [requireFeature('organisation', { write: true })];
 
   // Legal Entities
   router.post('/legal-entities', ...adminOnly, asyncHandler(async (req, res) => {
